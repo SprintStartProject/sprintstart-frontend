@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sparkles } from "lucide-react";
@@ -24,10 +24,22 @@ import { useProjectContext } from "../../projects/useProjectContext";
 import { CitationPopover } from "../citations/CitationPopover";
 import { citationDrawerProjectId } from "../citations/citationArtifact";
 import { useCitationViewer } from "../citations/useCitationViewer";
-import { ArtifactViewerDrawer } from "../../knowledge-base/components/ArtifactViewerDrawer";
 import { BuddyModeSwitcher } from "./BuddyModeSwitcher";
 import { BuddyDock, DOCK_EXPAND_S, DOCK_REVEAL_S } from "./BuddyDock";
 import { BuddyLauncher } from "./BuddyLauncher";
+
+/**
+ * The citation drawer arrives only when a citation opens it. Its module carries Prism with every
+ * language grammar and KaTeX — the biggest chunk in the app — and this widget is mounted at the
+ * app root, so a static import put all of it in the boot graph that every visitor pays for before
+ * the first page settles, the login screen included. The Knowledge Base page and the buddy page
+ * reach the same chunk on their own routes; here it loads on the click that needs it.
+ */
+const ArtifactViewerDrawer = lazy(() =>
+  import("../../knowledge-base/components/ArtifactViewerDrawer").then((module) => ({
+    default: module.ArtifactViewerDrawer,
+  })),
+);
 
 /** How long to wait for `/buddy` to announce itself before uncovering it anyway, in ms. */
 const HANDOFF_FALLBACK_MS = 1200;
@@ -487,14 +499,16 @@ export function BuddyWidget() {
       )}
 
       {citationViewer.citationArtifact && citationProjectId && (
-        <ArtifactViewerDrawer
-          artifact={citationViewer.citationArtifact}
-          onClose={citationViewer.closeArtifact}
-          projectId={citationProjectId}
-          highlightLines={citationViewer.highlightLines}
-          canDelete={false}
-          onDelete={() => {}}
-        />
+        <Suspense fallback={null}>
+          <ArtifactViewerDrawer
+            artifact={citationViewer.citationArtifact}
+            onClose={citationViewer.closeArtifact}
+            projectId={citationProjectId}
+            highlightLines={citationViewer.highlightLines}
+            canDelete={false}
+            onDelete={() => {}}
+          />
+        </Suspense>
       )}
     </>
   );
