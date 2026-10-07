@@ -13,10 +13,11 @@ import { MessageSquarePlus } from "lucide-react";
  * would undo what one shared header is for. Same chrome and same corner treatment as
  * `RailToggle`, on the opposite side, so the two never meet.
  *
- * Always on screen, disabled by its caller while starting one is not possible — mid-turn, for the
- * reason `BuddyDock` withdraws its own copy (`newConversation` clears the thread, but cannot call
- * back a request already streaming into it), or while the conversation is still empty. A control
- * that came and went read as a missing button.
+ * Always on screen, disabled by its caller while starting one is not possible: in a team
+ * conversation, while the conversation is still empty, while a conversation is opening or being
+ * greeted, or while a proposal decision is in flight. Mid-answer it stays live — the move stops
+ * the running answer itself (see `stopRunningTurn`). A control that came and went read as a
+ * missing button.
  */
 export function BuddyNewConversationButton({
   onClick,

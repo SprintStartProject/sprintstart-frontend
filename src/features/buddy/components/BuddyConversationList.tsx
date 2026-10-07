@@ -14,9 +14,11 @@ type BuddyConversationListProps = {
   /** Which one is on screen — marked with `aria-current` and the brand tone. */
   currentSessionId: string | null;
   /**
-   * True while a turn or an open is in flight: picking another conversation would clear the
-   * thread out from under a reply still streaming into it (the session's guards back this up),
-   * and binning is refused for the same reason — so its controls stand down with it.
+   * True while an open, a greeting, or a decision is in flight — and in team mode, whose list is
+   * there to look at but not to switch away with. The session refuses those moves; this is the
+   * same state kept here so the list does not offer what the session will bounce. A running
+   * answer does not disable it: picking or binning the conversation it streams into stops it
+   * first (see `stopRunningTurn`).
    */
   disabled?: boolean;
   onSelect: (sessionId: string) => void;
@@ -108,9 +110,8 @@ function groupSessions(sessions: BuddySessionSummary[]): SessionGroup[] {
  * **Binning is a confirmation, not a click.** The trash stands beside the row on hover or
  * focus (always, on touch), and the dialog spells out what happens before anything does — the
  * same deal the chat's sidebar struck, because it is the same kind of act. The row is removed
- * by the session, which is also what refuses mid-turn: a conversation cannot be binned out
- * from under a reply that is still streaming into it, so the controls stand down for that
- * window rather than failing after the fact.
+ * by the session, which stops a reply still streaming into that conversation before the bin
+ * goes through (see `stopRunningTurn`); binning another row leaves a running answer alone.
  *
  * Search filters by title and rows sit under date buckets — the shape the chat's sidebar had,
  * kept because a list that only grows is a wall by the tenth conversation. Both are client-side
