@@ -58,7 +58,7 @@ export async function streamAiProgress(
   try {
     res = await fetch(endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${keycloak.token}` },
+      headers: keycloak.token ? { Authorization: `Bearer ${keycloak.token}` } : {},
     });
   } catch {
     handlers.onError("Could not reach the server.");
