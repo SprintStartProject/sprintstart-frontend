@@ -1260,6 +1260,24 @@ describe("useKnowledgeBase URL state", () => {
     });
   });
 
+  it("follows a q an in-app navigation pushes", async () => {
+    const { result } = await renderAt(["/kb?q=Add"], makeFacetFixture());
+    expect(result.current.kb.searchQuery).toBe("Add");
+
+    act(() => void result.current.navigate("/kb?q=docker"));
+
+    await waitFor(() => expect(result.current.kb.searchQuery).toBe("docker"));
+  });
+
+  it("empties the search input when an in-app navigation clears q", async () => {
+    const { result } = await renderAt(["/kb?q=Add"], makeFacetFixture());
+    expect(result.current.kb.searchQuery).toBe("Add");
+
+    act(() => void result.current.navigate("/kb"));
+
+    await waitFor(() => expect(result.current.kb.searchQuery).toBe(""));
+  });
+
   it("opens and closes the drawer through ?artifact=", async () => {
     const { result } = await renderAt(["/kb?artifact=a1"], [makeArtifact("a1", "readme.md")]);
     expect(result.current.kb.selectedArtifactId).toBe("a1");
