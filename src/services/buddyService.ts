@@ -440,7 +440,7 @@ async function readBuddyStream(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${keycloak.token}`,
+        ...(keycloak.token ? { Authorization: `Bearer ${keycloak.token}` } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,

@@ -1,5 +1,4 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { NavigationType, useNavigationType } from "react-router-dom";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { queryKeys } from "../../../services/queryKeys";
@@ -91,7 +90,6 @@ export function useKnowledgeBase(
   options: KnowledgeBaseUrlStateOptions = {},
 ) {
   const queryClient = useQueryClient();
-  const navigationType = useNavigationType();
 
   const {
     state: urlState,
@@ -122,21 +120,29 @@ export function useKnowledgeBase(
   } = urlState;
 
   /*
-    The search input's own copy of `?q=`. It follows the URL only when the URL changed for a reason
-    other than this input: Back/Forward (a POP navigation) or a project switch. Every other change
-    of `?q=` was written *from* this state, so adopting it back could only ever be a stale echo -
-    one that, arriving a transition late, would eat the characters typed in between.
+    The search input's own copy of `?q=`. It follows the URL whenever the URL changed for a reason
+    other than this hook's own debounced write: Back/Forward, a project switch, or an in-app
+    navigation that carries its own `?q=` (a link can set it, and pressing the sidebar's entry
+    again clears it). The one change it does not adopt back is the echo of a value this hook
+    itself pushed to `?q=` while the input has already moved on - adopting that would eat the
+    characters typed in between, and it is the only change that can be older than what is on
+    screen.
   */
   const [searchQuery, setSearchQuery] = useState(urlState.search);
   const [syncedSearch, setSyncedSearch] = useState(urlState.search);
   const [searchScope, setSearchScope] = useState(scopeProjectId);
+  const debouncedSearch = useDebouncedValue(searchQuery, KB_SEARCH_DEBOUNCE_MS);
   if (searchScope !== scopeProjectId) {
     setSearchScope(scopeProjectId);
     setSyncedSearch(urlState.search);
     setSearchQuery(urlState.search);
   } else if (syncedSearch !== urlState.search) {
     setSyncedSearch(urlState.search);
-    if (navigationType === NavigationType.Pop) setSearchQuery(urlState.search);
+    // A URL equal to the settled text is this hook's own write echoing back — adopting it
+    // would eat the characters typed since the write. Anything else is somebody else's change.
+    if (urlState.search !== debouncedSearch) {
+      setSearchQuery(urlState.search);
+    }
   }
 
   /*
@@ -147,12 +153,13 @@ export function useKnowledgeBase(
     before the debounced copy of the adopted text catches up) would be overwritten again with the
     input's previous, now-stale settled value.
   */
-  const debouncedSearch = useDebouncedValue(searchQuery, KB_SEARCH_DEBOUNCE_MS);
   const lastSettledSearchRef = useRef(debouncedSearch);
   useEffect(() => {
     if (lastSettledSearchRef.current === debouncedSearch) return;
     lastSettledSearchRef.current = debouncedSearch;
-    if (debouncedSearch !== urlState.search) setSearch(debouncedSearch);
+    if (debouncedSearch !== urlState.search) {
+      setSearch(debouncedSearch);
+    }
   }, [debouncedSearch, urlState.search, setSearch]);
 
   const typesParam: ArtifactType[] | undefined = useMemo(() => {
@@ -228,6 +235,17 @@ export function useKnowledgeBase(
   const listScopeKey = useMemo(
     () => JSON.stringify([projectId ?? "", listParams]),
     [projectId, listParams],
+  );
+
+  /**
+   * Identity of the *filter set* behind the list — the same key minus the page, size and order.
+   * The bulk-delete report keys on this instead of `listScopeKey`: the page legitimately moves
+   * under it (the clamp that follows a delete which emptied the last page), and the report
+   * describes the deletion, not the page it happened to land on.
+   */
+  const filterScopeKey = useMemo(
+    () => JSON.stringify([projectId ?? "", facetsParams]),
+    [projectId, facetsParams],
   );
 
   const listQueryKey = queryKeys.knowledgeBase.list(projectId ?? "", listParams);
@@ -464,6 +482,8 @@ export function useKnowledgeBase(
     hasActiveFilters,
     /** Changes whenever the visible list's filters, page, size or order change. */
     listScopeKey,
+    /** The filter set alone: a filter change moves it, a page move does not (see the bulk-delete report scope). */
+    filterScopeKey,
     /** The artifact open in the viewer drawer (`?artifact=`), or null. */
     selectedArtifactId: urlState.artifactId,
     /** Opens or closes the viewer drawer; `replace`s `?artifact=` so reading leaves no history. */

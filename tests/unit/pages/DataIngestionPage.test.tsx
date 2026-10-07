@@ -1594,7 +1594,7 @@ describe("DataIngestionPage", () => {
 
       await openSyncSettings(user);
 
-      expect(await screen.findByRole("spinbutton", { name: /minutes/i })).toHaveValue(15);
+      expect(await screen.findByRole("combobox", { name: "Every" })).toHaveValue("15");
       expect(screen.queryByText(/different schedules/i)).not.toBeInTheDocument();
     });
 
@@ -1614,7 +1614,7 @@ describe("DataIngestionPage", () => {
       await openSyncSettings(user);
 
       expect(await screen.findByText(/different schedules/i)).toBeInTheDocument();
-      expect(screen.getByRole("spinbutton", { name: /minutes/i })).toHaveValue(60);
+      expect(screen.getByRole("combobox", { name: "Every" })).toHaveValue("60");
     });
 
     it("still applies the schedule to the other repositories when one save fails", async () => {
@@ -1753,18 +1753,17 @@ describe("DataIngestionPage", () => {
       );
 
       const { user, panel } = await openBitbucketDrawer();
-      const minutes = await within(panel).findByLabelText("Minutes");
-      await waitFor(() => expect(minutes).toHaveValue(30));
+      const minutes = await within(panel).findByLabelText("Every");
+      await waitFor(() => expect(minutes).toHaveValue("30"));
 
-      await user.clear(minutes);
-      await user.type(minutes, "45");
+      await user.selectOptions(minutes, "15");
       await user.click(within(panel).getByRole("button", { name: /save/i }));
 
       await waitFor(() => {
         expect(saved).toEqual([
           {
             params: { workspace: "acme", slug: "widgets" },
-            body: { autoUpdate: true, schedule: { type: "INTERVAL", everyMinutes: 45 } },
+            body: { autoUpdate: true, schedule: { type: "INTERVAL", everyMinutes: 15 } },
           },
         ]);
       });
@@ -2009,18 +2008,17 @@ describe("DataIngestionPage", () => {
       );
 
       const { user, panel } = await openNotionDrawer();
-      const minutes = await within(panel).findByLabelText("Minutes");
-      await waitFor(() => expect(minutes).toHaveValue(60));
+      const minutes = await within(panel).findByLabelText("Every");
+      await waitFor(() => expect(minutes).toHaveValue("60"));
 
-      await user.clear(minutes);
-      await user.type(minutes, "45");
+      await user.selectOptions(minutes, "15");
       await user.click(within(panel).getByRole("button", { name: /save/i }));
 
       await waitFor(() => {
         expect(saved).toEqual([
           {
             connectionId: "notion-conn-1",
-            body: { autoUpdate: true, schedule: { type: "INTERVAL", everyMinutes: 45 } },
+            body: { autoUpdate: true, schedule: { type: "INTERVAL", everyMinutes: 15 } },
           },
         ]);
       });

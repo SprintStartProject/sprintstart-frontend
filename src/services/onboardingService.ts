@@ -38,9 +38,7 @@ async function streamPathGeneration(
 
   const res = await fetch(url, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${keycloak.token}`,
-    },
+    headers: keycloak.token ? { Authorization: `Bearer ${keycloak.token}` } : {},
     signal,
   });
 

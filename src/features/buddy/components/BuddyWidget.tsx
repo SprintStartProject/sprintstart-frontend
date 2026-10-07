@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { Spinner } from "../../../components/ui/Spinner";
 import { centralSpringToken } from "../../../styles/tokens";
+import { RouteErrorBoundary } from "../../../router/RouteErrorBoundary";
 import {
   LAUNCHER_SIZE,
   isLeftCorner,
@@ -24,10 +27,63 @@ import { useProjectContext } from "../../projects/useProjectContext";
 import { CitationPopover } from "../citations/CitationPopover";
 import { citationDrawerProjectId } from "../citations/citationArtifact";
 import { useCitationViewer } from "../citations/useCitationViewer";
-import { ArtifactViewerDrawer } from "../../knowledge-base/components/ArtifactViewerDrawer";
 import { BuddyModeSwitcher } from "./BuddyModeSwitcher";
 import { BuddyDock, DOCK_EXPAND_S, DOCK_REVEAL_S } from "./BuddyDock";
 import { BuddyLauncher } from "./BuddyLauncher";
+
+/**
+ * The citation drawer arrives only when a citation opens it. Its module carries Prism with every
+ * language grammar and KaTeX — the biggest chunk in the app — and this widget is mounted at the
+ * app root, so a static import put all of it in the boot graph that every visitor pays for before
+ * the first page settles, the login screen included. The Knowledge Base page and the buddy page
+ * reach the same chunk on their own routes; here it loads on the click that needs it.
+ */
+const ArtifactViewerDrawer = lazy(() =>
+  import("../../knowledge-base/components/ArtifactViewerDrawer").then((module) => ({
+    default: module.ArtifactViewerDrawer,
+  })),
+);
+
+/**
+ * The citation drawer's two non-happy states. The widget is mounted outside `AppRouter`'s
+ * boundary, so a rejected chunk (a stale deploy, a dropped connection) would otherwise travel
+ * to the React root and take the whole app down; the boundary at the render site keeps it
+ * local. The loading state answers the click while the chunk — Prism + KaTeX, the biggest in
+ * the app — arrives; without it the click read as dead.
+ */
+function CitationDrawerLoading(): ReactNode {
+  return (
+    <div
+      className="fixed inset-y-0 right-0 z-50 flex h-dvh w-full max-w-5xl flex-col items-center justify-center overflow-hidden border-l border-app-border bg-app-surface shadow-2xl sm:rounded-l-[28px]"
+      aria-busy="true"
+    >
+      <Spinner size="lg" label="Opening the artifact" />
+    </div>
+  );
+}
+
+function CitationDrawerFailure(): ReactNode {
+  return (
+    <div
+      className="fixed right-4 bottom-4 z-50 max-w-sm rounded-xl border border-app-border bg-app-surface p-4 shadow-app-brand-lift"
+      role="alert"
+    >
+      <p className="text-sm font-medium text-app-text">The artifact couldn&apos;t open.</p>
+      <p className="mt-1 text-xs leading-relaxed text-app-text-muted">
+        A reload usually fixes it — a new deployment may have replaced the file this page was built
+        from.
+      </p>
+      <Button
+        variant="secondary"
+        size="sm"
+        className="mt-3"
+        onClick={() => window.location.reload()}
+      >
+        Reload page
+      </Button>
+    </div>
+  );
+}
 
 /** How long to wait for `/buddy` to announce itself before uncovering it anyway, in ms. */
 const HANDOFF_FALLBACK_MS = 1200;
@@ -487,14 +543,18 @@ export function BuddyWidget() {
       )}
 
       {citationViewer.citationArtifact && citationProjectId && (
-        <ArtifactViewerDrawer
-          artifact={citationViewer.citationArtifact}
-          onClose={citationViewer.closeArtifact}
-          projectId={citationProjectId}
-          highlightLines={citationViewer.highlightLines}
-          canDelete={false}
-          onDelete={() => {}}
-        />
+        <RouteErrorBoundary fallback={<CitationDrawerFailure />}>
+          <Suspense fallback={<CitationDrawerLoading />}>
+            <ArtifactViewerDrawer
+              artifact={citationViewer.citationArtifact}
+              onClose={citationViewer.closeArtifact}
+              projectId={citationProjectId}
+              highlightLines={citationViewer.highlightLines}
+              canDelete={false}
+              onDelete={() => {}}
+            />
+          </Suspense>
+        </RouteErrorBoundary>
       )}
     </>
   );

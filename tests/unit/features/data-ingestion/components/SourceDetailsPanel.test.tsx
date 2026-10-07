@@ -488,9 +488,8 @@ describe("SourceDetailsPanel", () => {
       expect(screen.getByText("Sync Schedule")).toBeInTheDocument();
       await waitFor(() => connector.expectScheduleLoaded());
 
-      const minutes = await screen.findByLabelText("Minutes");
-      await user.clear(minutes);
-      await user.type(minutes, "30");
+      const minutes = await screen.findByLabelText("Every");
+      await user.selectOptions(minutes, "30");
       await user.click(screen.getByRole("switch", { name: connector.autoUpdateName }));
       await user.click(screen.getByRole("button", { name: /save/i }));
 

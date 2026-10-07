@@ -19,10 +19,13 @@ export interface ArtifactBulkActionsProps {
   /** After a request that reached the backend: ingestion ids actually deleted. */
   onDeleted: (deletedArtifactIds: string[]) => void;
   /**
-   * Identity of the list on screen (filters, page, size, order). A change drops
-   * the last delete report, which describes a list the reader has moved away from.
+   * Identity of the *filter set* the report describes — project, search, facets; deliberately
+   * not the page, size or order. A filter change drops the last delete report, which describes
+   * a list the reader has moved away from; a page move does not, because the clamp that follows
+   * a delete which emptied the last page is the delete's own doing and the report must outlive
+   * it.
    */
-  listScopeKey: string;
+  filterScopeKey: string;
 }
 
 interface BulkDeleteReport {
@@ -76,7 +79,7 @@ export function ArtifactBulkActions({
   selected,
   onClearSelection,
   onDeleted,
-  listScopeKey,
+  filterScopeKey,
 }: ArtifactBulkActionsProps) {
   const queryClient = useQueryClient();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -87,11 +90,13 @@ export function ArtifactBulkActions({
   const [pending, setPending] = useState<readonly Artifact[]>([]);
 
   // Render-phase reset ("adjust state when a prop changes"), not an effect:
-  // the stale report must not paint for one frame over the new list. A
-  // delete's own refetch keeps the key, so its report survives that.
-  const [reportScope, setReportScope] = useState(listScopeKey);
-  if (reportScope !== listScopeKey) {
-    setReportScope(listScopeKey);
+  // the stale report must not paint for one frame over the new list. The key
+  // is the filter set, not the page: a delete's own refetch — including the
+  // clamp when it emptied the last page — keeps the key, so its report
+  // survives.
+  const [reportScope, setReportScope] = useState(filterScopeKey);
+  if (reportScope !== filterScopeKey) {
+    setReportScope(filterScopeKey);
     setReport(null);
   }
 

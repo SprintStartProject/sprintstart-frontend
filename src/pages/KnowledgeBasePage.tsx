@@ -118,6 +118,7 @@ export function KnowledgeBasePage() {
     handleClearFilters,
     hasActiveFilters,
     listScopeKey,
+    filterScopeKey,
     selectedArtifactId,
     setSelectedArtifactId,
     sort,
@@ -311,7 +312,7 @@ export function KnowledgeBasePage() {
                     selected={selectedUploads}
                     onClearSelection={uploadSelection.clear}
                     onDeleted={handleBulkDeleted}
-                    listScopeKey={listScopeKey}
+                    filterScopeKey={filterScopeKey}
                   />
                 </div>
               )}

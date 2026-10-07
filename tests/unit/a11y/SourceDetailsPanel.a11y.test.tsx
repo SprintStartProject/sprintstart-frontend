@@ -115,7 +115,7 @@ describe("SourceDetailsPanel Accessibility", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Acme Workspace").length).toBeGreaterThan(0);
     });
-    await screen.findByLabelText("Minutes");
+    await screen.findByLabelText("Every");
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });
@@ -158,7 +158,7 @@ describe("SourceDetailsPanel Accessibility", () => {
     await waitFor(() => {
       expect(screen.getAllByText("acme/widgets").length).toBeGreaterThan(0);
     });
-    await screen.findByLabelText("Minutes");
+    await screen.findByLabelText("Every");
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });

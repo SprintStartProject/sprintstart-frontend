@@ -41,7 +41,7 @@ function props(overrides: Partial<Parameters<typeof ArtifactBulkActions>[0]> = {
     selected,
     onClearSelection: vi.fn(),
     onDeleted: vi.fn(),
-    listScopeKey: "scope-1",
+    filterScopeKey: "filters-1",
     ...overrides,
   };
 }
@@ -82,7 +82,7 @@ describe("ArtifactBulkActions", () => {
     expect(screen.queryByTestId("kb-bulk-failed")).not.toBeInTheDocument();
   });
 
-  it("drops the delete report once the reader moves to another list", async () => {
+  it("drops the delete report once the reader moves to another filter set", async () => {
     vi.spyOn(knowledgeService, "deleteUploads").mockResolvedValue({
       deletedIds: ["up-a1"],
       failed: [{ artifactId: "up-a2", error: "Locked" }],
@@ -93,11 +93,16 @@ describe("ArtifactBulkActions", () => {
     fireEvent.click(screen.getByTestId("kb-bulk-confirm"));
     expect(await screen.findByTestId("kb-bulk-deleted")).toHaveTextContent("1 deleted");
 
-    // Same list (the delete's own refetch): the report stays.
+    // Same filter set (the delete's own refetch): the report stays.
     rerender(<ArtifactBulkActions {...props()} />);
     expect(screen.getByTestId("kb-bulk-failed")).toBeInTheDocument();
 
-    rerender(<ArtifactBulkActions {...props({ listScopeKey: "scope-2" })} />);
+    // The page moved under it — the clamp after a delete that emptied the last page, or the
+    // reader turning the page themselves. The report describes the deletion, so it stays.
+    rerender(<ArtifactBulkActions {...props({ filterScopeKey: "filters-1" })} />);
+    expect(screen.getByTestId("kb-bulk-deleted")).toHaveTextContent("1 deleted");
+
+    rerender(<ArtifactBulkActions {...props({ filterScopeKey: "filters-2" })} />);
     expect(screen.queryByTestId("kb-bulk-deleted")).not.toBeInTheDocument();
     expect(screen.queryByTestId("kb-bulk-failed")).not.toBeInTheDocument();
   });
