@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Input } from "../../../components/ui/Input.tsx";
 import { SaveButton } from "../../../components/ui/SaveButton.tsx";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs.tsx";
+import { Select } from "../../../components/ui/Select.tsx";
 import { IconTile } from "../../../components/ui/IconTile";
 import { useToast } from "../../../context/useToast.ts";
 import { AccountEnabledToggle } from "../../../components/ui/AccountEnabledToggle.tsx";
@@ -48,6 +49,15 @@ const DAYS_OF_WEEK: ScheduleDayOfWeek[] = [
   "SATURDAY",
   "SUNDAY",
 ];
+
+/**
+ * The minute values a Spring cron step can keep: n must divide 60, or the schedule quietly
+ * means something else — a 45-minute step fires at minute 0 and 45 and then again at the next
+ * hour's 0, and a two-hour step collapses to once an hour. A free number let both be saved. A
+ * stored value outside this list is still shown (see `intervalOptions`), so the control never
+ * lies about what is saved.
+ */
+const INTERVAL_MINUTE_OPTIONS: readonly number[] = [5, 10, 15, 20, 30, 60];
 
 /**
  * Compact sync-schedule control shared by the project-wide modal and the source
@@ -237,6 +247,16 @@ export function SyncScheduleSettings({
   );
   const isDirty = currentSnapshot !== baseline;
 
+  // The offered minutes, plus whatever a stored config already holds — the same "an extra
+  // option so the control never lies" treatment the page-size control gives a hand-edited size.
+  const intervalOptions = useMemo(() => {
+    const current = Number(everyMinutes);
+    if (!Number.isFinite(current) || INTERVAL_MINUTE_OPTIONS.includes(current)) {
+      return INTERVAL_MINUTE_OPTIONS;
+    }
+    return [...INTERVAL_MINUTE_OPTIONS, current].sort((a, b) => a - b);
+  }, [everyMinutes]);
+
   // A quiet opacity crossfade between cadence field sets — deliberately not a
   // height/unfold reveal, which replayed an "expand" every time the schedule
   // type changed. Instant swap under reduced-motion.
@@ -324,21 +344,21 @@ export function SyncScheduleSettings({
           {scheduleType === "INTERVAL" && (
             <div className="max-w-xs">
               <label htmlFor={intervalInputId} className="text-sm font-medium text-app-text">
-                Minutes
+                Every
               </label>
-              <div className="mt-2 flex min-h-10 items-center rounded-xl border border-app-border bg-app-surface focus-within:border-app-brand focus-within:ring-2 focus-within:ring-app-focus">
-                <span className="pl-3 text-sm text-app-text-muted">Every</span>
-                <input
-                  id={intervalInputId}
-                  type="number"
-                  min="1"
-                  value={everyMinutes}
-                  disabled={isBusy}
-                  onChange={(event) => setEveryMinutes(event.target.value)}
-                  className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-sm font-semibold text-app-text focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
-                />
-                <span className="pr-3 text-sm text-app-text-muted">minutes</span>
-              </div>
+              <Select
+                id={intervalInputId}
+                value={everyMinutes}
+                disabled={isBusy}
+                onChange={(event) => setEveryMinutes(event.target.value)}
+                className="mt-2"
+              >
+                {intervalOptions.map((minutes) => (
+                  <option key={minutes} value={String(minutes)}>
+                    {minutes} minutes
+                  </option>
+                ))}
+              </Select>
             </div>
           )}
 

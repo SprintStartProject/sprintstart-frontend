@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SyncScheduleSettings } from "../../../../../src/features/data-ingestion/components/SyncScheduleSettings";
 import type { GithubRepositoryConfig } from "../../../../../src/services/sources/githubService";
@@ -97,10 +97,23 @@ describe("SyncScheduleSettings", () => {
       />,
     );
 
-    const intervalInput = await screen.findByLabelText("Minutes");
-    await user.clear(intervalInput);
-    await user.type(intervalInput, "30");
+    const intervalSelect = await screen.findByLabelText("Every");
+    await user.selectOptions(intervalSelect, "30");
 
     expect(screen.getByText(UNSAVED)).toBeInTheDocument();
+  });
+
+  it("keeps a stored interval the options do not offer, so the control never lies", async () => {
+    render(
+      <SyncScheduleSettings
+        loadKey="acme/monorepo"
+        loadConfig={vi.fn().mockResolvedValue(config())}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    const intervalSelect = await screen.findByLabelText("Every");
+    expect(intervalSelect).toHaveValue("120");
+    expect(within(intervalSelect).getByRole("option", { name: "120 minutes" })).toBeInTheDocument();
   });
 });
