@@ -237,6 +237,17 @@ export function useKnowledgeBase(
     [projectId, listParams],
   );
 
+  /**
+   * Identity of the *filter set* behind the list — the same key minus the page, size and order.
+   * The bulk-delete report keys on this instead of `listScopeKey`: the page legitimately moves
+   * under it (the clamp that follows a delete which emptied the last page), and the report
+   * describes the deletion, not the page it happened to land on.
+   */
+  const filterScopeKey = useMemo(
+    () => JSON.stringify([projectId ?? "", facetsParams]),
+    [projectId, facetsParams],
+  );
+
   const listQueryKey = queryKeys.knowledgeBase.list(projectId ?? "", listParams);
   const facetsQueryKey = queryKeys.knowledgeBase.facets(projectId ?? "", facetsParams);
 
@@ -471,6 +482,8 @@ export function useKnowledgeBase(
     hasActiveFilters,
     /** Changes whenever the visible list's filters, page, size or order change. */
     listScopeKey,
+    /** The filter set alone: a filter change moves it, a page move does not (see the bulk-delete report scope). */
+    filterScopeKey,
     /** The artifact open in the viewer drawer (`?artifact=`), or null. */
     selectedArtifactId: urlState.artifactId,
     /** Opens or closes the viewer drawer; `replace`s `?artifact=` so reading leaves no history. */
