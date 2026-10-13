@@ -1163,7 +1163,10 @@ export function BoardGrid({
     // One band is not a band, it is a heading over the whole board saying what everything on it
     // already says. A board where nothing has been sequenced yet is exactly that board, and it
     // should look the way it did before there were bands at all.
-    return filled.length > 1 ? filled : [];
+    //
+    // Except "Behind you": when a filter, a section or a finished path leaves only finished cards
+    // on screen, dropping the heading drew them as if they were current, and the band looked gone.
+    return filled.length > 1 || filled.some((band) => band.stage === "BEHIND") ? filled : [];
   }, [banding, blocks, spanningGroups, stagesOf, states]);
 
   /**
@@ -1290,6 +1293,7 @@ export function BoardGrid({
         onTogglePinned={onTogglePinned}
         allCards={board.cards}
         state={states?.get(card.id)}
+        leadsPile={stack !== undefined && stack.rootId === card.id}
         // Piling is rearranging, so it is offered where the rest of rearranging is: in plan mode.
         onStackOnto={isArranging ? onStackOnto : undefined}
         onDrop={handleCardDrop}
@@ -1628,6 +1632,8 @@ type BoardCardCellProps = {
   /** Every card on the board, so this one can offer them as cards to lie under. */
   allCards: BoardCard[];
   state?: CardState;
+  /** Whether other cards lie under this one, so the pile picker can say it is the top of a pile. */
+  leadsPile?: boolean;
   onStackOnto?: (cardId: string, targetId: string | null) => void;
   /**
    * Set only on the top card of a *closed* pile — the one standing in for the others.
@@ -1698,6 +1704,7 @@ function BoardCardCell({
   onTogglePinned,
   allCards,
   state,
+  leadsPile = false,
   onStackOnto,
   stack,
   origin,
@@ -1777,25 +1784,29 @@ function BoardCardCell({
 
     const top = stack.memberIds.indexOf(stack.topId);
 
+    // A pinned card can stand on top from anywhere in the pile, the last place included. Then the
+    // cards before it fill in after the ones that follow it, so a pile topped by its last card
+    // still shows what lies under it. Unpinned, the cards before the top are the finished ones and
+    // stay out of the sheets as before.
+    const after = stack.memberIds.slice(top + 1);
+    const others = pinned ? [...after, ...stack.memberIds.slice(0, top)] : after;
+
     // Named from the stack, not from the board: these cards are folded away, so they are not in
     // the list this grid was handed.
-    return stack.memberIds
-      .slice(top + 1)
-      .slice(0, STACK_SHEETS.length)
-      .map((memberId) => {
-        const member = stack.members.get(memberId);
+    return others.slice(0, STACK_SHEETS.length).map((memberId) => {
+      const member = stack.members.get(memberId);
 
-        return {
-          id: memberId,
-          name: member?.name ?? "The next card",
-          Icon: cardIcon(member?.kind ?? "NOTE"),
-          // The kind's own ink, the same as the card would wear if it were open. A closed pile is
-          // the one place the board says what is underneath without drawing it, and in one grey it
-          // said "two more cards" where it can just as easily say which two.
-          accent: cardAccent(member?.kind ?? "NOTE"),
-        };
-      });
-  }, [stack]);
+      return {
+        id: memberId,
+        name: member?.name ?? "The next card",
+        Icon: cardIcon(member?.kind ?? "NOTE"),
+        // The kind's own ink, the same as the card would wear if it were open. A closed pile is
+        // the one place the board says what is underneath without drawing it, and in one grey it
+        // said "two more cards" where it can just as easily say which two.
+        accent: cardAccent(member?.kind ?? "NOTE"),
+      };
+    });
+  }, [pinned, stack]);
 
   /**
    * Opens the pile when the card itself is clicked.
@@ -1837,7 +1848,7 @@ function BoardCardCell({
           className="max-w-40"
           onChange={(event) => onStackOnto(card.id, event.target.value || null)}
         >
-          <option value="">Not in a pile</option>
+          <option value="">{leadsPile ? "Top of its pile" : "Not in a pile"}</option>
           {allCards
             .filter((other) => other.id !== card.id)
             .map((other) => (
@@ -1925,6 +1936,7 @@ function BoardCardCell({
       dragControls,
       index,
       label,
+      leadsPile,
       onMove,
       onStackOnto,
       onToggleStack,

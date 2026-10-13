@@ -31,7 +31,10 @@ export type CardStack = {
   rootId: string;
   /** Every card in the chain, in the order they must be worked. */
   memberIds: string[];
-  /** The card on top: the first that is not done, or the last one when they all are. */
+  /**
+   * The card on top: a pinned member if there is one (an unfinished one first), otherwise the
+   * first that is not done, or the last one when they all are.
+   */
   topId: string;
   /** How many are still to do, the top one included. */
   remaining: number;
@@ -69,6 +72,7 @@ export function buildStacks(
   cards: BoardCard[],
   states: Map<string, CardState>,
   areaOf: (cardId: string) => string | null = () => null,
+  pinnedIds: ReadonlySet<string> = new Set(),
 ): Map<string, CardStack> {
   const byId = new Map(cards.map((card) => [card.id, card]));
 
@@ -111,10 +115,15 @@ export function buildStacks(
     if (memberIds.length < 2) continue;
 
     const firstOpen = memberIds.find((id) => states.get(id)?.status !== "DONE");
+    // A pinned card is the hire saying "this one matters now", so it is the one a closed pile
+    // shows — an open pinned card before a finished one, and the order of the pile is untouched.
+    const pinned = memberIds.filter((id) => pinnedIds.has(id));
+    const pinnedTop =
+      pinned.find((id) => states.get(id)?.status !== "DONE") ?? pinned[0] ?? undefined;
     const stack: CardStack = {
       rootId: card.id,
       memberIds,
-      topId: firstOpen ?? memberIds[memberIds.length - 1],
+      topId: pinnedTop ?? firstOpen ?? memberIds[memberIds.length - 1],
       remaining: memberIds.filter((id) => states.get(id)?.status !== "DONE").length,
       members: new Map(
         memberIds.flatMap((id) => {

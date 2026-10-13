@@ -114,6 +114,30 @@ describe("buildStacks", () => {
 
     expect(stacks.get("b")?.memberIds).toEqual(["b", "c"]);
   });
+
+  it("puts a pinned card on top, without changing the pile's order", () => {
+    const cards = [card("a"), card("b"), card("c")];
+    const structure = chain("a", "b", "c");
+    const stacks = buildStacks(
+      cards,
+      deriveCardStates(cards, structure),
+      () => null,
+      new Set(["c"]),
+    );
+
+    expect(stacks.get("a")?.topId).toBe("c");
+    expect(stacks.get("a")?.memberIds).toEqual(["a", "b", "c"]);
+    expect(stacks.get("a")?.rootId).toBe("a");
+  });
+
+  it("prefers an unfinished pinned card over a finished one", () => {
+    const cards = [card("a"), card("b", true), card("c")];
+    const structure = chain("a", "b", "c");
+    const pinned = new Set(["b", "c"]);
+    const stacks = buildStacks(cards, deriveCardStates(cards, structure), () => null, pinned);
+
+    expect(stacks.get("a")?.topId).toBe("c");
+  });
 });
 
 describe("collapseStacks", () => {

@@ -12,6 +12,7 @@ import {
   Milestone,
   Minimize2,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
@@ -76,9 +77,25 @@ import {
   type CardSizes,
 } from "../features/board/layout/cardSizes";
 import { readCardOrigins, type CardOrigins } from "../features/board/layout/cardOrigins";
-import { subscribeToBoardStorageReplaced } from "../features/board/layout/boardStorage";
+import {
+  notifyBoardStorageWritten,
+  subscribeToBoardStorageReplaced,
+  subscribeToBoardStorageWritten,
+} from "../features/board/layout/boardStorage";
 import { forgetCard } from "../features/board/layout/forgetCard";
 import { useBoardStructureSync } from "../features/board/sync/useBoardStructureSync";
+import {
+  applyBoardDocument,
+  readBoardDocument,
+  type BoardDocument,
+} from "../features/board/sync/boardDocument";
+import {
+  countPlanChanges,
+  revertedDocument,
+  revertedOrder,
+  sameOrder,
+  type PlanSnapshot,
+} from "../features/board/layout/planChanges";
 import { useCardMarks, useMarkableBoard } from "../features/board/marks/useCardMarks";
 import { buildStacks, collapseStacks } from "../features/board/layout/cardStacks";
 import {
@@ -190,6 +207,10 @@ export function BoardPage() {
   }, [isFocused, setFocused]);
 
   const [isArranging, setIsArranging] = useState(false);
+  /** The arrangement as it stood when planning began, so Cancel can put it back. */
+  const [planStart, setPlanStart] = useState<PlanSnapshot | null>(null);
+  /** The arrangement as it is now while planning, read again on every write to it. */
+  const [planDocument, setPlanDocument] = useState<BoardDocument | null>(null);
   const [filter, setFilter] = useState<BoardFilter>("all");
   const [sectionId, setSectionId] = useState<string | null>(null);
 
@@ -251,6 +272,16 @@ export function BoardPage() {
   // Keeps this hire's arrangement on the server rather than only in this browser, and brings it
   // down on the first load of a visit. See `sync/useBoardStructureSync.ts`.
   const localOnly = useBoardStructureSync(boardId, selectedProjectId);
+
+  useEffect(() => {
+    if (!isArranging) return;
+
+    // Read after the write has finished: some layers are written from inside a state updater,
+    // and setting state from there would be an update during render.
+    return subscribeToBoardStorageWritten(() =>
+      queueMicrotask(() => setPlanDocument(readBoardDocument(boardId, selectedProjectId))),
+    );
+  }, [isArranging, boardId, selectedProjectId]);
 
   /**
    * Bumped whenever the stored arrangement is replaced under this page — by the sync above pulling
@@ -591,8 +622,8 @@ export function BoardPage() {
    * not rearranging the board.
    */
   const stacks = useMemo(
-    () => buildStacks(allCards, states, (cardId) => groupOf(groups, cardId)?.id ?? null),
-    [allCards, groups, states],
+    () => buildStacks(allCards, states, (cardId) => groupOf(groups, cardId)?.id ?? null, pinnedIds),
+    [allCards, groups, pinnedIds, states],
   );
   const [expandedStackIds, setExpandedStackIds] = useState<Set<string>>(new Set());
 
@@ -908,7 +939,13 @@ export function BoardPage() {
       cardMarks,
     );
 
-    return [...visible].sort((a, b) => Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)));
+    // A pile counts as pinned when any card in it is, so a pinned card does not stay buried at
+    // the bottom of the board because it happens to lie in a pile.
+    const lifted = (cardId: string) =>
+      pinnedIds.has(cardId) ||
+      (stacks.get(cardId)?.memberIds.some((memberId) => pinnedIds.has(memberId)) ?? false);
+
+    return [...visible].sort((a, b) => Number(lifted(b.id)) - Number(lifted(a.id)));
   }, [
     allCards,
     cardMarks,
@@ -971,6 +1008,20 @@ export function BoardPage() {
   const handleReorder = (cardIds: string[]) => void reorder(cardIds);
 
   /**
+   * How much planning has changed so far, read again on every write to the arrangement and every
+   * new card order. Zero outside planning.
+   */
+  const planChanges = useMemo(() => {
+    if (!isArranging || !planStart || !planDocument || !board) return 0;
+
+    return countPlanChanges(
+      planStart,
+      planDocument,
+      board.cards.map((card) => card.id),
+    );
+  }, [isArranging, planStart, planDocument, board]);
+
+  /**
    * Opens the planning mode, with nothing folded away.
    *
    * **It no longer clears the filter and the section.** It used to have to: a reorder replaces the
@@ -984,8 +1035,41 @@ export function BoardPage() {
    * dependency you cannot see is one you cannot set.
    */
   function startArranging() {
+    const document = readBoardDocument(boardId, selectedProjectId);
     setOpenStages(new Set(BOARD_STAGES));
+    setPlanStart({ document, order: board?.cards.map((card) => card.id) ?? [] });
+    setPlanDocument(document);
     setIsArranging(true);
+  }
+
+  /** Leaves planning and keeps what was changed — every change is already saved as it is made. */
+  function finishArranging() {
+    setIsArranging(false);
+    setPlanStart(null);
+    setPlanDocument(null);
+  }
+
+  /**
+   * Leaves planning and puts the board back the way it was when planning began.
+   *
+   * Planning writes as it goes, so Cancel is not "don't save" but "undo all of it": the snapshot
+   * taken on the way in is written back over the layers (and announced as a change, so the sync
+   * sends it up), and the old card order is sent again if it moved.
+   */
+  function cancelArranging() {
+    if (planStart && board) {
+      applyBoardDocument(
+        boardId,
+        selectedProjectId,
+        revertedDocument(planStart, readBoardDocument(boardId, selectedProjectId)),
+      );
+      notifyBoardStorageWritten();
+
+      const current = board.cards.map((card) => card.id);
+      const order = revertedOrder(planStart, current);
+      if (!sameOrder(order, current)) void reorder(order);
+    }
+    finishArranging();
   }
 
   /**
@@ -1024,13 +1108,23 @@ export function BoardPage() {
                 }
                 actions={
                   isArranging ? (
-                    <Button
-                      variant="primary"
-                      onClick={() => setIsArranging(false)}
-                      icon={<Check className="h-4 w-4" aria-hidden="true" />}
-                    >
-                      Done
-                    </Button>
+                    <>
+                      <span className="text-sm text-app-text-muted" role="status">
+                        {planChanges === 0
+                          ? "No changes yet"
+                          : `${planChanges} ${planChanges === 1 ? "change" : "changes"}`}
+                      </span>
+                      <Button variant="secondary" onClick={cancelArranging}>
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="primary"
+                        onClick={finishArranging}
+                        icon={<Check className="h-4 w-4" aria-hidden="true" />}
+                      >
+                        Done
+                      </Button>
+                    </>
                   ) : (
                     <>
                       <Button
@@ -1122,7 +1216,7 @@ export function BoardPage() {
                   variant="ghost"
                   size="sm"
                   iconOnly
-                  onClick={() => (isArranging ? setIsArranging(false) : startArranging())}
+                  onClick={() => (isArranging ? finishArranging() : startArranging())}
                   disabled={!board}
                   aria-pressed={isArranging}
                   title={isArranging ? "Done planning" : "Plan the board"}
@@ -1134,6 +1228,24 @@ export function BoardPage() {
                     <ListTree className="h-4 w-4" aria-hidden="true" />
                   )}
                 </Button>
+
+                {/* The header's Cancel, for focus mode where the header is gone. */}
+                {isArranging && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    onClick={cancelArranging}
+                    title={
+                      planChanges === 0
+                        ? "Cancel planning"
+                        : `Cancel planning and undo ${planChanges} ${planChanges === 1 ? "change" : "changes"}`
+                    }
+                    aria-label="Cancel planning"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                )}
 
                 <Button
                   variant="ghost"
