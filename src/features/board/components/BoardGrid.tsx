@@ -47,75 +47,40 @@ import {
   type BoardStage,
   type CardState,
 } from "../layout/boardStructure";
-import { spansFullWidth } from "../layout/cardWidths";
 import {
   GRID_COLUMNS,
   sizeFromDrag,
   sizeOf,
-  WIDTH_SPAN,
   type CardSize,
   type CardSizes,
 } from "../layout/cardSizes";
+import {
+  buildBands,
+  buildBlocks,
+  emptyGroups as findEmptyGroups,
+  orderAfterBlockMove,
+  spanningGroups as findSpanningGroups,
+  spanOf as spanOfBlock,
+  stagesOf,
+  type Band,
+  type Block,
+  type Item,
+} from "../layout/gridBlocks";
+import {
+  centerOf,
+  contains,
+  inMiddle,
+  MIDDLE_HOLD_REACH,
+  MOVE_COOLDOWN_MS,
+  PILE_DWELL_MS,
+  REORDER_DWELL_MS,
+  STILL_PX,
+  toViewport,
+} from "../layout/dragGeometry";
 import type { AuthoredCardRequest, Board, BoardCard, BoardUndoNotice } from "../types";
 
 /** Two columns from Tailwind's `lg` up; one below it. The only width this grid branches on. */
 const TWO_COLUMN_QUERY = "(min-width: 1024px)";
-
-/**
- * How long the board ignores further reordering after a move.
- *
- * A drag reports on every frame, but the re-flow it triggers takes a moment to land — and measuring
- * the new positions before they exist makes the next frame move again. Roughly the length of the
- * layout animation, so the next decision is made against where things actually are. Taken from the
- * dashboard, which learned it the same way.
- */
-const MOVE_COOLDOWN_MS = 160;
-
-/**
- * How long a dragged card has to rest over the middle of another before letting go piles it there.
- *
- * Long enough that passing over a card on the way somewhere else never does it, short enough that
- * somebody who means it does not feel the board hesitating. The edge of a card still moves cards
- * aside the way it always did — after {@link REORDER_DWELL_MS}, so the middle is reachable at all.
- */
-const PILE_DWELL_MS = 350;
-
-/**
- * How long a dragged card rests over the edge of another before the two trade places.
- *
- * An instant swap would make the middle of a card unreachable: the card would move aside the moment
- * its edge was touched. A beat is enough to tell "passing through" from "this is the
- * place" — as long as the beat only counts while the pointer is still (see {@link STILL_PX}).
- */
-const REORDER_DWELL_MS = 150;
-
-/**
- * How far the pointer may drift over a card's edge and still count as resting.
- *
- * Reordering waits for the pointer to *stop*, not merely to stay over the edge. Timing the zone
- * alone meant the edge band — which every drag towards a card's middle crosses first — moved the
- * card aside on the way in whenever the crossing took longer than a beat, and the pile it was
- * headed for slid out from under it. A hand held still jitters a few pixels; anything more is the
- * hire still on their way.
- */
-const STILL_PX = 8;
-
-/** Whether a point is in the middle of an element — the half of it, either way, around its centre. */
-function inMiddle(element: HTMLElement, x: number, y: number, reach = 1 / 4): boolean {
-  const rect = element.getBoundingClientRect();
-  const dx = Math.abs(x - (rect.left + rect.width / 2));
-  const dy = Math.abs(y - (rect.top + rect.height / 2));
-
-  return dx <= rect.width * reach && dy <= rect.height * reach;
-}
-
-/**
- * How far the middle reaches once the pointer is in it — further than the way in.
- *
- * Without the extra room a hand resting near the middle's border flickered between middle and edge,
- * and every flicker started the wait over, so the pile never lit.
- */
-const MIDDLE_HOLD_REACH = 0.4;
 
 /**
  * The tilt that says "this can be moved".
@@ -247,22 +212,6 @@ const FAN_ROOM = ["", "pb-4 motion-safe:hover:pb-14", "pb-6 motion-safe:hover:pb
 const SHEET_HOVERED = "hover:border-app-brand-border-strong! hover:bg-app-brand-soft!";
 
 /**
- * One thing that sits in a column or inside an area: a card, or a sequence spread out.
- *
- * A spread-out stack stays one item rather than becoming its members. Letting the members loose
- * into the packing would deal them into different columns and interleave them with whatever else
- * was around — which is the opposite of what opening a pile is for. You open it to see the run, so
- * the run has to still look like a run.
- */
-type Item =
-  | { kind: "card"; key: string; card: BoardCard; cards: BoardCard[] }
-  | { kind: "stack"; key: string; stack: CardStack; cards: BoardCard[] };
-
-/** One thing the board lays out: an item, or a named area holding items. */
-type Block =
-  Item | { kind: "group"; key: string; group: BoardGroup; cards: BoardCard[]; items: Item[] };
-
-/**
  * The board's grid, in pixels.
  *
  * `ROW_UNIT` is deliberately tiny: a card is given as many of these rows as it measures, so the
@@ -274,9 +223,6 @@ const ROW_UNIT = 8;
 
 /** The gap between cards. In JS because the row maths has to use the same number. */
 const GRID_GAP = 16;
-
-/** One stage of the board, with everything filed under it. */
-type Band = { stage: BoardStage; blocks: Block[]; total: number; remaining: number };
 
 type GridBlockProps = {
   /** How many of the grid's columns this block takes. */
@@ -357,30 +303,6 @@ function GridBlock({ span, gap, reduceMotion, children }: GridBlockProps) {
       <div ref={ref}>{children}</div>
     </motion.div>
   );
-}
-
-/** Where a dragged card counts as being: its own middle, which is what the eye is following. */
-function centerOf(element: HTMLElement): { x: number; y: number } {
-  const rect = element.getBoundingClientRect();
-
-  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-}
-
-function contains(element: HTMLElement, x: number, y: number): boolean {
-  const rect = element.getBoundingClientRect();
-
-  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-}
-
-/**
- * A drag's release point in the same space as `getBoundingClientRect`.
- *
- * Framer reports where a pointer was let go in page coordinates, which only agree with an
- * element's box while the page is scrolled to the top — so on a board scrolled down far enough
- * to see the areas, hit-testing without this would always miss.
- */
-function toViewport(point: { x: number; y: number }): { x: number; y: number } {
-  return { x: point.x - window.scrollX, y: point.y - window.scrollY };
 }
 
 /** What piling onto the lit card does to the dragged card's area, if anything. */
@@ -985,219 +907,38 @@ export function BoardGrid({
     [clearPileTarget, lightPileTarget, onReorder, onStackOnto, reorder],
   );
 
-  /**
-   * The board as blocks, in board order: one card, or one named area with its cards inside it.
-   *
-   * An area takes the place of its first member, so grouping cards moves them together to where the
-   * earliest of them already sat rather than to the end. Everything is built from `board.cards` in
-   * order, which is what keeps the grouping a *display* decision — the order underneath is
-   * untouched, and ungrouping puts every card back exactly where it was.
-   */
-  const blocks = useMemo<Block[]>(() => {
-    /** A list of cards as items, with the members of any open stack folded back into one. */
-    const toItems = (cards: BoardCard[]): Item[] => {
-      const items: Item[] = [];
-      const seen = new Set<string>();
+  const blocks = useMemo<Block[]>(
+    () => buildBlocks(board.cards, groups, stacks, expandedStackIds),
+    [board.cards, expandedStackIds, groups, stacks],
+  );
 
-      for (const card of cards) {
-        if (seen.has(card.id)) continue;
-
-        const stack = stacks?.get(card.id);
-        if (stack && expandedStackIds?.has(stack.rootId)) {
-          const members = cards.filter((member) => stack.memberIds.includes(member.id));
-          members.forEach((member) => seen.add(member.id));
-          items.push({ kind: "stack", key: `stack-${stack.rootId}`, stack, cards: members });
-          continue;
-        }
-
-        items.push({ kind: "card", key: `card-${card.id}`, card, cards: [card] });
-      }
-
-      return items;
-    };
-
-    const built: Block[] = [];
-    const placed = new Set<string>();
-
-    for (const card of board.cards) {
-      if (placed.has(card.id)) continue;
-
-      const group = groupOf(groups, card.id);
-      if (group) {
-        // Members in the board's own order, whatever order they were added to the area in.
-        const members = board.cards.filter((member) => group.cardIds.includes(member.id));
-        members.forEach((member) => placed.add(member.id));
-        built.push({
-          kind: "group",
-          key: `group-${group.id}`,
-          group,
-          cards: members,
-          items: toItems(members),
-        });
-        continue;
-      }
-
-      const stack = stacks?.get(card.id);
-      if (stack && expandedStackIds?.has(stack.rootId)) {
-        const members = board.cards.filter((member) => stack.memberIds.includes(member.id));
-        members.forEach((member) => placed.add(member.id));
-        built.push({ kind: "stack", key: `stack-${stack.rootId}`, stack, cards: members });
-        continue;
-      }
-
-      built.push({ kind: "card", key: `card-${card.id}`, card, cards: [card] });
-    }
-
-    return built;
-  }, [board.cards, expandedStackIds, groups, stacks]);
-
-  /**
-   * How wide a block is, in columns of the board's grid.
-   *
-   * The card's own size, clamped to what the grid it sits in actually has: a card pulled wide
-   * inside an area two columns across is two columns across, not four sticking out of its own
-   * container. A diagram is wide whatever anybody chose, because half of a half-width picture is
-   * not a picture.
-   *
-   * An area is as wide as the widest thing in it, and never narrower than two — an area of one
-   * narrow note would otherwise be a tinted box the size of a stamp with a name in it.
-   */
   const spanOf = useCallback(
-    (block: Block, columns: number): number => {
-      const widest = block.cards.reduce(
-        (span, card) =>
-          Math.max(
-            span,
-            spansFullWidth(card) ? GRID_COLUMNS : WIDTH_SPAN[sizeOf(cardSizes, card.id).width],
-          ),
-        1,
-      );
-      const wanted = block.kind === "group" ? Math.max(widest, 2) : widest;
-
-      return Math.min(wanted, columns);
-    },
+    (block: Block, columns: number): number => spanOfBlock(block, columns, cardSizes),
     [cardSizes],
   );
 
-  /**
-   * The board's blocks filed under their stage, in stage order.
-   *
-   * **An area goes in the band of its earliest card**, whole, rather than being split across three.
-   * Two grouping axes have to agree about which one owns a block, and an area is a thing somebody
-   * named and expects to find in one piece — the same rule the section bar already uses for an
-   * area's stage, so the two never disagree.
-   *
-   * Empty bands are not drawn. A board where nothing is due later should not carry a heading saying
-   * so; the fold exists to hold cards, and a band with none holds a sentence nobody needs.
-   */
   const banding = states !== undefined && openStages !== undefined && !isArranging;
 
-  /** Which stages a set of cards covers, earliest first. */
-  const stagesOf = useCallback(
-    (cards: BoardCard[]): BoardStage[] =>
-      BOARD_STAGES.filter((stage) =>
-        cards.some((card) => (states?.get(card.id)?.stage ?? "NOW") === stage),
-      ),
-    [states],
+  const stagesIn = (cards: BoardCard[]) => stagesOf(cards, states);
+
+  const emptyGroups = useMemo(() => findEmptyGroups(board.cards, groups), [board.cards, groups]);
+
+  const spanningGroups = useMemo<Block[]>(
+    () => (banding ? findSpanningGroups(blocks, states) : []),
+    [banding, blocks, states],
   );
 
-  /**
-   * The areas with nothing drawn in them.
-   *
-   * They have no box in the grid, which is built by walking the cards, so while the board is being
-   * arranged they are given a box of their own to be dropped into: the only way a first card gets
-   * into an empty area.
-   */
-  const emptyGroups = useMemo(
-    () =>
-      (groups ?? []).filter(
-        (group) => !board.cards.some((card) => group.cardIds.includes(card.id)),
-      ),
-    [board.cards, groups],
+  const bands = useMemo<Band[]>(
+    () => (states && banding ? buildBands(blocks, spanningGroups, states) : []),
+    [banding, blocks, spanningGroups, states],
   );
 
-  /**
-   * The areas that carry stages of their own: a named set of cards that is not all due at once.
-   *
-   * These are not filed into a band, they are banded *inside*. A team's blueprints are the case
-   * this exists for — one set somebody wrote in one sitting, deliberately spread across the stages.
-   * Filing it under "Now" because its earliest card is due now would put a heading saying "Now"
-   * around cards already behind the hire, and splitting it across the bands would take a thing with
-   * a name and scatter it. So it keeps its name, keeps its cards, and folds by stage within itself
-   * — the same fold, one level in.
-   *
-   * They lead, above the bands. An area is a decision somebody made about what belongs together,
-   * and the bands are the board's own answer to when; the named thing goes first.
-   */
-  const spanningGroups = useMemo<Block[]>(() => {
-    if (!banding) return [];
-
-    return blocks.filter((block) => block.kind === "group" && stagesOf(block.cards).length > 1);
-  }, [banding, blocks, stagesOf]);
-
-  const bands = useMemo<Band[]>(() => {
-    if (!states || !banding) return [];
-
-    const stageOf = (block: Block): BoardStage => stagesOf(block.cards)[0] ?? "NOW";
-    const rest = blocks.filter((block) => !spanningGroups.includes(block));
-
-    const filled = BOARD_STAGES.map((stage) => {
-      const own = rest.filter((block) => stageOf(block) === stage);
-      const cards = own.flatMap((block) => block.cards);
-
-      return {
-        stage,
-        blocks: own,
-        total: cards.length,
-        remaining: cards.filter((card) => states.get(card.id)?.status !== "DONE").length,
-      };
-    }).filter((band) => band.total > 0);
-
-    // One band is not a band, it is a heading over the whole board saying what everything on it
-    // already says. A board where nothing has been sequenced yet is exactly that board, and it
-    // should look the way it did before there were bands at all.
-    //
-    // Except "Behind you": when a filter, a section or a finished path leaves only finished cards
-    // on screen, dropping the heading drew them as if they were current, and the band looked gone.
-    return filled.length > 1 || filled.some((band) => band.stage === "BEHIND") ? filled : [];
-  }, [banding, blocks, spanningGroups, stagesOf, states]);
-
-  /**
-   * Moves a whole block — a named area, or the diagram that owns its row — past its neighbour.
-   *
-   * An area has no position of its own: it sits where its earliest member sits. So moving one is
-   * moving all of its cards at once, which is what this does — put a block where another block is
-   * and send the order that falls out. Nothing about the grouping changes, only where its cards are
-   * in the board.
-   */
   const moveBlockTo = useCallback(
     (from: number, to: number) => {
-      if (!onReorder || from === to || to < 0 || to >= blocks.length) return;
+      if (!onReorder) return;
 
-      // Expressed over the *whole* order, the way {@link moveTo} is, and never over the blocks on
-      // screen. Rebuilding the order from the blocks was right only while arranging began by
-      // clearing every cut — narrowed, it dropped every card the view was hiding, which is the one
-      // thing a reorder must never do.
-      //
-      // A block is a set of cards that need not be contiguous in the board's own order: an area
-      // gathers its members from wherever they sit. So the move is "take these out, and put them
-      // back beside the block they were aimed at" rather than a splice of one element.
-      const moved = blocks[from].cards.map((card) => card.id);
-      if (moved.length === 0) return;
-
-      const movedIds = new Set(moved);
-      const rest = ids.filter((id) => !movedIds.has(id));
-
-      // Past the target's far edge going down, in front of its near edge going up — which is what
-      // stepping a block past its neighbour has always meant.
-      const targetAt = blocks[to].cards
-        .map((card) => rest.indexOf(card.id))
-        .filter((index) => index !== -1);
-      if (targetAt.length === 0) return;
-
-      const at = from < to ? Math.max(...targetAt) + 1 : Math.min(...targetAt);
-
-      onReorder([...rest.slice(0, at), ...moved, ...rest.slice(at)]);
+      const next = orderAfterBlockMove(blocks, ids, from, to);
+      if (next) onReorder(next);
     },
     [blocks, ids, onReorder],
   );
@@ -1342,7 +1083,7 @@ export function BoardGrid({
   const renderBandedItems = (items: Item[], span: number) => (
     <div className="space-y-3">
       {BOARD_STAGES.map((stage) => {
-        const own = items.filter((item) => stagesOf(item.cards)[0] === stage);
+        const own = items.filter((item) => stagesIn(item.cards)[0] === stage);
         if (own.length === 0) return null;
 
         const cards = own.flatMap((item) => item.cards);
