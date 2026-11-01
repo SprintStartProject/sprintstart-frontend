@@ -620,3 +620,47 @@ describe("letting go of a card", () => {
     expect(onAssignGroup).not.toHaveBeenCalled();
   });
 });
+
+describe("what a drag looks like", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    motionProps.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  function setup() {
+    render(<BoardGrid board={board(3)} isArranging onReorder={vi.fn()} onStackOnto={vi.fn()} />);
+    const cards = cardElements();
+
+    return { cards, drag: dragging(cards[0]) };
+  }
+
+  it("lifts the dragged card and shows it grabbed, until it is let go", () => {
+    const { cards, drag } = setup();
+    expect(cards[0].className).not.toContain("z-40");
+
+    drag.start();
+    expect(cards[0].className).toContain("z-40");
+    expect(cards[0].className).toContain("cursor-grabbing");
+    expect(cards[1].className).not.toContain("z-40");
+
+    drag.letGo(700, 700);
+    expect(cards[0].className).not.toContain("z-40");
+  });
+
+  it("rings the card a drop would pile onto, and only that one", async () => {
+    const { cards, drag } = setup();
+
+    drag.start();
+    drag.over(...MIDDLE);
+    await wait(350);
+
+    expect(cards[1].className).toContain("ring-2");
+    expect(cards[0].className).not.toContain("ring-2");
+    expect(cards[2].className).not.toContain("ring-2");
+  });
+});
