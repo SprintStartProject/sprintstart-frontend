@@ -495,17 +495,6 @@
       "count": 1
     }
   },
-  "src/features/board/components/BoardGrid.tsx": {
-    "complexity": {
-      "count": 2
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/features/board/components/BoardPathWindow.tsx": {
     "max-lines-per-function": {
       "count": 1

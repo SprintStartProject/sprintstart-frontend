@@ -664,3 +664,132 @@ describe("what a drag looks like", () => {
     expect(cards[2].className).not.toContain("ring-2");
   });
 });
+
+describe("dragging an area", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    motionProps.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const area: BoardGroup = { id: "g1", name: "Setup", cardIds: ["c0"], collapsed: false };
+
+  function setup() {
+    const onReorder = vi.fn();
+    render(<BoardGrid board={board(3)} groups={[area]} onReorder={onReorder} />);
+    cardElements();
+    const section = [...motionProps.entries()].find(
+      ([node]) => node.tagName === "SECTION" && node.isConnected,
+    );
+    if (!section) throw new Error("no area drawn");
+    vi.advanceTimersByTime(1000);
+
+    return { onReorder, section: section[0], drag: (node: Element) => motionProps.get(node) };
+  }
+
+  /** Puts the area's box where its middle is over the second card. */
+  const overSecondCard = (section: Element) =>
+    place(section, { left: 210, top: 10, width: 80, height: 80 });
+
+  it("lands on the block its middle is over", () => {
+    const { onReorder, section, drag } = setup();
+    overSecondCard(section);
+
+    act(() => (drag(section)?.onDrag as () => void)());
+
+    expect(onReorder).toHaveBeenCalledWith(["c1", "c0", "c2"]);
+  });
+
+  it("does nothing while its middle is over no card", () => {
+    const { onReorder, section, drag } = setup();
+    place(section, { left: 700, top: 700, width: 80, height: 80 });
+
+    act(() => (drag(section)?.onDrag as () => void)());
+
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it("does nothing while its middle is over its own cards", () => {
+    const { onReorder, section, drag } = setup();
+    place(section, { left: 10, top: 10, width: 80, height: 80 });
+
+    act(() => (drag(section)?.onDrag as () => void)());
+
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it("waits for the last move to land before moving again", () => {
+    const { onReorder, section, drag } = setup();
+    overSecondCard(section);
+
+    act(() => (drag(section)?.onDrag as () => void)());
+    act(() => (drag(section)?.onDrag as () => void)());
+    expect(onReorder).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(200);
+    act(() => (drag(section)?.onDrag as () => void)());
+    expect(onReorder).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("moving a closed pile", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    motionProps.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const pile = (memberIds: string[]): CardStack => ({
+    rootId: memberIds[0],
+    memberIds,
+    topId: memberIds[0],
+    remaining: memberIds.length,
+    members: new Map(),
+  });
+
+  function setup(memberIds: string[]) {
+    const onReorder = vi.fn();
+    const shared = pile(memberIds);
+    render(
+      <BoardGrid
+        board={board(3)}
+        boardOrder={["c0", "c1", "c2", "c3"]}
+        stacks={new Map(memberIds.map((id) => [id, shared]))}
+        expandedStackIds={new Set()}
+        onReorder={onReorder}
+      />,
+    );
+    const [first] = cardElements();
+    vi.advanceTimersByTime(1000);
+
+    return { onReorder, drag: dragging(first) };
+  }
+
+  it("takes the cards hidden behind it along when it is dragged over a neighbour", () => {
+    const { onReorder, drag } = setup(["c0", "c3"]);
+
+    drag.start();
+    drag.over(...EDGE);
+    act(() => void vi.advanceTimersByTime(150));
+
+    expect(onReorder).toHaveBeenCalledWith(["c1", "c0", "c3", "c2"]);
+  });
+
+  it("is not moved onto a card that is part of it", () => {
+    const { onReorder, drag } = setup(["c0", "c1"]);
+
+    drag.start();
+    drag.over(...EDGE);
+    act(() => void vi.advanceTimersByTime(150));
+
+    expect(onReorder).toHaveBeenCalledWith(["c0", "c1", "c2", "c3"]);
+  });
+});
