@@ -167,3 +167,79 @@ describe("a card's cell", () => {
     expect(cellOf("plain note").querySelectorAll("button[aria-hidden='true']")).toHaveLength(0);
   });
 });
+
+describe("opening a pile by one of its sheets", () => {
+  const pile = pileOf(2);
+
+  function renderPile(over: Partial<React.ComponentProps<typeof BoardGrid>> = {}) {
+    const onToggleStack = vi.fn();
+    const props = {
+      stacks: new Map([
+        ["m0", pile],
+        ["m1", pile],
+      ]),
+      onToggleStack,
+      ...over,
+    };
+    const view = render(
+      <BoardGrid
+        board={boardOf(note("m0", "top of two"))}
+        expandedStackIds={new Set()}
+        {...props}
+      />,
+    );
+
+    return { onToggleStack, props, ...view };
+  }
+
+  it("asks for the pile to open, naming its root", () => {
+    const { onToggleStack } = renderPile();
+
+    cellOf("top of two").querySelector<HTMLElement>("button[aria-hidden='true']")?.click();
+
+    expect(onToggleStack).toHaveBeenCalledWith("m0");
+  });
+
+  it("brings the card that was asked for into view once the pile is open", async () => {
+    const scroll = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+    const { rerender, props } = renderPile();
+
+    cellOf("top of two").querySelector<HTMLElement>("button[aria-hidden='true']")?.click();
+    rerender(
+      <BoardGrid
+        {...props}
+        board={boardOf(note("m0", "top of two"), note("m1", "second of two"))}
+        expandedStackIds={new Set(["m0"])}
+      />,
+    );
+
+    await vi.waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+    expect((scroll.mock.contexts[0] as HTMLElement).textContent).toContain("second of two");
+    scroll.mockRestore();
+  });
+
+  it("scrolls nothing when the pile was opened some other way", async () => {
+    const scroll = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+    const { rerender, props } = renderPile();
+
+    rerender(
+      <BoardGrid
+        {...props}
+        board={boardOf(note("m0", "top of two"), note("m1", "second of two"))}
+        expandedStackIds={new Set(["m0"])}
+      />,
+    );
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+
+    expect(scroll).not.toHaveBeenCalled();
+    scroll.mockRestore();
+  });
+
+  it("has no sheet to press on a board that cannot open piles", () => {
+    renderPile({ onToggleStack: undefined });
+
+    const strip = cellOf("top of two").querySelector<HTMLElement>("button[aria-hidden='true']");
+    expect(() => strip?.click()).not.toThrow();
+  });
+});
