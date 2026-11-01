@@ -497,7 +497,7 @@
   },
   "src/features/board/components/BoardGrid.tsx": {
     "complexity": {
-      "count": 5
+      "count": 2
     },
     "max-lines": {
       "count": 1

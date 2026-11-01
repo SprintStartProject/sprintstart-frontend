@@ -3,15 +3,16 @@ import { AnimatePresence, useReducedMotion } from "framer-motion";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
 import { originOf, type CardOrigins } from "../layout/cardOrigins";
 import { useBoardPath } from "../hooks/boardPath";
+import { useCardDrag } from "../hooks/useCardDrag";
+import { useOpenPileDismissal } from "../hooks/useOpenPileDismissal";
 import { leadsOntoPath } from "../layout/pathStages";
-import { BoardCardCell, type PileAreaMove } from "./BoardCardCell";
+import { BoardCardCell } from "./BoardCardCell";
 import { BoardGroupSection } from "./BoardGroupSection";
-import { KEEPS_PILES_OPEN } from "./interactiveSelectors";
 import { ExpandedStack } from "./ExpandedStack";
 import { GridBlock } from "./GridBlock";
 import { BoardStageBand } from "./BoardStageBand";
 import type { AreaAccent } from "../layout/areaAccents";
-import { groupOf, type BoardGroup } from "../layout/boardGroups";
+import type { BoardGroup } from "../layout/boardGroups";
 import { moveTo } from "../layout/boardOrder";
 import type { CardStack } from "../layout/cardStacks";
 import { BOARD_STAGES, type BoardStage, type CardState } from "../layout/boardStructure";
@@ -30,17 +31,7 @@ import {
   ROW_UNIT,
   type Item,
 } from "../layout/gridBlocks";
-import {
-  centerOf,
-  contains,
-  inMiddle,
-  MIDDLE_HOLD_REACH,
-  MOVE_COOLDOWN_MS,
-  PILE_DWELL_MS,
-  REORDER_DWELL_MS,
-  STILL_PX,
-  toViewport,
-} from "../layout/dragGeometry";
+import { centerOf } from "../layout/dragGeometry";
 import type { AuthoredCardRequest, Board, BoardCard, BoardUndoNotice } from "../types";
 
 /** Two columns from Tailwind's `lg` up; one below it. The only width this grid branches on. */
@@ -231,10 +222,6 @@ export function BoardGrid({
 
   /** The gap between blocks, which the row maths has to agree with — see {@link GridBlock}. */
   const gap = GRID_GAP;
-  const elements = useRef(new Map<string, HTMLDivElement>());
-  const groupElements = useRef(new Map<string, HTMLElement>());
-  const lastMoveAt = useRef(0);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   /**
    * A card's way back, unless it leads into the path somewhere the path no longer has.
@@ -251,21 +238,6 @@ export function BoardGrid({
 
     return leadsOntoPath(origin.url, pathPhasesNow) ? origin : null;
   };
-  /** The card a dragged one would be piled under if let go now — see `handleDrag`. */
-  const [pileTargetId, setPileTargetId] = useState<string | null>(null);
-  const pileTargetRef = useRef<string | null>(null);
-  /** Whether piling onto the lit card moves the dragged one into or out of an area — on the label. */
-  const [pileAreaMove, setPileAreaMove] = useState<PileAreaMove>(null);
-  /**
-   * Lights the pile target once the dragged card has rested long enough, even when the pointer
-   * holds perfectly still: drag events only arrive while it moves, so counting on them alone left a
-   * hire who stopped and waited with nothing happening.
-   */
-  const pileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** The card and the part of it the dragged card is resting on, and where the rest began. */
-  const restingRef = useRef<{ id: string; zone: "middle" | "edge"; x: number; y: number } | null>(
-    null,
-  );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   /**
    * A card the pile was opened *for*, to be brought into view once it is on the board.
@@ -328,210 +300,31 @@ export function BoardGrid({
       }
     : undefined;
 
-  const registerElement = useCallback((id: string, element: HTMLDivElement | null) => {
-    if (element) elements.current.set(id, element);
-    else elements.current.delete(id);
-  }, []);
+  const {
+    draggingId,
+    pileTargetId,
+    pileAreaMove,
+    registerElement,
+    registerGroupElement,
+    elementOf,
+    cardIdAt,
+    cooledDown,
+    markMoved,
+    startDrag,
+    drag,
+    endDrag,
+    drop,
+  } = useCardDrag({
+    groups,
+    stacks,
+    expandedStackIds,
+    onStackOnto,
+    onAssignGroup,
+    onReorder,
+    reorder,
+  });
 
-  /**
-   * Closes an open pile as soon as attention moves off it.
-   *
-   * Opening a stack is looking into something, not rearranging the board — so it should end the way
-   * looking into something ends, by looking somewhere else. Without this, spreading out three
-   * sequences to check them leaves three sequences spread out, and the hire has to go back and put
-   * each one away by hand, which is exactly the tidying the stacks existed to save.
-   *
-   * Hit-tested against the card elements the grid already registers rather than against a wrapper,
-   * because "outside the stack" includes *other cards*: clicking the next card along should put the
-   * pile away and act on that card, not just the second of those.
-   *
-   * On `pointerdown` rather than `click`, so it lands before the card's own handler — a click on
-   * another stack's top card closes this one and opens that one, in that order, rather than the two
-   * fighting over the same event.
-   *
-   * Off entirely while the board is being arranged: arranging deliberately opens every stack, and a
-   * press on the background to start a drag would otherwise fold them all away mid-gesture.
-   */
-  useEffect(() => {
-    if (isArranging || !onToggleStack) return;
-    if (!expandedStackIds || expandedStackIds.size === 0) return;
-
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target instanceof Element ? event.target : null;
-      // Floating controls acting on what is in the pile — the highlighter's toolbar, the colour
-      // popover, a menu or dialog — are not looking elsewhere.
-      if (target?.closest(KEEPS_PILES_OPEN)) return;
-      const openedFrame = target?.closest("[data-stack-root]");
-      const insideRoot = openedFrame?.getAttribute("data-stack-root") ?? null;
-
-      for (const rootId of expandedStackIds ?? []) {
-        if (rootId !== insideRoot) onToggleStack?.(rootId);
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [expandedStackIds, isArranging, onToggleStack]);
-
-  const registerGroupElement = useCallback((id: string, element: HTMLElement | null) => {
-    if (element) groupElements.current.set(id, element);
-    else groupElements.current.delete(id);
-  }, []);
-
-  /**
-   * Where a card was let go decides which area it is in.
-   *
-   * Dropped inside an area's box, it joins that area; dropped anywhere else, it leaves the one it
-   * was in. Decided on release rather than during the drag, so the board is not re-grouping under
-   * a pointer that is still moving — and it is the pointer's own position that counts, not the
-   * card's, because that is where the hire is looking when they let go.
-   */
-  const clearPileTarget = useCallback(() => {
-    if (pileTimer.current) clearTimeout(pileTimer.current);
-    pileTimer.current = null;
-    if (pileTargetRef.current) {
-      pileTargetRef.current = null;
-      setPileTargetId(null);
-    }
-  }, []);
-
-  const lightPileTarget = useCallback(
-    (draggedId: string, candidateId: string) => {
-      if (pileTargetRef.current === candidateId) return;
-      pileTargetRef.current = candidateId;
-      setPileTargetId(candidateId);
-      const from = groupOf(groups, draggedId)?.id ?? null;
-      const to = groupOf(groups, candidateId)?.id ?? null;
-      setPileAreaMove(from === to ? null : to ? "into" : "out");
-    },
-    [groups],
-  );
-
-  useEffect(() => clearPileTarget, [clearPileTarget]);
-
-  const handleCardDrop = useCallback(
-    (cardId: string, point: { x: number; y: number }) => {
-      const target = pileTargetRef.current;
-      clearPileTarget();
-      restingRef.current = null;
-
-      // Let go over the middle of another card: the two become a pile. See `handleDrag`. A closed
-      // pile is drawn as one card and moves as one: all of it goes onto the target. From an open
-      // pile only the card that was picked up goes.
-      if (target && target !== cardId && onStackOnto) {
-        const pile = stacks?.get(cardId);
-        if (pile && !expandedStackIds?.has(pile.rootId)) {
-          onStackOnto(pile.memberIds[0], target, pile.memberIds);
-        } else {
-          onStackOnto(cardId, target);
-        }
-        return;
-      }
-
-      const { x, y } = toViewport(point);
-
-      // Dragged out of an open pile and let go anywhere outside it: it leaves the pile.
-      const pile = stacks?.get(cardId);
-      if (pile && onStackOnto && expandedStackIds?.has(pile.rootId)) {
-        const frame = document.querySelector(`[data-stack-root="${CSS.escape(pile.rootId)}"]`);
-        if (frame instanceof HTMLElement && !contains(frame, x, y)) onStackOnto(cardId, null);
-      }
-
-      if (!onAssignGroup) return;
-
-      for (const [groupId, element] of groupElements.current) {
-        if (contains(element, x, y)) {
-          if (groupOf(groups, cardId)?.id !== groupId) onAssignGroup(cardId, groupId);
-
-          return;
-        }
-      }
-
-      if (groupOf(groups, cardId)) onAssignGroup(cardId, null);
-    },
-    [clearPileTarget, expandedStackIds, groups, onAssignGroup, onStackOnto, stacks],
-  );
-
-  /**
-   * What a dragged card is over, every frame, and what letting go there would do.
-   *
-   * Two things a drag can mean, told apart by *where* on the other card it rests:
-   *
-   * - **Its edge** — the two trade places, as dragging always did, after a beat
-   *   ({@link REORDER_DWELL_MS}).
-   * - **Its middle** — after a longer rest ({@link PILE_DWELL_MS}) the card underneath lights up,
-   *   and letting go puts the dragged card into a pile under it. Nothing moves aside while it is
-   *   lit, so the target stays where the pointer is.
-   *
-   * In plan mode and outside it alike: tidying two cards into one pile is something a person
-   * reading the board notices they want, and the grip is there in both.
-   */
-  const handleDrag = useCallback(
-    (id: string, point: { x: number; y: number }) => {
-      // The pointer, not the dragged card's centre. The card is held by its grip in a corner, so
-      // its centre sits half a card away from where the hire is looking — and how far depends on
-      // the card's size, which is why aiming at a card's middle piled onto some cards and not
-      // others. Letting go already goes by the pointer; this now agrees with it.
-      const { x, y } = toViewport(point);
-
-      for (const [candidateId, element] of elements.current) {
-        if (candidateId === id || !contains(element, x, y)) continue;
-
-        const resting = restingRef.current;
-        const holding = resting?.id === candidateId && resting.zone === "middle";
-        const zone =
-          onStackOnto && inMiddle(element, x, y, holding ? MIDDLE_HOLD_REACH : undefined)
-            ? "middle"
-            : "edge";
-        // The middle only has to be *stayed in*: it is small and deliberate, and asking a hand to
-        // hold still inside it as well made piling feel broken. The edge has to be rested on, or
-        // every drag towards a middle would shuffle the cards on its way in.
-        const sameSpot =
-          resting?.id === candidateId &&
-          resting.zone === zone &&
-          (zone === "middle" || Math.hypot(x - resting.x, y - resting.y) <= STILL_PX);
-        // Still resting where it was: whatever is pending stays pending, whatever is lit stays lit.
-        if (sameSpot) return;
-
-        // Anything else starts the wait over from here.
-        const keepLit = zone === "middle" && pileTargetRef.current === candidateId;
-        if (pileTimer.current) clearTimeout(pileTimer.current);
-        pileTimer.current = null;
-        if (!keepLit) clearPileTarget();
-
-        const spot = { id: candidateId, zone, x, y } as const;
-        restingRef.current = spot;
-        if (keepLit) return;
-
-        pileTimer.current = setTimeout(
-          () => {
-            pileTimer.current = null;
-            if (restingRef.current !== spot) return;
-
-            if (zone === "middle") {
-              lightPileTarget(id, candidateId);
-              return;
-            }
-            if (!onReorder) return;
-            const now = performance.now();
-            if (now - lastMoveAt.current < MOVE_COOLDOWN_MS) return;
-
-            onReorder(reorder(id, candidateId));
-            lastMoveAt.current = now;
-            restingRef.current = null;
-          },
-          zone === "middle" ? PILE_DWELL_MS : REORDER_DWELL_MS,
-        );
-        return;
-      }
-
-      // Over nothing: whatever was about to happen is off.
-      restingRef.current = null;
-      clearPileTarget();
-    },
-    [clearPileTarget, lightPileTarget, onReorder, onStackOnto, reorder],
-  );
+  useOpenPileDismissal({ isArranging, expandedStackIds, onToggleStack });
 
   const blocks = useMemo<Block[]>(
     () => buildBlocks(board.cards, groups, stacks, expandedStackIds),
@@ -573,22 +366,19 @@ export function BoardGrid({
   const handleGroupDrag = useCallback(
     (blockIndex: number, element: HTMLElement) => {
       const now = performance.now();
-      if (now - lastMoveAt.current < MOVE_COOLDOWN_MS) return;
+      if (!cooledDown(now)) return;
 
       const { x, y } = centerOf(element);
-      for (const [cardId, candidate] of elements.current) {
-        if (!contains(candidate, x, y)) continue;
+      const cardId = cardIdAt(x, y);
+      if (cardId === null) return;
 
-        const target = blocks.findIndex((block) => block.cards.some((card) => card.id === cardId));
-        if (target === -1 || target === blockIndex) return;
+      const target = blocks.findIndex((block) => block.cards.some((card) => card.id === cardId));
+      if (target === -1 || target === blockIndex) return;
 
-        moveBlockTo(blockIndex, target);
-        lastMoveAt.current = now;
-
-        return;
-      }
+      moveBlockTo(blockIndex, target);
+      markMoved(now);
     },
-    [blocks, moveBlockTo],
+    [blocks, cardIdAt, cooledDown, markMoved, moveBlockTo],
   );
 
   const moveBlock = (blockIndex: number, direction: "up" | "down") =>
@@ -618,7 +408,7 @@ export function BoardGrid({
     revealId.current = null;
     if (pending === null) return;
 
-    const element = elements.current.get(pending);
+    const element = elementOf(pending);
     if (!element) return;
 
     // After the paint, so the card is where it is going to be rather than where the layout
@@ -628,7 +418,7 @@ export function BoardGrid({
     );
 
     return () => cancelAnimationFrame(frame);
-  }, [expandedStackIds, reduceMotion]);
+  }, [elementOf, expandedStackIds, reduceMotion]);
 
   const renderCard = (card: BoardCard) => {
     const stack = stacks?.get(card.id);
@@ -658,7 +448,7 @@ export function BoardGrid({
         leadsPile={stack !== undefined && stack.rootId === card.id}
         // Piling is rearranging, so it is offered where the rest of rearranging is: in plan mode.
         onStackOnto={isArranging ? onStackOnto : undefined}
-        onDrop={handleCardDrop}
+        onDrop={drop}
         onMove={move}
         onDismiss={onDismiss}
         dismissing={dismissingId === card.id}
@@ -668,13 +458,9 @@ export function BoardGrid({
         saving={savingIds.has(card.id)}
         undoNotice={undoNotices.get(card.id) ?? null}
         registerElement={registerElement}
-        onDragStart={() => {
-          lastMoveAt.current = 0;
-          restingRef.current = null;
-          setDraggingId(card.id);
-        }}
-        onDrag={(point) => handleDrag(card.id, point)}
-        onDragEnd={() => setDraggingId(null)}
+        onDragStart={() => startDrag(card.id)}
+        onDrag={(point) => drag(card.id, point)}
+        onDragEnd={endDrag}
         onHoverChange={(hovered) =>
           setHoveredId((current) => (hovered ? card.id : current === card.id ? null : current))
         }
