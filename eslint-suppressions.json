@@ -497,13 +497,13 @@
   },
   "src/features/board/components/BoardGrid.tsx": {
     "complexity": {
-      "count": 8
+      "count": 7
     },
     "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 4
+      "count": 3
     }
   },
   "src/features/board/components/BoardPathWindow.tsx": {

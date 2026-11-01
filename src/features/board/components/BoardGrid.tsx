@@ -5,14 +5,10 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
-  type ReactNode,
 } from "react";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "framer-motion";
-import { ChevronsDownUp, ChevronsUpDown, GripVertical, X } from "lucide-react";
-import { Badge } from "../../../components/ui/Badge";
+import { GripVertical } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
-import { Collapsible } from "../../../components/ui/Collapsible";
-import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
 import { centralSpringToken } from "../../../styles/tokens";
@@ -20,23 +16,20 @@ import { originOf, type CardOrigin, type CardOrigins } from "../layout/cardOrigi
 import { useBoardPath } from "../hooks/boardPath";
 import { leadsOntoPath } from "../layout/pathStages";
 import { BoardCardContext } from "./boardCardControls";
+import { BoardGroupSection } from "./BoardGroupSection";
+import { INTERACTIVE_WITHIN_CARD, KEEPS_PILES_OPEN } from "./interactiveSelectors";
 import { BoardCardView } from "./BoardCardView";
 import { ExpandedStack } from "./ExpandedStack";
 import { GridBlock } from "./GridBlock";
 import { BoardStageBand } from "./BoardStageBand";
 import { cardAccent } from "../layout/cardAccents";
-import { AREA_ACCENTS, areaAccent, type AreaAccent } from "../layout/areaAccents";
+import type { AreaAccent } from "../layout/areaAccents";
 import { groupOf, type BoardGroup } from "../layout/boardGroups";
 import { moveTo } from "../layout/boardOrder";
 import { cardIcon } from "../layout/cardIcons";
 import { cardName } from "../layout/cardNames";
 import type { CardStack } from "../layout/cardStacks";
-import {
-  BOARD_STAGES,
-  STAGE_LABELS,
-  type BoardStage,
-  type CardState,
-} from "../layout/boardStructure";
+import { BOARD_STAGES, type BoardStage, type CardState } from "../layout/boardStructure";
 import {
   GRID_COLUMNS,
   sizeFromDrag,
@@ -83,22 +76,6 @@ const TWO_COLUMN_QUERY = "(min-width: 1024px)";
  * have reached it. Lifted from the dashboard, down to the numbers.
  */
 const WIGGLE = { rotate: [-0.55, 0.55, -0.55] };
-
-/**
- * Everything on a card that already does something when it is clicked.
- *
- * The top card of a closed stack opens the pile — but these cards are full of controls, and a card
- * that both ticks a checkbox and unfolds a stack gets one of the two wrong. So the card handles a
- * click only when it landed on nothing in particular: on the title, the body text, the padding.
- * Ticking an item, following a link or pressing a control does what it says, and never also opens
- * the pile.
- */
-/** Pressing inside one of these is acting on the board, not looking away from an open pile. */
-const KEEPS_PILES_OPEN =
-  "[role='toolbar'], [role='dialog'], [role='menu'], [role='listbox'], [role='status'], [role='alert'], [data-keeps-piles-open]";
-
-const INTERACTIVE_WITHIN_CARD =
-  "a, button, input, select, textarea, label, [role='button'], [role='checkbox'], [role='link']";
 
 /**
  * The rest of the pile, showing under the card that is standing in for it.
@@ -1512,266 +1489,5 @@ function BoardCardCell({
         </motion.div>
       </motion.div>
     </div>
-  );
-}
-
-type BoardGroupSectionProps = {
-  group: BoardGroup;
-  canMove: boolean;
-  onMoveStep: (direction: "up" | "down") => void;
-  onDragMove: (element: HTMLElement) => void;
-  onRename?: (groupId: string, name: string) => void;
-  onToggle?: (groupId: string) => void;
-  onDissolve?: (groupId: string) => void;
-  /** Paints the area. Absent on a board that cannot be changed. */
-  onRecolour?: (groupId: string, accent: AreaAccent) => void;
-  /** The earliest stage among the area's cards, shown as the area's own. */
-  stage?: BoardStage;
-  registerElement: (groupId: string, element: HTMLElement | null) => void;
-  children: ReactNode;
-};
-
-/**
- * One named area: its header, and the cards packed inside it.
- *
- * A component of its own for the same reason a card cell is — the drag controls are a hook, and an
- * area needs its own.
- *
- * An area has no position of its own; it sits where its earliest card sits. Moving it therefore
- * moves every card in it at once, which is why the grip belongs to the header rather than to any
- * of the cards inside. Dragging works exactly as it does for a card: the area lands on whatever
- * block its middle is over. The arrow keys do the same in one step, so an area is movable without
- * a pointer.
- */
-function BoardGroupSection({
-  group,
-  canMove,
-  onMoveStep,
-  onDragMove,
-  onRename,
-  onToggle,
-  onDissolve,
-  onRecolour,
-  stage,
-  registerElement,
-  children,
-}: BoardGroupSectionProps) {
-  const accent = areaAccent(group.accent);
-  const dragControls = useDragControls();
-  const element = useRef<HTMLElement | null>(null);
-
-  // The name being typed, or null when it is not being edited. A draft rather than writing every
-  // keystroke through: the areas are persisted on every change, and renaming an area character by
-  // character would be a storage write per key.
-  const [draft, setDraft] = useState<string | null>(null);
-  const editing = draft !== null;
-  const nameInput = useRef<HTMLInputElement>(null);
-
-  // Focused from an effect rather than through `autoFocus`, which `jsx-a11y` rejects — rightly, for
-  // the case it is usually reached for, a field grabbing focus on page load. This is the other
-  // case: the field appeared because the hire just made this area, and their next act is naming it.
-  useEffect(() => {
-    if (!editing) return;
-    nameInput.current?.focus();
-    nameInput.current?.select();
-  }, [editing]);
-
-  function closeName() {
-    setDraft(null);
-  }
-
-  function commitName() {
-    const next = (draft ?? "").trim();
-    // An area with no name is an area nobody can talk about, so an emptied field keeps the old one.
-    if (next && next !== group.name) onRename?.(group.id, next);
-    closeName();
-  }
-
-  function cancelName() {
-    closeName();
-  }
-
-  return (
-    <motion.section
-      ref={(node) => {
-        element.current = node;
-        registerElement(group.id, node);
-      }}
-      layout="position"
-      transition={centralSpringToken}
-      drag={canMove}
-      dragListener={false}
-      dragControls={dragControls}
-      dragSnapToOrigin
-      dragElastic={0}
-      dragMomentum={false}
-      onDrag={() => element.current && onDragMove(element.current)}
-      aria-label={group.name}
-      // Tinted rather than outlined: an area is a tray the cards sit *in*, and a dashed rectangle
-      // around white cards on a white page reads as a gap, not as a container. The tint is kept low
-      // so a board of several areas is still a board and not a set of banners — which is also why
-      // the hire picks from four quiet colours rather than from a colour wheel.
-      className={`group/area rounded-2xl border p-3 shadow-sm ${accent.box}`}
-    >
-      <header
-        className="mb-3 flex items-center justify-between gap-2"
-        // The same gesture the cards answer to: double-click the bar and the area folds or opens.
-        // Anything in the header that already does something on a click — the name, the grip, the
-        // stage, the fold and dissolve buttons — keeps doing exactly that.
-        onDoubleClick={(event) => {
-          if (!onToggle) return;
-          if ((event.target as HTMLElement).closest(INTERACTIVE_WITHIN_CARD)) return;
-
-          window.getSelection()?.removeAllRanges();
-          onToggle(group.id);
-        }}
-      >
-        <div className="flex min-w-0 items-center gap-2">
-          {canMove && (
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              title="Drag to move this area, or use the arrow keys"
-              aria-label={`Move the ${group.name} area — drag, or use the arrow keys`}
-              className="-ml-1 cursor-grab active:cursor-grabbing"
-              onPointerDown={(event) => dragControls.start(event)}
-              onKeyDown={(event) => {
-                const back = event.key === "ArrowUp" || event.key === "ArrowLeft";
-                const on = event.key === "ArrowDown" || event.key === "ArrowRight";
-                if (!back && !on) return;
-                event.preventDefault();
-                onMoveStep(back ? "up" : "down");
-              }}
-            >
-              <GripVertical className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          )}
-
-          {/* The name is the control. Renaming used to be an input that existed only in arrange
-              mode, so naming the area you had just made meant leaving what you were doing, finding
-              an unlabelled button and coming back. A heading you can click is where everybody
-              already tries first. */}
-          {editing && onRename ? (
-            <Input
-              size="sm"
-              ref={nameInput}
-              value={draft ?? ""}
-              // Selected on focus so a freshly created area's placeholder name is replaced by
-              // typing rather than edited around.
-              onFocus={(event) => event.currentTarget.select()}
-              onChange={(event) => setDraft(event.target.value)}
-              onBlur={commitName}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  commitName();
-                }
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  cancelName();
-                }
-              }}
-              aria-label={`Name of the ${group.name} area`}
-              className="max-w-56"
-            />
-          ) : (
-            <h2 className={`min-w-0 truncate text-sm font-semibold ${accent.title}`}>
-              {onRename ? (
-                <button
-                  type="button"
-                  onClick={() => setDraft(group.name)}
-                  title="Rename this area"
-                  className="max-w-full truncate rounded-sm hover:underline"
-                >
-                  {group.name}
-                </button>
-              ) : (
-                group.name
-              )}
-            </h2>
-          )}
-
-          <span className="shrink-0 text-xs text-app-text-subtle tabular-nums">
-            {group.cardIds.length}
-          </span>
-
-          {/* Said only of an area whose cards are all from finished phases: "Now" on every other
-              area would be the board labelling itself. The stage comes from the path, so it is a
-              fact here and never a control. */}
-          {stage === "BEHIND" && (
-            <Badge variant="neutral" size="sm">
-              {STAGE_LABELS[stage].title}
-            </Badge>
-          )}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1">
-          {/* Four dots, revealed on approach like the controls on a card. Always-on swatches would
-              put a paint set in the header of every area on the board, which is a lot of colour for
-              a decision most people make once and never revisit. */}
-          {onRecolour && (
-            <span className="mr-1 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-focus-within/area:opacity-100 group-hover/area:opacity-100 [[data-arranging]_&]:opacity-100">
-              {AREA_ACCENTS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => onRecolour(group.id, option)}
-                  aria-pressed={(group.accent ?? "blue") === option}
-                  title={`Paint the ${group.name} area ${areaAccent(option).label.toLowerCase()}`}
-                  aria-label={`Paint the ${group.name} area ${areaAccent(option).label.toLowerCase()}`}
-                  className="group/accent flex h-6 w-6 items-center justify-center rounded-full"
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`h-3.5 w-3.5 rounded-full transition-transform ${
-                      areaAccent(option).swatch
-                    } ${
-                      (group.accent ?? "blue") === option
-                        ? "ring-2 ring-app-text/40 ring-offset-1 ring-offset-app-surface"
-                        : "group-hover/accent:scale-125"
-                    }`}
-                  />
-                </button>
-              ))}
-            </span>
-          )}
-
-          {onDissolve && (
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              onClick={() => onDissolve(group.id)}
-              title="Take this area away — the cards stay on the board"
-              aria-label={`Take the ${group.name} area away`}
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          )}
-
-          {onToggle && (
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              onClick={() => onToggle(group.id)}
-              aria-expanded={!group.collapsed}
-              aria-label={
-                group.collapsed ? `Unfold the ${group.name} area` : `Fold the ${group.name} area`
-              }
-            >
-              {group.collapsed ? (
-                <ChevronsUpDown className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <ChevronsDownUp className="h-4 w-4" aria-hidden="true" />
-              )}
-            </Button>
-          )}
-        </div>
-      </header>
-
-      <Collapsible open={!group.collapsed}>{children}</Collapsible>
-    </motion.section>
   );
 }
