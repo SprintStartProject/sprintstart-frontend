@@ -148,16 +148,22 @@ describe("ArtifactViewerDrawer highlighting", () => {
         }
         return realSetTimeout(callback, delay, ...rest);
       }) as typeof setTimeout);
-      await serveContent("const a = 1;", "text/plain");
+      try {
+        await serveContent("const a = 1;", "text/plain");
 
-      renderDrawer("app.ts", [1]);
-      await screen.findByTestId("cited-chunk-banner");
+        renderDrawer("app.ts", [1]);
+        await screen.findByTestId("cited-chunk-banner");
 
-      expect(deferred).toHaveLength(1);
-      expect(scrollIntoView()).not.toHaveBeenCalled();
-      deferred[0]();
-      expect(scrollIntoView()).toHaveBeenCalledTimes(1);
-      spy.mockRestore();
+        // The banner can show before the content has rendered, so the timer is waited for rather
+        // than assumed; and the spy is restored whatever happens, or a failure here would swallow
+        // the 120ms timers of every test after it.
+        await waitFor(() => expect(deferred).toHaveLength(1));
+        expect(scrollIntoView()).not.toHaveBeenCalled();
+        deferred[0]();
+        expect(scrollIntoView()).toHaveBeenCalledTimes(1);
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it("does not scroll when no line is cited", async () => {
