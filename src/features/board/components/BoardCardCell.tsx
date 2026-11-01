@@ -6,15 +6,13 @@ import type { CardOrigin } from "../layout/cardOrigins";
 import type { CardSize } from "../layout/cardSizes";
 import type { CardStack } from "../layout/cardStacks";
 import { FAN_ROOM, sheetsBehind } from "../layout/stackSheets";
+import type { PileAreaMove } from "../hooks/usePileTarget";
 import type { AuthoredCardRequest, BoardCard, BoardUndoNotice } from "../types";
 import { BoardCardContext, type BoardCardControls } from "./boardCardControls";
 import { BoardCardView } from "./BoardCardView";
 import { doubleClickHandler, stackClickHandler } from "./cardCellGestures";
 import { useCardControls } from "./useCardControls";
 import { StackSheets } from "./StackSheets";
-
-/** What piling onto the lit card does to the dragged card's area, if anything. */
-export type PileAreaMove = "into" | "out" | null;
 
 /**
  * The tilt that says "this can be moved".

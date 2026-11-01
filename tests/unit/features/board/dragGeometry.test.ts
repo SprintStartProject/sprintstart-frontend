@@ -3,7 +3,10 @@ import {
   centerOf,
   contains,
   inMiddle,
+  isHolding,
+  isStillResting,
   MIDDLE_HOLD_REACH,
+  restZone,
   toViewport,
 } from "../../../../src/features/board/layout/dragGeometry";
 
@@ -79,5 +82,48 @@ describe("toViewport", () => {
 
   it("leaves a point alone on an unscrolled page", () => {
     expect(toViewport({ x: 12, y: 34 })).toEqual({ x: 12, y: 34 });
+  });
+});
+
+describe("what a dragged card rests on", () => {
+  const rested = (zone: "middle" | "edge", x = 10, y = 10) => ({ id: "c1", zone, x, y });
+
+  it("holds the middle only for the very card it was resting in the middle of", () => {
+    expect(isHolding(rested("middle"), "c1")).toBe(true);
+    expect(isHolding(rested("middle"), "c2")).toBe(false);
+    expect(isHolding(rested("edge"), "c1")).toBe(false);
+    expect(isHolding(null, "c1")).toBe(false);
+  });
+
+  it("tells the middle from the edge, and never finds a middle where nothing can be piled", () => {
+    const element = box(0, 0, 100, 100);
+
+    expect(restZone(element, { x: 50, y: 50 }, false, true)).toBe("middle");
+    expect(restZone(element, { x: 50, y: 50 }, false, false)).toBe("edge");
+    expect(restZone(element, { x: 5, y: 50 }, false, true)).toBe("edge");
+  });
+
+  it("reaches further into the middle once the pointer is already holding it", () => {
+    const element = box(0, 0, 100, 100);
+
+    expect(restZone(element, { x: 85, y: 50 }, false, true)).toBe("edge");
+    expect(restZone(element, { x: 85, y: 50 }, true, true)).toBe("middle");
+  });
+
+  it("is still resting in the middle wherever in it the pointer moves", () => {
+    expect(isStillResting(rested("middle", 0, 0), "c1", "middle", { x: 80, y: 80 })).toBe(true);
+  });
+
+  it("is still resting on an edge only while the pointer stays within a few pixels", () => {
+    const edge = rested("edge", 100, 100);
+
+    expect(isStillResting(edge, "c1", "edge", { x: 105, y: 106 })).toBe(true);
+    expect(isStillResting(edge, "c1", "edge", { x: 109, y: 100 })).toBe(false);
+  });
+
+  it("is not resting on a different card, a different zone, or nothing", () => {
+    expect(isStillResting(rested("edge"), "c2", "edge", { x: 10, y: 10 })).toBe(false);
+    expect(isStillResting(rested("edge"), "c1", "middle", { x: 10, y: 10 })).toBe(false);
+    expect(isStillResting(null, "c1", "edge", { x: 10, y: 10 })).toBe(false);
   });
 });

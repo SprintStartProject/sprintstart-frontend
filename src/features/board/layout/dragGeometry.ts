@@ -77,3 +77,44 @@ export function contains(element: HTMLElement, x: number, y: number): boolean {
 export function toViewport(point: { x: number; y: number }): { x: number; y: number } {
   return { x: point.x - window.scrollX, y: point.y - window.scrollY };
 }
+
+/** Which part of another card a dragged one is resting on. */
+export type RestZone = "middle" | "edge";
+
+/** The card and the part of it the dragged card is resting on, and where the rest began. */
+export type Resting = { id: string; zone: RestZone; x: number; y: number };
+
+/** Whether the pointer is still where it last rested in the middle of this very card. */
+export function isHolding(resting: Resting | null, candidateId: string): boolean {
+  return resting?.id === candidateId && resting.zone === "middle";
+}
+
+/** The middle of a card, or its edge — and the middle only when there is somewhere to pile. */
+export function restZone(
+  element: HTMLElement,
+  point: { x: number; y: number },
+  holding: boolean,
+  canPile: boolean,
+): RestZone {
+  return canPile && inMiddle(element, point.x, point.y, holding ? MIDDLE_HOLD_REACH : undefined)
+    ? "middle"
+    : "edge";
+}
+
+/**
+ * Whether the pointer is still resting where it was.
+ *
+ * The middle only has to be *stayed in*: it is small and deliberate, and asking a hand to hold
+ * still inside it as well made piling feel broken. The edge has to be rested on, or every drag
+ * towards a middle would shuffle the cards on its way in.
+ */
+export function isStillResting(
+  resting: Resting | null,
+  candidateId: string,
+  zone: RestZone,
+  point: { x: number; y: number },
+): boolean {
+  if (resting?.id !== candidateId || resting.zone !== zone) return false;
+
+  return zone === "middle" || Math.hypot(point.x - resting.x, point.y - resting.y) <= STILL_PX;
+}
