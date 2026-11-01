@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { shouldRenderAsMarkdown } from "../../../../src/features/knowledge-base/artifactPresentation";
+import {
+  contentKind,
+  shouldRenderAsMarkdown,
+} from "../../../../src/features/knowledge-base/artifactPresentation";
 import type { Artifact, ArtifactContent } from "../../../../src/features/knowledge-base/types";
 
 function artifact(overrides: Partial<Artifact> = {}): Artifact {
@@ -95,5 +98,44 @@ describe("shouldRenderAsMarkdown", () => {
 
   it("does not render a plain file as markdown just because the connector does not say so", () => {
     expect(renders(content(), artifact(), false)).toBe(false);
+  });
+});
+
+describe("contentKind", () => {
+  const text = (value = "some body text", mimeType = "text/plain"): ArtifactContent => ({
+    content: value,
+    mimeType,
+    isObjectUrl: false,
+  });
+
+  it("is source while nothing is loaded", () => {
+    expect(contentKind(null, false, "rendered")).toBe("source");
+    expect(contentKind(null, true, "rendered")).toBe("source");
+  });
+
+  it("is empty for a body with nothing in it, even when it is markdown", () => {
+    expect(contentKind(text(""), true, "rendered")).toBe("empty");
+    expect(contentKind(text("   \n "), false, "source")).toBe("empty");
+  });
+
+  it("is markdown for markdown the reader wants formatted", () => {
+    expect(contentKind(text(), true, "rendered")).toBe("markdown");
+  });
+
+  it("is source for markdown the reader wants as source", () => {
+    expect(contentKind(text(), true, "source")).toBe("source");
+  });
+
+  it("is source for text that is not markdown", () => {
+    expect(contentKind(text(), false, "rendered")).toBe("source");
+  });
+
+  it("is pdf for a pdf, whatever the markdown settings", () => {
+    expect(contentKind(text("blob:x", "application/pdf"), false, "rendered")).toBe("pdf");
+    expect(contentKind(text("blob:x", "application/pdf"), true, "rendered")).toBe("markdown");
+  });
+
+  it.each(["image/png", "image/svg+xml"])("is image for %s", (mimeType) => {
+    expect(contentKind(text("blob:x", mimeType), false, "rendered")).toBe("image");
   });
 });

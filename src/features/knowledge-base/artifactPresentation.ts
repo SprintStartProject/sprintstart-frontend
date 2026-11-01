@@ -1,3 +1,4 @@
+import { isEmptyContent } from "./summarizability";
 import type { Artifact, ArtifactContent } from "./types";
 
 const MARKDOWN_EXTENSIONS = [".md", ".markdown", ".mdown", ".mkd"];
@@ -43,3 +44,23 @@ export const shouldRenderAsMarkdown = (
     sourceUrl.includes("/wiki/spaces/")
   );
 };
+
+/** How the drawer shows an artifact's content. */
+export type ContentKind = "empty" | "markdown" | "pdf" | "image" | "source";
+
+/**
+ * Picks how to show the content: a notice for an empty body, rendered markdown when it
+ * is markdown and the reader wants it formatted, the browser's PDF or image viewer for
+ * those, and a numbered source listing for everything else (also while nothing is loaded).
+ */
+export function contentKind(
+  content: ArtifactContent | null,
+  rendersMarkdown: boolean,
+  markdownViewMode: "rendered" | "source",
+): ContentKind {
+  if (content && isEmptyContent(content)) return "empty";
+  if (content && rendersMarkdown && markdownViewMode === "rendered") return "markdown";
+  if (content?.mimeType === "application/pdf") return "pdf";
+  if (content?.mimeType.startsWith("image/")) return "image";
+  return "source";
+}
