@@ -1,5 +1,4 @@
 import {
-  Children,
   useCallback,
   useEffect,
   useMemo,
@@ -9,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "framer-motion";
-import { ChevronsDownUp, ChevronsUpDown, GripVertical, Layers, X } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, GripVertical, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Collapsible } from "../../../components/ui/Collapsible";
@@ -17,22 +16,13 @@ import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
 import { centralSpringToken } from "../../../styles/tokens";
-import { ChecklistCard } from "./ChecklistCard";
-import { CompetencyProgressCard } from "./CompetencyProgressCard";
-import { CurrentTaskCard } from "./CurrentTaskCard";
-import { DiagramCard } from "./DiagramCard";
-import { LinkCard } from "./LinkCard";
 import { originOf, type CardOrigin, type CardOrigins } from "../layout/cardOrigins";
 import { useBoardPath } from "../hooks/boardPath";
 import { leadsOntoPath } from "../layout/pathStages";
-import { MemoryRecapCard } from "./MemoryRecapCard";
-import { NoteCard } from "./NoteCard";
-import { ArrivalStepsCard } from "./ArrivalStepsCard";
-import { OpenPullRequestsCard } from "./OpenPullRequestsCard";
-import { PathStepCard } from "./PathStepCard";
-import { SuggestedTasksCard } from "./SuggestedTasksCard";
-import { TaskPoolCard } from "./TaskPoolCard";
 import { BoardCardContext } from "./boardCardControls";
+import { BoardCardView } from "./BoardCardView";
+import { ExpandedStack } from "./ExpandedStack";
+import { GridBlock } from "./GridBlock";
 import { BoardStageBand } from "./BoardStageBand";
 import { cardAccent } from "../layout/cardAccents";
 import { AREA_ACCENTS, areaAccent, type AreaAccent } from "../layout/areaAccents";
@@ -64,6 +54,8 @@ import {
   stagesOf,
   type Band,
   type Block,
+  GRID_GAP,
+  ROW_UNIT,
   type Item,
 } from "../layout/gridBlocks";
 import {
@@ -211,100 +203,6 @@ const FAN_ROOM = ["", "pb-4 motion-safe:hover:pb-14", "pb-6 motion-safe:hover:pb
  */
 const SHEET_HOVERED = "hover:border-app-brand-border-strong! hover:bg-app-brand-soft!";
 
-/**
- * The board's grid, in pixels.
- *
- * `ROW_UNIT` is deliberately tiny: a card is given as many of these rows as it measures, so the
- * unit is the resolution of the layout rather than a row height anybody sees. Small enough that a
- * card is never rounded up by more than a few pixels, large enough that the browser is not laying
- * out a thousand tracks.
- */
-const ROW_UNIT = 8;
-
-/** The gap between cards. In JS because the row maths has to use the same number. */
-const GRID_GAP = 16;
-
-type GridBlockProps = {
-  /** How many of the grid's columns this block takes. */
-  span: number;
-  /** The grid's gap, which the row maths has to agree with. */
-  gap: number;
-  /** Whether the reader asked for less motion, which the arrival and exit honour. */
-  reduceMotion: boolean;
-  children: ReactNode;
-};
-
-/**
- * One block in the board's grid: as wide as it was told, and as tall as it turns out to be.
- *
- * **Measured, not estimated.** A card can be one column, two, or four, and a grid places things in
- * rows, so a row is only as honest as the height it was given: the block asks the browser how tall
- * it actually is and claims that many of the grid's small rows. A wrong answer here is cards
- * overlapping.
- *
- * The `ResizeObserver` is what keeps it right afterwards: a checklist that is ticked, a card that
- * is folded, a band that opens — all of them change a height without changing anything this
- * component is passed, and all of them would otherwise leave the grid holding the old number.
- */
-function GridBlock({ span, gap, reduceMotion, children }: GridBlockProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [rows, setRows] = useState(1);
-
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-
-    // No first measurement of our own: `ResizeObserver` reports the initial size as soon as it
-    // observes, so calling it here as well would be a second render for the same number.
-    const observer = new ResizeObserver(([entry]) => {
-      // The *layout* height, never `getBoundingClientRect()`.
-      //
-      // This block is a motion element that arrives at `scale: 0.97` and animates to 1, and a
-      // bounding rect is the drawn size — so a first measurement that lands while that animation is
-      // still running reports the block three percent short. Nothing corrects it afterwards either:
-      // a transform does not change the border box, so the observer never fires again, and the
-      // block keeps a row count taken from a frame it was mid-animation in.
-      //
-      // Which is exactly the shape of the bug people saw — cards overlapping *sometimes*, depending
-      // on how wide the board was and how much else was arriving at the same moment.
-      // `borderBoxSize` is the geometry the grid actually places against, and it is blind to
-      // transforms.
-      const height =
-        entry?.borderBoxSize?.[0]?.blockSize ??
-        (element as HTMLElement).offsetHeight ??
-        element.getBoundingClientRect().height;
-
-      setRows(Math.max(1, Math.ceil((height + gap) / (ROW_UNIT + gap))));
-    });
-
-    observer.observe(element);
-
-    return () => observer.disconnect();
-  }, [gap]);
-
-  return (
-    // The animation lives here rather than one level in, because `AnimatePresence` can only hold a
-    // block back long enough to fade it if the block it is holding is a motion element.
-    <motion.div
-      style={{ gridColumn: `span ${span}`, gridRow: `span ${rows}` }}
-      initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      // Quick and its own transition: a leaving block is out of the flow already, and a
-      // spring-length exit would leave it fading over whatever moved into its place.
-      exit={{
-        opacity: 0,
-        ...(reduceMotion ? {} : { scale: 0.97 }),
-        transition: { duration: 0.12, ease: "easeIn" },
-      }}
-      transition={centralSpringToken}
-    >
-      {/* Deliberately not stretched to the grid row: a measurement that read back the height the
-          grid gave it would be measuring its own answer. */}
-      <div ref={ref}>{children}</div>
-    </motion.div>
-  );
-}
-
 /** What piling onto the lit card does to the dragged card's area, if anything. */
 type PileAreaMove = "into" | "out" | null;
 
@@ -414,118 +312,6 @@ type BoardGridProps = {
    */
   onCardAdded?: () => void;
 };
-
-type SharedProps = {
-  card: BoardCard;
-  onDismiss?: (cardId: string) => void;
-  dismissing: boolean;
-  /** Where this card came from, for the kinds that can have been found somewhere. */
-  origin?: CardOrigin | null;
-  /** Told when this card made another one — see `BoardGridProps.onCardAdded`. */
-  onCardAdded?: () => void;
-};
-
-/**
- * Renders one card by its kind.
- *
- * The catalog is closed, so this switch is exhaustive by construction — but an unknown kind still
- * renders something visible rather than nothing: a card that silently disappears because the client
- * is a version behind is indistinguishable from the mentor never having placed it.
- */
-type BoardCardViewProps = SharedProps & {
-  onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
-  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
-  /** True while this card's own undo is in flight. */
-  restoring: boolean;
-  /** True while this card is being written to — an edit, or a tick, still on its way. */
-  saving: boolean;
-  /** What just happened to this card's undo, when anything did. */
-  undoNotice: BoardUndoNotice | null;
-};
-
-function BoardCardView({
-  card,
-  onEdit,
-  onRestorePrevious,
-  restoring,
-  saving,
-  undoNotice,
-  origin,
-  onCardAdded,
-  ...shared
-}: BoardCardViewProps) {
-  // Only the authored kinds take an origin — all three of them now, since a checklist minted from
-  // a task is as found as a note taken from a paragraph. It is unpacked here rather than spread
-  // with the rest: a live card was never found anywhere, and handing it a prop it ignores invites
-  // somebody to wire one up later and wonder why nothing shows.
-  const props = { card, ...shared };
-  switch (card.content.kind) {
-    case "ARRIVAL_STEPS":
-      return <ArrivalStepsCard content={card.content} {...props} />;
-    case "OPEN_PULL_REQUESTS":
-      return <OpenPullRequestsCard content={card.content} {...props} />;
-    case "CURRENT_TASK":
-      return <CurrentTaskCard content={card.content} onCardAdded={onCardAdded} {...props} />;
-    case "SUGGESTED_TASKS":
-      return <SuggestedTasksCard content={card.content} onCardAdded={onCardAdded} {...props} />;
-    case "TASK_POOL":
-      return <TaskPoolCard content={card.content} {...props} />;
-    case "COMPETENCY_PROGRESS":
-      return <CompetencyProgressCard content={card.content} {...props} />;
-    case "MEMORY_RECAP":
-      return <MemoryRecapCard content={card.content} {...props} />;
-    case "DIAGRAM":
-      return <DiagramCard content={card.content} {...props} />;
-    case "PATH_STEP":
-      return <PathStepCard content={card.content} {...props} />;
-    case "NOTE":
-      return (
-        <NoteCard
-          content={card.content}
-          onEdit={onEdit}
-          onRestorePrevious={onRestorePrevious}
-          restoring={restoring}
-          saving={saving}
-          undoNotice={undoNotice}
-          origin={origin}
-          {...props}
-        />
-      );
-    case "LINK":
-      return (
-        <LinkCard
-          content={card.content}
-          onRestorePrevious={onRestorePrevious}
-          restoring={restoring}
-          saving={saving}
-          undoNotice={undoNotice}
-          origin={origin}
-          {...props}
-        />
-      );
-    case "CHECKLIST":
-      return (
-        <ChecklistCard
-          content={card.content}
-          onEdit={onEdit}
-          onRestorePrevious={onRestorePrevious}
-          restoring={restoring}
-          saving={saving}
-          undoNotice={undoNotice}
-          origin={origin}
-          {...props}
-        />
-      );
-    default:
-      return (
-        <section className="rounded-2xl border border-dashed border-app-border p-4">
-          <p className="text-sm text-app-text-muted">
-            This card needs a newer version of the app to show.
-          </p>
-        </section>
-      );
-  }
-}
 
 /** Stand-ins for a board rendered without undo state — one with no writes to report. */
 const NO_IDS: ReadonlySet<string> = new Set();
@@ -1258,94 +1044,6 @@ export function BoardGrid({
             columns,
           )}
     </div>
-  );
-}
-
-type ExpandedStackProps = {
-  stack: CardStack;
-  /** Puts the pile back together. Absent on a board whose stacks cannot be opened. */
-  onCollapse?: () => void;
-  children: ReactNode;
-};
-
-/**
- * A sequence that has been spread out, held together so it still reads as one.
- *
- * The point of opening a pile is seeing the run — which the layout would take straight back if the
- * cards were released into the packing: two columns and a greedy pass would deal the third card
- * beside the first and put somebody else's note between them. So the run keeps one slot and lays
- * its cards out inside it, in the order they are meant to be worked, and stays inside whatever area
- * it was filed in.
- *
- * Numbered down the left, because that is the one thing a spread-out sequence stops saying for
- * itself: closed, the pile *was* the claim that these come in an order; open, the cards look like
- * any other cards under each other.
- *
- * Quieter than an area's frame on purpose — dashed, untinted. An area is somewhere the hire filed
- * things; this is a pile they happen to have open, and it closes again the moment they look
- * elsewhere.
- */
-function ExpandedStack({ stack, onCollapse, children }: ExpandedStackProps) {
-  const reduceMotion = useReducedMotion();
-
-  return (
-    <motion.section
-      // `layout` so the frame grows and shrinks with what is in it rather than jumping to its
-      // final height. Safe here in a way it is not around a card: nothing inside this is a drag
-      // target, so there is no hit-test being measured mid-animation.
-      layout
-      initial={reduceMotion ? false : { opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{
-        opacity: 0,
-        ...(reduceMotion ? {} : { scale: 0.98 }),
-        transition: { duration: 0.12, ease: "easeIn" },
-      }}
-      transition={centralSpringToken}
-      aria-label={`Sequence of ${stack.memberIds.length} cards`}
-      // Read by the click-away handler: a press on this frame's header, padding or numbers is a
-      // press *on the open pile*, not away from it. Without it, "Put back" would be caught as a
-      // click outside, close the pile, and then have its own handler open it straight back up.
-      data-stack-root={stack.rootId}
-      className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted/40 p-3"
-    >
-      <header className="mb-3 flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-app-text-muted">
-          <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span className="truncate">
-            {stack.memberIds.length} cards, in order · {stack.remaining} still to do
-          </span>
-        </span>
-
-        {onCollapse && (
-          <Button variant="ghost" size="sm" onClick={onCollapse}>
-            Put back
-          </Button>
-        )}
-      </header>
-
-      {/* Numbered so the order survives being spread out. `tabular-nums` keeps a two-digit step
-          from shifting its card a pixel left of the one above it. */}
-      {/* The cards arrive one after another rather than all at once. Four appearing on the same
-          frame is a pop; the same four arriving down the list is a pile being dealt out, which is
-          what just happened. 45ms apart — enough to read as a sequence, short enough that the last
-          one is not still on its way when the eye gets there. */}
-      <ol className="space-y-4">
-        {Children.map(children, (child, index) => (
-          <motion.li
-            initial={reduceMotion ? false : { opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...centralSpringToken, delay: reduceMotion ? 0 : index * 0.045 }}
-            className="flex min-w-0 items-start gap-2"
-          >
-            <span className="mt-4 w-4 shrink-0 text-right text-xs text-app-text-subtle tabular-nums">
-              {index + 1}
-            </span>
-            <div className="min-w-0 flex-1">{child}</div>
-          </motion.li>
-        ))}
-      </ol>
-    </motion.section>
   );
 }
 

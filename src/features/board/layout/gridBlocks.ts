@@ -248,3 +248,16 @@ export function orderAfterBlockMove(
 
   return [...rest.slice(0, at), ...moved, ...rest.slice(at)];
 }
+
+/**
+ * The board's grid, in pixels.
+ *
+ * `ROW_UNIT` is deliberately tiny: a card is given as many of these rows as it measures, so the
+ * unit is the resolution of the layout rather than a row height anybody sees. Small enough that a
+ * card is never rounded up by more than a few pixels, large enough that the browser is not laying
+ * out a thousand tracks.
+ */
+export const ROW_UNIT = 8;
+
+/** The gap between cards. In JS because the row maths has to use the same number. */
+export const GRID_GAP = 16;
