@@ -888,9 +888,6 @@
     "complexity": {
       "count": 2
     },
-    "max-depth": {
-      "count": 1
-    },
     "max-lines": {
       "count": 1
     },

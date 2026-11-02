@@ -1,38 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  getMessages,
-  getSessions,
   createSession,
   binSession as binSessionApi,
-  streamOpenBuddy,
   type BuddyOpeningAction,
-  type BuddySessionSummary,
 } from "../../../services/buddyService";
-import { buddySessionIdFromPath } from "../buddyPagePath";
 import { clearDraft } from "../buddyDraftStorage";
 import { useAuth } from "../../../context/useAuth";
 import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
-import type { BuddyMessage, BuddyMessageView } from "../types";
+import type { BuddyMessageView } from "../types";
 import type { BuddySessionFilters, QueuedBuddyMessage } from "../types";
 import {
   BIN_MOVE_FAILED,
   CONVERSATION_FAILED,
-  GREETING_FAILED,
   HISTORY_FAILED,
   isNotFound,
 } from "../conversation/replyMessages";
-import {
-  appendToken,
-  greetingPlaceholder,
-  settleGreeting,
-  withHistory,
-} from "../conversation/messageReducers";
-import {
-  blankSession,
-  chooseSession,
-  mergeFetchedSessions,
-  reusableBlankSession,
-} from "../conversation/sessionRules";
+import { blankSession, reusableBlankSession } from "../conversation/sessionRules";
 import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
 import { useDinoSurface } from "./useDinoSurface";
 import { useProposalActions } from "./useProposalActions";
@@ -42,6 +25,9 @@ import { useMessageQueue } from "./useMessageQueue";
 import { useSessionStore } from "./useSessionStore";
 import { useTeamMode } from "./useTeamMode";
 import { useTurnRunner } from "./useTurnRunner";
+import { useOpening } from "./useOpening";
+import { useSessionResolution } from "./useSessionResolution";
+import { createOpeningLatches } from "../conversation/openingLatches";
 
 export type { ProjectSelectionSlice } from "../conversation/projectSelection";
 import type { ProjectSelectionSlice } from "../conversation/projectSelection";
@@ -146,15 +132,8 @@ export function useBuddyConversation(
     bindTeamTarget,
   } = useTeamMode(selection, userId, onTeamModeLeft);
 
-  const loadedRef = useRef(false);
-  // Guards the greeting against overlapping calls — see `newConversation` and `selectSession`.
-  const greetingRef = useRef(false);
-  /**
-   * Which move the banner's "Try again" must redo. A failed "new conversation" retries as
-   * itself — `ensureOpened` would no-op out of it (the conversation is already loaded), which
-   * cleared the banner and did nothing else. Set by the failure site, consumed by `retryOpen`.
-   */
-  const retryRef = useRef<"newConversation" | null>(null);
+  // Guards the opening moves against overlapping calls and remembers which one "Try again" redoes.
+  const [latches] = useState(createOpeningLatches);
 
   const { queued, queuePaused, commitQueued, setQueuePaused, queuedNow, pausedNow } =
     useMessageQueue();
@@ -195,145 +174,18 @@ export function useBuddyConversation(
   const onResolveFailed = useCallback(() => {
     // The banner this puts up owns the retry, like every other failure site: a stale "new
     // conversation" marker must not outvote the move that actually failed.
-    retryRef.current = null;
+    latches.setRetryMove(null);
     setOpenError(HISTORY_FAILED);
-  }, []);
+  }, [latches]);
 
-  /**
-   * Streams the buddy's opening greeting into the thread.
-   *
-   * Only called for a conversation with nothing in it — the hire's first, or a team
-   * conversation nobody has spoken in. A conversation that already has words is read, never
-   * re-greeted: the greeting belongs to the conversation, and the second one *under* the
-   * transcript was what the visit divider used to explain — both went with the visit model
-   * (visits are replaced by conversations, and only the hire's first conversation opens with
-   * the greeting; see the issue).
-   *
-   * The greeting is a single growing message rather than one per token, so the hire watches it
-   * being written instead of watching messages pile up.
-   *
-   * @param target - Which conversation it is for — `sessionId` for the hire's own, or
-   *   `teamProjectId` for a team conversation. Passed at call time, never captured: a switch
-   *   that lands between turns opens the right one.
-   */
-  const greet = useCallback(async (target: { sessionId?: string; teamProjectId?: string }) => {
-    const id = crypto.randomUUID();
-
-    // The greeting claims its place in the thread before the stream is awaited: the composer is
-    // live while it is written, and a question typed straight away must not land above it. An empty
-    // assistant turn renders nothing (see `BuddyThread`).
-    setMessages((prev) => [...prev, greetingPlaceholder(id, new Date().toISOString())]);
-
-    // A bag rather than two `let`s: a local written only inside callbacks narrows to its initial
-    // value at the read below, a property does not.
-    const stream = { wroteSomething: false, failure: null as string | null };
-
-    // The switch gate holds for the whole greeting, not just the empty-screen part — see
-    // `isGreeting`.
-    setIsGreeting(true);
-    try {
-      await streamOpenBuddy(
-        {
-          onToken: (token) => {
-            stream.wroteSomething = true;
-            setMessages((prev) => appendToken(prev, id, token));
-            // The surface stops waiting at the first word, not the last: everything after this
-            // is the hire reading along, and the composer is theirs from here.
-            setIsOpening(false);
-          },
-          onAction: setOpenerAction,
-          onDone: () => setIsOpening(false),
-          onError: (message) => {
-            console.error(message);
-            stream.failure = GREETING_FAILED;
-          },
-        },
-        target.sessionId,
-        target.teamProjectId,
-      );
-    } catch (e) {
-      console.error(e);
-      stream.failure = GREETING_FAILED;
-    } finally {
-      setMessages((prev) => settleGreeting(prev, id, stream));
-
-      setIsOpening(false);
-      setIsGreeting(false);
-    }
-  }, []);
-
-  /** Merges a read window in front of whatever is already there, never assigned over it.
-   *
-   * The fetch is in flight while the composer is live, so a hire who types straight away has
-   * an optimistic turn in the list by the time this resolves — assigning would delete their
-   * own message out from under them. History is older, so it belongs in front.
-   */
-  const mergeHistory = useCallback((history: BuddyMessage[]) => {
-    setMessages((prev) => withHistory(prev, history));
-  }, []);
-
-  /**
-   * The conversation the hire was last in: their newest one, or a brand-new one when they
-   * have none at all.
-   *
-   * Prefers the conversation this app session was already in when the list still holds it —
-   * a team-mode round trip or a retry must not move the hire out of their conversation. Before
-   * that, a conversation the address names (`/buddy/:id` — a reload, a shared link): resolving
-   * the newest and then switching would read a conversation nobody asked for and flash it, and
-   * the switch is refused while that first read is still running. Read from the window at
-   * resolve time, like `currentPage` on a send, because the dock resolves at app mount — before
-   * the lazily loaded page could hand the address over.
-   *
-   * Memoised in flight, because the composer is live from the first paint: a send racing the
-   * opening read must land on the same conversation, not create a second.
-   */
-  const resolveHireSession = useCallback(async (): Promise<string> => {
-    return shareResolution(async () => {
-      const list = await getSessions();
-
-      if (list.length > 0) {
-        const addressed = buddySessionIdFromPath(window.location.pathname);
-        const chosen = chooseSession(list, addressed, currentSessionNow());
-        applySessions(list);
-        applyCurrentSession(chosen);
-        return chosen;
-      }
-
-      const createdId = await createSession();
-      applySessions([blankSession(createdId, new Date().toISOString())]);
-      applyCurrentSession(createdId);
-      return createdId;
-    });
-  }, [applySessions, applyCurrentSession, shareResolution, currentSessionNow]);
-
-  /**
-   * Re-reads the conversation list.
-   *
-   * The backend names a conversation from its first message, and the list is otherwise read
-   * once at open and edited locally from there — so without this, every conversation started in
-   * a session read "New conversation" in the rail until a reload. Called when a first turn
-   * completes on a row that is still untitled; the refreshed read naturally stops needing it.
-   * The page also calls it once before giving up on an address the list does not hold — a
-   * conversation started in another tab is newer than this session's read.
-   *
-   * @returns The list as applied, or `null` when the read failed.
-   */
-  const refreshSessions = useCallback(async (): Promise<BuddySessionSummary[] | null> => {
-    try {
-      const read = await getSessions();
-
-      // A conversation binned while this read was in flight is still in it — the read is a
-      // moment — so the tombstone wins over the row (see `binnedSessionIdsRef`); and one created
-      // while it was in flight is newer than that moment, so it stays in front.
-      const next = mergeFetchedSessions(read, binnedNow(), sessionsNow());
-      applySessions(next);
-      return next;
-    } catch (e) {
-      // Cosmetic only: the rail keeps the titles it has; the next completed turn tries again.
-      console.error(e);
-      return null;
-    }
-  }, [applySessions, binnedNow, sessionsNow]);
+  const { resolveHireSession, refreshSessions } = useSessionResolution({
+    applySessions,
+    applyCurrentSession,
+    sessionsNow,
+    currentSessionNow,
+    binnedNow,
+    shareResolution,
+  });
 
   const { tracker, sendMessage, stopStreaming, stopRunningTurn } = useTurnRunner({
     setMessages,
@@ -355,116 +207,20 @@ export function useBuddyConversation(
     onTurnStopped,
   });
 
-  /**
-   * Brings one conversation on screen: reads it, merges its window in front of anything the
-   * composer has already put up, and greets only the hire's first, never-spoken conversation.
-   * Never-spoken is read as of when the read settles: a turn the composer sent while
-   * `getMessages` was still in flight is the hire having spoken, and a greeting over it would
-   * answer their question with a hello.
-   *
-   * A conversation with anything in it is read, not re-greeted — the greeting belongs to the
-   * conversation, not to every reopening of it — and a conversation the hire created on
-   * purpose starts empty, the composer theirs (see `newConversation`).
-   *
-   * Throws when the read fails; the callers decide what that means (the mount warm-up
-   * releases its latch so "Try again" can retry, a pick from the list reports it in place).
-   */
-  const openSession = useCallback(
-    async (sessionId: string) => {
-      setIsOpening(true);
-      setOpenError(null);
-
-      try {
-        const history = await getMessages(sessionId);
-
-        // A read for a conversation that has left the screen is not this thread's to show. Every
-        // switch refuses while an open runs, so this guards the invariant for the next caller.
-        if (currentSessionNow() !== sessionId) return;
-
-        mergeHistory(history);
-
-        if (
-          history.length === 0 &&
-          sessionsNow().length === 1 &&
-          !messagesRef.current.some((message) => message.role === "USER")
-        ) {
-          greetingRef.current = true;
-          try {
-            await greet({ sessionId });
-          } finally {
-            greetingRef.current = false;
-          }
-        }
-      } finally {
-        setIsOpening(false);
-      }
-    },
-    [greet, mergeHistory, currentSessionNow, sessionsNow],
+  const openView = useMemo(
+    () => ({ setMessages, setOpenerAction, setIsOpening, setIsGreeting, setOpenError }),
+    [],
   );
-
-  /**
-   * Brings the current conversation on screen, once per app session.
-   *
-   * For the hire it first resolves *which* conversation that is — the newest, or the one this
-   * window was last in — then reads it and, only for the first, still-empty conversation,
-   * opens the greeting. Reading first is what keeps a reload from replacing the transcript:
-   * everything read is merged in front of what is already on screen, never assigned over it.
-   *
-   * Nothing is deleted by leaving a conversation, and nothing older than its current window is
-   * replayed — `getMessages` returns from the conversation's last opening marker, and the
-   * durable memory note, not the transcript, is what carries continuity.
-   *
-   * Team mode names its project instead of a session: one conversation per project, read the
-   * same way and greeted only while it is still empty.
-   *
-   * Idempotent by ref rather than by state, so the dock's mount effect and the page's can both
-   * call it without either double-fetching or racing.
-   */
-  const ensureOpened = useCallback(async () => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
-    setIsOpening(true);
-    setOpenError(null);
-
-    try {
-      const teamId = teamProjectNow();
-
-      if (teamId === null) {
-        const sessionId = await resolveHireSession();
-        await openSession(sessionId);
-      } else {
-        const history = await getMessages(undefined, teamId);
-
-        // Same invariant as `openSession`'s: a switch that happened while this read was in
-        // flight makes the read stale, and stale history does not merge.
-        if (teamProjectNow() !== teamId) return;
-
-        mergeHistory(history);
-
-        if (
-          history.length === 0 &&
-          !messagesRef.current.some((message) => message.role === "USER")
-        ) {
-          greetingRef.current = true;
-          try {
-            await greet({ teamProjectId: teamId });
-          } finally {
-            greetingRef.current = false;
-          }
-        }
-      }
-    } catch (e) {
-      console.error(e);
-      // This failure owns the banner: a retry must redo *this* read, not a stale move.
-      retryRef.current = null;
-      // The latch goes back, or one blip is permanent: this runs as the app root mounts, the widget
-      // never unmounts, and `retryOpen` is the only way back.
-      loadedRef.current = false;
-      setOpenError(HISTORY_FAILED);
-    } finally {
-      setIsOpening(false);
-    }
-  }, [resolveHireSession, openSession, mergeHistory, greet, teamProjectNow]);
+  const messagesNow = useCallback(() => messagesRef.current, []);
+  const { openSession, ensureOpened } = useOpening({
+    latches,
+    view: openView,
+    messagesNow,
+    sessionsNow,
+    currentSessionNow,
+    teamProjectNow,
+    resolveHireSession,
+  });
 
   /**
    * Brings a conversation the hire picked from the list on screen.
@@ -483,7 +239,7 @@ export function useBuddyConversation(
     async (sessionId: string): Promise<boolean> => {
       if (sessionId === currentSessionNow()) return true;
       if (teamProjectNow() !== null) return false;
-      const blocked = () => greetingRef.current || isOpening || isDeciding || decidingNow();
+      const blocked = () => latches.isBusy() || isOpening || isDeciding || decidingNow();
       if (blocked()) return false;
 
       if (tracker.isStreaming()) {
@@ -493,7 +249,7 @@ export function useBuddyConversation(
         if (blocked() || tracker.isStreaming() || teamProjectNow() !== null) return false;
         if (sessionId === currentSessionNow()) return true;
       }
-      greetingRef.current = true;
+      latches.setBusy(true);
 
       applyCurrentSession(sessionId);
       clearThread();
@@ -504,12 +260,12 @@ export function useBuddyConversation(
         console.error(e);
         // Release the latch so the banner's "Try again" can re-run the read for this
         // conversation; the switch itself stays, and the banner says what failed.
-        loadedRef.current = false;
+        latches.releaseLoad();
         // This failure owns the banner: a retry must redo this read, not a stale move.
-        retryRef.current = null;
+        latches.setRetryMove(null);
         setOpenError(HISTORY_FAILED);
       } finally {
-        greetingRef.current = false;
+        latches.setBusy(false);
       }
 
       // Switched even when the read failed: the conversation on screen is the one asked for,
@@ -517,6 +273,7 @@ export function useBuddyConversation(
       return true;
     },
     [
+      latches,
       tracker,
       isOpening,
       isDeciding,
@@ -558,7 +315,7 @@ export function useBuddyConversation(
     // and nothing to start. The controls that call this are hidden there too, but a stale
     // keyboard shortcut must not switch a manager into an empty hire thread.
     if (teamProjectNow() !== null) return;
-    const blocked = () => greetingRef.current || isOpening || isDeciding || decidingNow();
+    const blocked = () => latches.isBusy() || isOpening || isDeciding || decidingNow();
     if (blocked()) return;
 
     if (tracker.isStreaming()) {
@@ -575,7 +332,7 @@ export function useBuddyConversation(
       return;
     }
 
-    greetingRef.current = true;
+    latches.setBusy(true);
     // What this click saw, for the re-check after the create: a send that begins during the round
     // trip would otherwise land in the conversation being left and lose its optimistic turn to the
     // clears below.
@@ -605,12 +362,13 @@ export function useBuddyConversation(
       console.error(e);
       // "Try again" redoes the create itself: `ensureOpened` would no-op out of a loaded
       // conversation, so the retry has to be this move, not the opening read.
-      retryRef.current = "newConversation";
+      latches.setRetryMove("newConversation");
       setOpenError(CONVERSATION_FAILED);
     } finally {
-      greetingRef.current = false;
+      latches.setBusy(false);
     }
   }, [
+    latches,
     tracker,
     isOpening,
     isDeciding,
@@ -655,7 +413,7 @@ export function useBuddyConversation(
     async (sessionId: string) => {
       if (teamProjectNow() !== null)
         throw new Error("Conversations can't be binned while you're in team mode.");
-      if (greetingRef.current || isOpening || isDeciding || decidingNow())
+      if (latches.isBusy() || isOpening || isDeciding || decidingNow())
         throw new Error("Your buddy is still working — try again once the reply finishes.");
 
       try {
@@ -691,6 +449,7 @@ export function useBuddyConversation(
       if (currentSessionNow() === sessionId) throw new Error(BIN_MOVE_FAILED);
     },
     [
+      latches,
       tracker,
       applySessions,
       isOpening,
@@ -726,13 +485,13 @@ export function useBuddyConversation(
     setOpenError(null);
     // A failed "new conversation" retries as itself: `ensureOpened` would no-op out of a loaded
     // conversation.
-    if (retryRef.current === "newConversation") {
-      retryRef.current = null;
+    if (latches.retryMove() === "newConversation") {
+      latches.setRetryMove(null);
       await newConversation();
       return;
     }
     await ensureOpened();
-  }, [ensureOpened, newConversation]);
+  }, [latches, ensureOpened, newConversation]);
 
   /**
    * The composer's entry point — and the only path a keypress or click takes to send.
@@ -877,11 +636,12 @@ export function useBuddyConversation(
       setIsStreaming(false);
       // The latch is per conversation: releasing it is what lets `ensureOpened` read and greet
       // the one being switched to, exactly as it did the first time.
-      loadedRef.current = false;
+      latches.releaseLoad();
 
       void ensureOpened();
     })();
   }, [
+    latches,
     teamProjectId,
     isThinking,
     isStreaming,
