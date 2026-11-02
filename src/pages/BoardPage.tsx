@@ -1,5 +1,5 @@
 import { MainContent } from "../components/layout/MainContent";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AlertCircle, Check, LayoutDashboard, RefreshCw } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
@@ -10,6 +10,8 @@ import { Spinner } from "../components/ui/Spinner";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardPlanning } from "../features/board/hooks/useBoardPlanning";
+import { useCardPreferences } from "../features/board/hooks/useCardPreferences";
+import { usePanelSwitches } from "../features/board/hooks/usePanelSwitches";
 import { useCardRemovals } from "../features/board/hooks/useCardRemovals";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
@@ -30,15 +32,11 @@ import { useProjectContext } from "../features/projects/useProjectContext";
 import { useToast } from "../context/useToast";
 import { useFocusMode } from "../context/useFocusMode";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
 import {
   hasNewlyBehind,
   readBehindSeen,
   writeBehindSeen,
 } from "../features/board/layout/behindSeen";
-import { readPathWindowShown, writePathWindowShown } from "../features/board/layout/pathWindowFold";
-import { readTaskPoolShown, writeTaskPoolShown } from "../features/board/layout/taskPoolShown";
-import { readPinnedCards, writePinnedCards } from "../features/board/layout/pinnedCards";
 import {
   ALL_SECTIONS,
   markSectionColor,
@@ -53,13 +51,6 @@ import {
 } from "../features/board/layout/boardStructure";
 import type { BoardFilter } from "../features/board/layout/boardFilters";
 import type { AreaAccent } from "../features/board/layout/areaAccents";
-import {
-  isDefault,
-  readCardSizes,
-  writeCardSizes,
-  type CardSize,
-  type CardSizes,
-} from "../features/board/layout/cardSizes";
 import { readCardOrigins, type CardOrigins } from "../features/board/layout/cardOrigins";
 import { subscribeToBoardStorageReplaced } from "../features/board/layout/boardStorage";
 import { describeCuts, selectShownCards } from "../features/board/layout/boardCuts";
@@ -241,94 +232,16 @@ export function BoardPage() {
   /** What the reads below compare against: this board, at this revision of what is stored for it. */
   const storedFor = `${boardId}:${storageRevision}`;
 
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-  const [readFor, setReadFor] = useState<string | null>(null);
-
-  // Derived during render rather than in an effect, the way `SlidingTabPanel` derives its
-  // direction: the fold state has to be right on the render that first shows the board, and
-  // reading a key back out of storage is an idempotent read with nothing to synchronise.
-  if (storedFor !== readFor) {
-    setReadFor(storedFor);
-    setCollapsedIds(readCollapsedCards(boardId));
-  }
-
-  const toggleCollapsed = useCallback(
-    (cardId: string) => {
-      setCollapsedIds((current) => {
-        const next = new Set(current);
-        if (next.has(cardId)) next.delete(cardId);
-        else next.add(cardId);
-        writeCollapsedCards(boardId, next);
-        return next;
-      });
-    },
-    [boardId],
-  );
-
-  const [isPathShown, setIsPathShown] = useState(true);
-  const [pathReadFor, setPathReadFor] = useState<string | null>(null);
-
-  if (storedFor !== pathReadFor) {
-    setPathReadFor(storedFor);
-    setIsPathShown(readPathWindowShown(boardId));
-  }
-
-  const showPathWindow = useCallback(
-    (shown: boolean) => {
-      setIsPathShown(shown);
-      writePathWindowShown(boardId, shown);
-    },
-    [boardId],
-  );
-
-  /**
-   * Takes the path strip off the board, with the same undo the board gives a dismissed card.
-   *
-   * No server call behind it and nothing to wait for, so the undo is the toast alone rather than a
-   * held-back write — and the switch in the rail is the way back afterwards, which is why this is
-   * allowed to be a one-press removal at all.
-   */
-  const removePathWindow = useCallback(() => {
-    showPathWindow(false);
-    toast.info("Taken off your board", {
-      description: "You can put it back from the switches on the right.",
-      action: { label: "Undo", onClick: () => showPathWindow(true) },
-    });
-  }, [showPathWindow, toast]);
-
-  // The task pool card, on or off — a switch like the path strip rather than a dismissal. See
-  // `layout/taskPoolShown.ts` for why this one card does not get the sticky server-side removal.
-  const [isTaskPoolShown, setIsTaskPoolShown] = useState(true);
-  const [taskPoolReadFor, setTaskPoolReadFor] = useState<string | null>(null);
-
-  if (storedFor !== taskPoolReadFor) {
-    setTaskPoolReadFor(storedFor);
-    setIsTaskPoolShown(readTaskPoolShown(boardId));
-  }
-
-  const showTaskPool = useCallback(
-    (shown: boolean) => {
-      setIsTaskPoolShown(shown);
-      writeTaskPoolShown(boardId, shown);
-    },
-    [boardId],
-  );
-
-  const removeTaskPool = useCallback(() => {
-    showTaskPool(false);
-    toast.info("Task pool hidden", {
-      description: "You can put it back from the switches on the right.",
-      action: { label: "Undo", onClick: () => showTaskPool(true) },
-    });
-  }, [showTaskPool, toast]);
-
-  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
-  const [pinsReadFor, setPinsReadFor] = useState<string | null>(null);
-
-  if (storedFor !== pinsReadFor) {
-    setPinsReadFor(storedFor);
-    setPinnedIds(readPinnedCards(boardId));
-  }
+  const { collapsedIds, toggleCollapsed, pinnedIds, togglePinned, cardSizes, resizeCard } =
+    useCardPreferences(boardId, storedFor);
+  const {
+    isPathShown,
+    showPathWindow,
+    removePathWindow,
+    isTaskPoolShown,
+    showTaskPool,
+    removeTaskPool,
+  } = usePanelSwitches(boardId, storedFor);
 
   const [groups, setGroups] = useState<BoardGroup[]>([]);
   const [groupsReadFor, setGroupsReadFor] = useState<string | null>(null);
@@ -399,19 +312,6 @@ export function BoardPage() {
       ),
     );
   }
-
-  const togglePinned = useCallback(
-    (cardId: string) => {
-      setPinnedIds((current) => {
-        const next = new Set(current);
-        if (next.has(cardId)) next.delete(cardId);
-        else next.add(cardId);
-        writePinnedCards(boardId, next);
-        return next;
-      });
-    },
-    [boardId],
-  );
 
   const { pendingRemovals, handleDismiss } = useCardRemovals({
     board,
@@ -761,33 +661,6 @@ export function BoardPage() {
 
   /** The kind of card being written, or null when nothing is being added. */
   const [addingKind, setAddingKind] = useState<AuthoredCardKind | null>(null);
-
-  /** The sizes the hire pulled their cards to — see `cardSizes.ts`. */
-  const [cardSizes, setCardSizes] = useState<CardSizes>({});
-  const [sizesReadFor, setSizesReadFor] = useState<string | null>(null);
-
-  if (storedFor !== sizesReadFor) {
-    setSizesReadFor(storedFor);
-    setCardSizes(readCardSizes(boardId));
-  }
-
-  /**
-   * Sets one card's size, and forgets the entry entirely when it is pulled back to the default.
-   *
-   * Storage should hold the decisions somebody made. A row per card saying "unchanged" is not a
-   * decision, and it is what would slowly turn a preference into a copy of the board.
-   */
-  function resizeCard(cardId: string, size: CardSize) {
-    setCardSizes((current) => {
-      const next = { ...current };
-      if (isDefault(size)) delete next[cardId];
-      else next[cardId] = size;
-
-      writeCardSizes(boardId, next);
-
-      return next;
-    });
-  }
 
   /**
    * Undoes every cut at once: the step it was opened for, the filter, the section and the focus
