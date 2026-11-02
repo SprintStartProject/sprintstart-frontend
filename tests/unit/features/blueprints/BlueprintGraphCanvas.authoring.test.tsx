@@ -5,6 +5,7 @@ import {
   BlueprintGraphCanvas,
   type BlueprintGraphCanvasNode,
 } from "../../../../src/features/blueprints/components/BlueprintGraphCanvas.tsx";
+import { EDGE_STYLE_SWATCH } from "../../../../src/features/graph-diagram/edgeStyles.ts";
 import { BlueprintNodeCard } from "../../../../src/features/blueprints/components/BlueprintNodeCard.tsx";
 
 type CanvasProps = Parameters<typeof BlueprintGraphCanvas<BlueprintGraphCanvasNode>>[0];
@@ -517,5 +518,167 @@ describe("BlueprintGraphCanvas: the opened node", () => {
     expect(cover).not.toBeNull();
     fireEvent.click(within(document.body).getByRole("button", { name: /back/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("BlueprintGraphCanvas: how a node is named for a screen reader", () => {
+  const label = (id: string) => nodeEl(id).getAttribute("aria-label");
+
+  it("says a node nothing has to happen before is a place to start", () => {
+    renderCanvas([at("a", 0, 0), at("b", 600, 0, ["a"])]);
+
+    expect(label("a")).toBe("Node a, nothing has to happen first");
+  });
+
+  it("says what a node waits for, by name", () => {
+    renderCanvas([at("a", 0, 0), at("b", 600, 0), at("c", 1200, 0, ["a", "b"])]);
+
+    expect(label("c")).toBe("Node c, waits for Node a, Node b");
+  });
+});
+
+describe("BlueprintGraphCanvas: how the arrows of a lit run are drawn", () => {
+  const nodes = [
+    at("a", 0, 0),
+    at("b", 500, 0, ["a"]),
+    at("c", 1000, 0, ["b"]),
+    at("d", 0, 500),
+    at("e", 1000, 500, ["d"]),
+  ];
+  const edge = (key: string) => document.querySelector(`path[data-edge="${key}"]`)!;
+  const classOf = (key: string) => edge(key).getAttribute("class") ?? "";
+
+  it("draws what comes before the node being pointed at apart from what comes after", async () => {
+    renderCanvas(nodes);
+    expect(classOf("a->b")).toContain(EDGE_STYLE_SWATCH.rule.className);
+
+    fireEvent.mouseEnter(screen.getByTestId("graph-node-b"));
+
+    await waitFor(() => expect(classOf("b->c")).toContain("journey-edge-flow"));
+    expect(classOf("a->b")).toContain(EDGE_STYLE_SWATCH.upstream.className);
+    expect(classOf("a->b")).not.toContain("journey-edge-flow");
+  });
+
+  it("leaves an arrow outside the run alone", async () => {
+    renderCanvas(nodes);
+
+    fireEvent.mouseEnter(screen.getByTestId("graph-node-b"));
+
+    await waitFor(() => expect(classOf("b->c")).toContain("journey-edge-flow"));
+    expect(classOf("d->e")).toContain(EDGE_STYLE_SWATCH.rule.className);
+    expect(classOf("d->e")).not.toContain("journey-edge-flow");
+  });
+
+  it("does not light an arrow from the run to a node that is not in it", async () => {
+    renderCanvas([...nodes, at("f", 500, 500, ["a"])]);
+
+    fireEvent.mouseEnter(screen.getByTestId("graph-node-b"));
+
+    await waitFor(() => expect(classOf("b->c")).toContain("journey-edge-flow"));
+    expect(classOf("a->f")).toContain(EDGE_STYLE_SWATCH.rule.className);
+  });
+
+  it("lets the caller say how firm an arrow is while nothing is pointed at", () => {
+    const edgeTone = vi.fn((node: BlueprintGraphCanvasNode) =>
+      node.id === "c" ? ("active" as const) : ("rule" as const),
+    );
+    renderCanvas(nodes, { edgeTone });
+
+    expect(classOf("b->c")).toContain("journey-edge-flow");
+    expect(classOf("a->b")).not.toContain("journey-edge-flow");
+    expect(edgeTone).toHaveBeenCalledWith(expect.objectContaining({ id: "c" }), "b");
+  });
+
+  it("lets the pointed-at run win over the caller's tone", async () => {
+    renderCanvas(nodes, { edgeTone: () => "active" });
+
+    fireEvent.mouseEnter(screen.getByTestId("graph-node-b"));
+
+    await waitFor(() => expect(classOf("a->b")).toContain(EDGE_STYLE_SWATCH.upstream.className));
+  });
+});
+
+describe("BlueprintGraphCanvas: where a step goes from an opened node", () => {
+  function opened(openNodeId: string, nodes: BlueprintGraphCanvasNode[]) {
+    const onNavigateNodeDetail = vi.fn();
+    renderCanvas(nodes, {
+      openNodeId,
+      onCloseNodeDetail: vi.fn(),
+      onNavigateNodeDetail,
+      renderNodeDetail: (item) => ({ title: item.title, body: <p>Fields for {item.title}</p> }),
+    });
+    return { onNavigateNodeDetail };
+  }
+
+  it("falls back to the author's own order where nothing is connected", () => {
+    opened("b", [at("a", 0, 0), at("b", 500, 0), at("c", 1000, 0)]);
+
+    expect(screen.getByRole("button", { name: "Previous: Node a" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Next: Node c" })).toBeEnabled();
+  });
+
+  it("has nothing before the first node and nothing after the last", () => {
+    opened("a", [at("a", 0, 0), at("b", 500, 0)]);
+    expect(screen.getByRole("button", { name: "Nothing before this one" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next: Node b" })).toBeEnabled();
+  });
+
+  it("has nothing after the last node", () => {
+    opened("b", [at("a", 0, 0), at("b", 500, 0)]);
+
+    expect(screen.getByRole("button", { name: "Nothing after this one" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Previous: Node a" })).toBeEnabled();
+  });
+
+  it("goes back to the last thing the author said it waits for, and on to the first thing it opens", () => {
+    opened("c", [
+      at("a", 0, 0),
+      at("b", 500, 0),
+      at("c", 1000, 0, ["a", "b"]),
+      at("d", 1500, 0, ["c"]),
+      at("e", 2000, 0, ["c"]),
+    ]);
+
+    expect(screen.getByRole("button", { name: "Waits for: Node b" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Opens: Node d" })).toBeEnabled();
+  });
+
+  it("asks the caller to go there rather than going", () => {
+    const { onNavigateNodeDetail } = opened("b", [
+      at("a", 0, 0),
+      at("b", 500, 0),
+      at("c", 1000, 0),
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous: Node a" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next: Node c" }));
+
+    expect(onNavigateNodeDetail).toHaveBeenNthCalledWith(1, "a");
+    expect(onNavigateNodeDetail).toHaveBeenNthCalledWith(2, "c");
+  });
+
+  it("steps back on a swipe the other way", async () => {
+    const { onNavigateNodeDetail } = opened("b", [
+      at("a", 0, 0),
+      at("b", 500, 0),
+      at("c", 1000, 0),
+    ]);
+    const surface = screen.getByRole("dialog", { name: "Node b" }).parentElement as HTMLElement;
+
+    fireEvent.wheel(surface, { deltaX: -60, deltaY: 0 });
+
+    await waitFor(() => expect(onNavigateNodeDetail).toHaveBeenCalledWith("a"));
+  });
+
+  it("opens a node by asking the caller, not the camera, when there is no page to open it into", () => {
+    const onNodeClick = vi.fn();
+    renderCanvas([at("a", 0, 0), at("b", 500, 0)], { onNodeClick });
+
+    const element = screen.getByTestId("graph-node-a");
+    fireEvent.pointerDown(element, { button: 0, pointerId: 1 });
+    fireEvent.pointerUp(element, { button: 0, pointerId: 1 });
+
+    expect(onNodeClick).toHaveBeenCalledTimes(1);
+    expect(onNodeClick.mock.calls[0][0].id).toBe("a");
   });
 });
