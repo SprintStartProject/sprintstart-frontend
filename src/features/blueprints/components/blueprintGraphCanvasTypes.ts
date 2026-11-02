@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import type { JourneyEdgeTone } from "../../onboarding/graph/JourneyCanvas.tsx";
-import type { ChainPosition } from "../../graph-diagram/graphLayout.ts";
+import { type ChainPosition, type JourneyEdgeTone } from "../graphKit.ts";
 
 export type { JourneyEdgeTone };
 
@@ -101,7 +100,7 @@ export type Props<TNode extends BlueprintGraphCanvasNode> = {
    *
    * Held by the caller rather than here, because closing is not always allowed: an editor with
    * unsaved fields has to ask first, and a canvas that had already closed would be asking about
-   * something the author can no longer see. Opening goes through `onNodeClick`, which is also
+   * something the author cannot see. Opening goes through `onNodeClick`, which is also
    * where the caller loads the node into whatever it draws.
    */
   openNodeId?: string | null;

@@ -1,11 +1,11 @@
 import { useCallback, type KeyboardEvent, type RefObject } from "react";
 import {
-  keyboardNeighbour,
   type GraphDirection,
+  type GraphPoint,
   type GraphPositions,
-} from "../../graph-diagram/graphLayout.ts";
-import type { JourneyCameraHandle } from "../../onboarding/graph/JourneyCanvas.tsx";
-import type { GraphPoint } from "../../onboarding/graph/layout.ts";
+  type JourneyCameraHandle,
+  keyboardNeighbour,
+} from "../graphKit.ts";
 import type { BlueprintGraphCanvasNode } from "../components/blueprintGraphCanvasTypes.ts";
 
 const DIRECTIONS: Record<string, GraphDirection> = {

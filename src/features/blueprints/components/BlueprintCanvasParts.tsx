@@ -3,7 +3,7 @@ import { Flag, Info, LayoutGrid, Plus, Search, TriangleAlert, Waypoints } from "
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Spinner } from "../../../components/ui/Spinner.tsx";
-import { CanvasButton } from "../../onboarding/graph/JourneyCanvas.tsx";
+import { CanvasButton } from "../graphKit.ts";
 import type { ChainHalf } from "../hooks/useChainFocus.ts";
 
 /**

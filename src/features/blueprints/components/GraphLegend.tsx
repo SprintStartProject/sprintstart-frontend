@@ -1,7 +1,6 @@
 import { useId } from "react";
 import { Flag, KeyRound, X } from "lucide-react";
-import { EdgeSwatch } from "../../graph-diagram/EdgeLegend.tsx";
-import { LOCK_SENTENCE } from "../../graph-diagram/lockWords.ts";
+import { EdgeSwatch, LOCK_SENTENCE } from "../graphKit.ts";
 
 /** The arrow the legend explains, drawn the way the canvas draws one. */
 function LockArrow() {

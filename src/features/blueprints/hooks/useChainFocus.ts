@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { blockersBehind, dependentsAhead } from "../../graph-diagram/graphLayout.ts";
+import { blockersBehind, dependentsAhead } from "../graphKit.ts";
 import type { BlueprintGraphCanvasNode } from "../components/blueprintGraphCanvasTypes.ts";
 
 /**

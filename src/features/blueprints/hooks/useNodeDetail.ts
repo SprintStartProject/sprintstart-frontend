@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useHorizontalWheelNavigation } from "../../../hooks/useHorizontalWheelNavigation.ts";
-import type { JourneyCameraHandle } from "../../onboarding/graph/JourneyCanvas.tsx";
+import type { JourneyCameraHandle } from "../graphKit.ts";
 import type { BlueprintGraphCanvasNode, Props } from "../components/blueprintGraphCanvasTypes.ts";
 import { neighbourSteps } from "../nodeSteps.ts";
 

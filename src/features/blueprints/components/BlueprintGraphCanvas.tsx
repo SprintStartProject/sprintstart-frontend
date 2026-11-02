@@ -1,11 +1,11 @@
 import { useMemo, useRef, useState } from "react";
 import { SWIPE_IGNORE_ATTRIBUTE } from "../../../hooks/useHorizontalWheelNavigation.ts";
 import {
-  JourneyCanvas,
+  type GraphPoint,
   type JourneyCameraHandle,
+  JourneyCanvas,
   type JourneyEdgeTone,
-} from "../../onboarding/graph/JourneyCanvas.tsx";
-import type { GraphPoint } from "../../onboarding/graph/layout.ts";
+} from "../graphKit.ts";
 import { useChainFocus, type ChainHalf } from "../hooks/useChainFocus.ts";
 import { useGraphEdits, useGraphSaving } from "../hooks/useGraphEdits.ts";
 import { useGraphKeyboard } from "../hooks/useGraphKeyboard.ts";

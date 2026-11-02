@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
-import { EDGE_REFUSAL_MESSAGE, edgeRefusal } from "../../graph-diagram/graphLayout.ts";
-import type { GraphPoint } from "../../onboarding/graph/layout.ts";
+import { EDGE_REFUSAL_MESSAGE, type GraphPoint, edgeRefusal } from "../graphKit.ts";
 import type { BlueprintGraphCanvasNode, Props } from "../components/blueprintGraphCanvasTypes.ts";
 
 /**

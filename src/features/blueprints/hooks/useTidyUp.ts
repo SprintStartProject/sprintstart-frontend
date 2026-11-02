@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { GraphPoint } from "../../onboarding/graph/layout.ts";
+import type { GraphPoint } from "../graphKit.ts";
 import type { BlueprintGraphCanvasNode, Props } from "../components/blueprintGraphCanvasTypes.ts";
 import type { useGraphPositions } from "./useGraphPositions";
 import type { useGraphSaving } from "./useGraphEdits";

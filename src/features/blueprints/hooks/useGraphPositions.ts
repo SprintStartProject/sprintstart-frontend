@@ -2,15 +2,13 @@ import { useMemo, useState } from "react";
 import {
   GRAPH_NODE_HEIGHT,
   GRAPH_NODE_WIDTH,
-  chainPositions,
-  entryPointIds,
-} from "../../graph-diagram/graphLayout.ts";
-import {
-  layeredLayout,
-  resolveLayout,
   type GraphPoint,
   type LayoutOptions,
-} from "../../onboarding/graph/layout.ts";
+  chainPositions,
+  entryPointIds,
+  layeredLayout,
+  resolveLayout,
+} from "../graphKit.ts";
 import type { BlueprintGraphCanvasNode } from "../components/blueprintGraphCanvasTypes.ts";
 
 /** The box a Blueprint card is drawn in, and the box the layout reserves for it. */
