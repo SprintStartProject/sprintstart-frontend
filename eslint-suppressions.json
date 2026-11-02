@@ -2172,17 +2172,6 @@
       "count": 2
     }
   },
-  "src/pages/BoardPage.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/pages/BuddyPage.tsx": {
     "complexity": {
       "count": 2
