@@ -2239,7 +2239,7 @@
   },
   "src/pages/OnBoardingPage.tsx": {
     "complexity": {
-      "count": 3
+      "count": 1
     },
     "max-lines": {
       "count": 1

@@ -17,7 +17,6 @@ import { Button } from "../components/ui/Button";
 import { SegmentedTabs } from "../components/ui/SegmentedTabs";
 import { SLIDING_PANEL_EXIT_MS, SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useAuth } from "../context/useAuth";
-import { useToast } from "../context/useToast";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { CenteredState, StateIcon } from "../features/onboarding/components/journey/CenteredState";
 import { EmptyJourney } from "../features/onboarding/components/journey/EmptyJourney";
@@ -32,6 +31,9 @@ import { QuestionWorkspace } from "../features/onboarding/components/journey/Que
 import { StepWorkspace } from "../features/onboarding/components/journey/StepWorkspace";
 import { useOnboardingJourney } from "../features/onboarding/generation/OnboardingJourneyContext";
 import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
+import { continueAfter } from "../features/onboarding/pageRules";
+import { useOnboardingPlace } from "../features/onboarding/hooks/useOnboardingPlace";
+import { useStepActions } from "../features/onboarding/hooks/useStepActions";
 import { useArrival, useScrollToOpened } from "../features/onboarding/hooks/useArrival";
 import { useGenerationScreen } from "../features/onboarding/hooks/useGenerationScreen";
 import { useJourneyView, type ViewMode } from "../features/onboarding/hooks/useJourneyView";
@@ -40,7 +42,6 @@ import { useGenerationFollowUp } from "../features/onboarding/hooks/useGeneratio
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
 import {
   blockingPhases,
-  isSkipPending,
   itemState,
   pathProgress,
   phaseItems,
@@ -49,33 +50,21 @@ import {
   type PhaseItem,
 } from "../features/onboarding/journey";
 import { resolveNextAction } from "../features/onboarding/nextAction";
-import type {
-  OnboardingQuestionEndpoint,
-  QuestionAttemptResult,
-} from "../features/onboarding/types";
 import { useMoments } from "../features/moments";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
 import { onBuddyPathChanged } from "../features/buddy/aiBuddyBus";
-import { setOnboardingPlace } from "../features/onboarding/onboardingPlace";
 import {
   askAboutEmptyPhase,
   askAboutEmptyPhases,
   askAboutPhase,
 } from "../features/onboarding/buddyDrafts";
 import { onboardingGraphService } from "../services/onboardingGraphService";
-import { onboardingService } from "../services/onboardingService";
 import { GenerationIssueSummary } from "../features/onboarding/components/GenerationIssueSummary";
 import { issueStatusLabel, retryCouldHelp } from "../features/onboarding/generationIssues";
-import {
-  notifySkipAnswerSeen,
-  withSkipAnswerSeen,
-  withSkipAnswerUnseen,
-} from "../features/onboarding/skipAnswers";
 import { hireJourneyViewKey } from "../features/onboarding/journeyViewMemory";
 
 /** How a step came to be opened: by its address, or by the member on the page. */
-type StartOptions = { byAddress?: boolean };
 
 const VIEW_ORDER: readonly ViewMode[] = ["graph", "list"];
 
@@ -112,7 +101,6 @@ export function OnBoardingPage() {
   // fallbacks below keep that case from writing under the wrong key anyway.
   const viewerId = useAuth().profile?.id ?? "";
   const viewKey = viewerId ? hireJourneyViewKey(viewerId) : null;
-  const toast = useToast();
   const { celebrate: celebrateMoment, completeMission, flyby } = useMoments();
   const {
     selectedProjectId,
@@ -210,34 +198,14 @@ export function OnBoardingPage() {
     nextAction?.kind === "step" || nextAction?.kind === "question" ? nextAction.phase.id : null;
   const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0] ?? null;
 
-  // Where the hire is on this page, for whatever they keep on their board from here: the step they
-  // have open, or the phase they are looking at. See `onboardingPlace.ts`.
-  useEffect(() => {
-    const openItemId = viewMode === "graph" ? graphItemId : expandedItemId;
-    const shownPhase =
-      viewMode === "graph"
-        ? (phases.find((phase) => phase.id === openGraphPhaseId) ?? null)
-        : selectedPhase;
-    const openItem = openItemId
-      ? phases.flatMap(phaseItems).find((item) => item.id === openItemId)
-      : undefined;
-    // A question is not a place a note is kept *about*; its phase is.
-    const itemPhase =
-      openItem?.kind === "question"
-        ? phases.find((phase) => phase.id === openItem.question.phaseId)
-        : undefined;
-    const phase = itemPhase ?? shownPhase;
-
-    setOnboardingPlace(
-      openItem?.kind === "step"
-        ? { kind: "step", id: openItem.id, title: openItem.title }
-        : phase
-          ? { kind: "phase", id: phase.id, title: phase.title }
-          : null,
-    );
-  }, [expandedItemId, graphItemId, openGraphPhaseId, phases, selectedPhase, viewMode]);
-
-  useEffect(() => () => setOnboardingPlace(null), []);
+  useOnboardingPlace({
+    viewMode,
+    phases,
+    selectedPhase,
+    openGraphPhaseId,
+    expandedItemId,
+    graphItemId,
+  });
   const overall = path ? pathProgress(path) : null;
   const generationIssues = path?.generationIssues ?? [];
   const generationIssueSummary = generationIssues
@@ -249,25 +217,13 @@ export function OnBoardingPage() {
       (phase) => phase.id === (item.kind === "step" ? item.step.phaseId : item.question.phaseId),
     );
 
-  /** A step the member opens for the first time is started; reopening one changes nothing. */
-  const beginStepIfWaiting = async (item: PhaseItem, { byAddress = false }: StartOptions = {}) => {
-    if (item.kind !== "step" || item.step.status !== "WAITING" || item.step.locked) return;
-    // Arriving at `/onboarding/<id>` for a step with a skip request open is arriving to change or
-    // withdraw it, not to begin the step; its own "Start step" button still does that. Only the
-    // address: the list's button says "Start", and a click on it should do what it says.
-    if (byAddress && isSkipPending(item.step.skip)) return;
-    try {
-      await onboardingService.startStep(item.step.id);
-      // The rocket marks a step *beginning*.
-      flyby();
-      await refreshPath();
-    } catch (error) {
-      console.error("Failed to start onboarding step:", error);
-      toast.error("The step could not be started", {
-        description: error instanceof Error ? error.message : undefined,
-      });
-    }
-  };
+  const { beginStepIfWaiting, acknowledgeSkipAnswer, handleAnswered } = useStepActions({
+    phases,
+    phasesDone: overall?.phasesDone ?? 0,
+    setPath,
+    refreshPath,
+    moments: { celebrate: celebrateMoment, completeMission, flyby },
+  });
 
   const { linkHighlight, clearLinkHighlight } = useArrival({
     path,
@@ -284,34 +240,6 @@ export function OnBoardingPage() {
       startStep: (item) => void beginStepIfWaiting(item, { byAddress: true }),
     },
   });
-
-  /**
-   * The answer to a skip request has been drawn for the member, so its "new" marker goes -- here
-   * and, so it stays gone on every device, on the server.
-   *
-   * Called by the step workspace once it has the answer on screen. Doing it from `openItem`
-   * marked answers seen on the way past: "Continue" and "Up next" open steps too, and a deep link
-   * opens one without going through it at all.
-   */
-  const acknowledgeSkipAnswer = useCallback(
-    (skipId: string) => {
-      const seenAt = new Date().toISOString();
-      setPath((current) => (current ? withSkipAnswerSeen(current, skipId, seenAt) : current));
-      onboardingService
-        .markSkipAnswerSeen(skipId)
-        .then(notifySkipAnswerSeen)
-        .catch((error: unknown) => {
-          console.error("Failed to mark skip answer as seen:", error);
-          // Put back, rather than left gone for the session and back after a reload -- and
-          // disagreeing with the sidebar's count in the meantime.
-          setPath((current) => (current ? withSkipAnswerUnseen(current, skipId) : current));
-          toast.error("The answer is still marked new", {
-            description: "It could not be marked as seen. It will still be there next time.",
-          });
-        });
-    },
-    [setPath, toast],
-  );
 
   /** Start, continue or answer: the item opens where it is -- unfolded in the list, or on the graph. */
   const openItem = (item: PhaseItem) => {
@@ -347,26 +275,19 @@ export function OnBoardingPage() {
   };
 
   /** What "continue" does once an item in a phase is behind the member, and what its button says. */
-  const continueAfter = (phaseId: string): { label: string; run: () => void } => {
-    const next = path ? resolveNextAction(path, { preferPhaseId: phaseId }) : null;
-    if (next?.kind === "step" || next?.kind === "question") {
-      const nextId = next.kind === "step" ? next.step.id : next.question.id;
-      const item = phaseItems(next.phase).find((candidate) => candidate.id === nextId);
+  const continueFrom = (phaseId: string): { label: string; run: () => void } => {
+    const step = continueAfter(path, phaseId);
+    if (step.kind === "item") {
       return {
-        label:
-          next.phase.id !== phaseId
-            ? `On to ${next.phase.title}`
-            : next.kind === "question"
-              ? "Next: a question"
-              : "Next step",
+        label: step.label,
         run: () => {
-          if (item) openItem(item);
+          if (step.item) openItem(step.item);
         },
       };
     }
-    if (next?.kind === "choose") {
+    if (step.kind === "choose") {
       return {
-        label: "Choose your next phase",
+        label: step.label,
         run: () => {
           setExpandedItemId(null);
           setGraphItemId(null);
@@ -378,7 +299,7 @@ export function OnBoardingPage() {
       };
     }
     return {
-      label: "Back to your path",
+      label: step.label,
       run: () => {
         setExpandedItemId(null);
         setGraphItemId(null);
@@ -386,41 +307,12 @@ export function OnBoardingPage() {
     };
   };
 
-  const handleAnswered = async (
-    question: OnboardingQuestionEndpoint,
-    result: QuestionAttemptResult,
-  ) => {
-    // The backend decides completion; nothing here is derived from the phase alone.
-    if (result.onboardingCompleted) {
-      completeMission();
-    } else if (result.correct) {
-      // Celebrate the phase, not the question: only when this answer finished its last open item.
-      const phase = phases.find((candidate) => candidate.id === question.phaseId);
-      const allStepsDone = phase?.steps.every(
-        (step) => step.status === "FINISHED" || step.status === "SKIPPED",
-      );
-      const allQuestionsPassed = phase?.questions.every(
-        (candidate) => candidate.status === "PASSED" || candidate.id === question.id,
-      );
-      if (allStepsDone && allQuestionsPassed) {
-        const done = (overall?.phasesDone ?? 0) + 1;
-        celebrateMoment({
-          tone: "milestone",
-          title: "Phase completed",
-          message: phase ? `You completed the ${phase.title} phase.` : "You completed the phase.",
-          progress: { current: Math.min(done, phases.length), total: phases.length },
-        });
-      }
-    }
-    await refreshPath();
-  };
-
   /** The item itself: a step to work through, a question to answer, or why it is not open yet. */
   const renderItemBody = (item: PhaseItem, layout: "inline" | "focus") => {
     const phase = phaseOf(item);
     if (!phase) return null;
     const state = itemState(item, phase.locked);
-    const next = continueAfter(phase.id);
+    const next = continueFrom(phase.id);
 
     if (state === "locked") {
       const blockers = waitingOn(item, phaseItems(phase));
