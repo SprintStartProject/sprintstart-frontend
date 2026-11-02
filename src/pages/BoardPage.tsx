@@ -10,6 +10,7 @@ import { Spinner } from "../components/ui/Spinner";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardPlanning } from "../features/board/hooks/useBoardPlanning";
+import { useBoardAreas } from "../features/board/hooks/useBoardAreas";
 import { useCardPreferences } from "../features/board/hooks/useCardPreferences";
 import { usePanelSwitches } from "../features/board/hooks/usePanelSwitches";
 import { useCardRemovals } from "../features/board/hooks/useCardRemovals";
@@ -50,22 +51,13 @@ import {
   type BoardStage,
 } from "../features/board/layout/boardStructure";
 import type { BoardFilter } from "../features/board/layout/boardFilters";
-import type { AreaAccent } from "../features/board/layout/areaAccents";
 import { readCardOrigins, type CardOrigins } from "../features/board/layout/cardOrigins";
 import { subscribeToBoardStorageReplaced } from "../features/board/layout/boardStorage";
 import { describeCuts, selectShownCards } from "../features/board/layout/boardCuts";
 import { useBoardStructureSync } from "../features/board/sync/useBoardStructureSync";
 import { useCardMarks, useMarkableBoard } from "../features/board/marks/useCardMarks";
 import { buildStacks } from "../features/board/layout/cardStacks";
-import {
-  assignToGroup,
-  dissolveGroup,
-  groupOf,
-  newBoardGroup,
-  readBoardGroups,
-  writeBoardGroups,
-  type BoardGroup,
-} from "../features/board/layout/boardGroups";
+import { assignToGroup, groupOf } from "../features/board/layout/boardGroups";
 
 /**
  * The board: the hire's persistent working surface.
@@ -243,75 +235,18 @@ export function BoardPage() {
     removeTaskPool,
   } = usePanelSwitches(boardId, storedFor);
 
-  const [groups, setGroups] = useState<BoardGroup[]>([]);
-  const [groupsReadFor, setGroupsReadFor] = useState<string | null>(null);
-
-  if (storedFor !== groupsReadFor) {
-    setGroupsReadFor(storedFor);
-    setGroups(readBoardGroups(boardId));
-  }
-
-  /** Whether the "name your area" form is open over the board. */
-  const [namingArea, setNamingArea] = useState(false);
-
-  function saveGroups(next: BoardGroup[]) {
-    setGroups(next);
-    writeBoardGroups(boardId, next);
-  }
-
-  /**
-   * Puts a card in an area, or takes it out of one.
-   *
-   * One caller: letting a card go while arranging. An area is made from the tool rail and filled by
-   * dropping cards into it.
-   */
-  function handleAssignGroup(cardId: string, groupId: string | null) {
-    saveGroups(assignToGroup(groups, cardId, groupId));
-  }
-
-  function handleRenameGroup(groupId: string, name: string) {
-    saveGroups(groups.map((group) => (group.id === groupId ? { ...group, name } : group)));
-  }
-
-  /**
-   * Makes an empty area under the name it was given, and opens it.
-   *
-   * Empty is the point: an area made from the tool rail is a box somebody wants *before* they have
-   * decided what goes in it — "Paperwork", "Week two" — and making them find a card to hang it off
-   * first is the reason areas were only ever made by accident.
-   *
-   * Named in the same breath, in a form over the board, the way a note or a link is written. The
-   * alternative was making it first and renaming it in place, which needs a name that can be
-   * edited where the area is drawn — and an empty area is drawn nowhere except in a tab, which is
-   * not a place to type.
-   */
-  function handleNewArea(name: string) {
-    const created = { ...newBoardGroup(groups), name };
-    saveGroups([...groups, created]);
-    setNamingArea(false);
-    setSectionId(created.id);
-  }
-
-  /** Takes the area away and leaves its cards exactly where they are on the board. */
-  function handleDissolveGroup(groupId: string) {
-    saveGroups(dissolveGroup(groups, groupId));
-    // A rail pointed at an area that no longer exists would show an empty pane, so the view falls
-    // back to the whole board rather than to nothing.
-    if (sectionId === groupId) setSectionId(null);
-  }
-
-  /** Paints an area. A colour the hire chose, on a group the hire named — see `areaAccents.ts`. */
-  function handleRecolourGroup(groupId: string, accent: AreaAccent) {
-    saveGroups(groups.map((group) => (group.id === groupId ? { ...group, accent } : group)));
-  }
-
-  function handleToggleGroup(groupId: string) {
-    saveGroups(
-      groups.map((group) =>
-        group.id === groupId ? { ...group, collapsed: !group.collapsed } : group,
-      ),
-    );
-  }
+  const {
+    groups,
+    saveGroups,
+    namingArea,
+    setNamingArea,
+    handleNewArea,
+    handleDissolveGroup,
+    handleAssignGroup,
+    handleRenameGroup,
+    handleRecolourGroup,
+    handleToggleGroup,
+  } = useBoardAreas({ boardId, storedFor, sectionId, setSectionId });
 
   const { pendingRemovals, handleDismiss } = useCardRemovals({
     board,
