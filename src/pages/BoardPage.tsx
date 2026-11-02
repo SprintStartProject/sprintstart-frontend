@@ -1,6 +1,6 @@
 import { MainContent } from "../components/layout/MainContent";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { AlertCircle, Check, LayoutDashboard, RefreshCw } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
@@ -9,17 +9,16 @@ import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { Spinner } from "../components/ui/Spinner";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardPlanning } from "../features/board/hooks/useBoardPlanning";
+import { useBoardPath } from "../features/board/hooks/useBoardPath";
+import { useStageBands } from "../features/board/hooks/useStageBands";
 import { useBoardPiles } from "../features/board/hooks/useBoardPiles";
 import { useBoardSections } from "../features/board/hooks/useBoardSections";
-import { FOLD_THRESHOLD } from "../features/board/layout/foldThreshold";
 import { useBoardAreas } from "../features/board/hooks/useBoardAreas";
 import { useCardPreferences } from "../features/board/hooks/useCardPreferences";
 import { usePanelSwitches } from "../features/board/hooks/usePanelSwitches";
 import { useCardRemovals } from "../features/board/hooks/useCardRemovals";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
-import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
 import { BoardPathContext } from "../features/board/hooks/boardPath";
-import { pathPhases, pathStages } from "../features/board/layout/pathStages";
 import { AddCardForm } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
@@ -35,18 +34,7 @@ import { useProjectContext } from "../features/projects/useProjectContext";
 import { useToast } from "../context/useToast";
 import { useFocusMode } from "../context/useFocusMode";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import {
-  hasNewlyBehind,
-  readBehindSeen,
-  writeBehindSeen,
-} from "../features/board/layout/behindSeen";
-import {
-  BOARD_STAGES,
-  currentStage,
-  type BoardStage,
-} from "../features/board/layout/boardStructure";
 import type { BoardFilter } from "../features/board/layout/boardFilters";
-import { readCardOrigins, type CardOrigins } from "../features/board/layout/cardOrigins";
 import { subscribeToBoardStorageReplaced } from "../features/board/layout/boardStorage";
 import { describeCuts, selectShownCards } from "../features/board/layout/boardCuts";
 import { useBoardStructureSync } from "../features/board/sync/useBoardStructureSync";
@@ -260,60 +248,17 @@ export function BoardPage() {
     [board, pendingRemovals, isTaskPoolShown],
   );
 
-  /**
-   * Where each card was found — see `cardOrigins.ts`.
-   *
-   * Read once when the board arrives and never written here: the origin is recorded by whoever
-   * made the card, which is always somewhere else in the app. The board only reads the trail.
-   *
-   * Keyed by project rather than by board, because the surfaces that write one — the selection
-   * toolbar, a chat, the buddy dock — know the project and not the board.
-   *
-   * Read under `selectedProjectId`, which is the id those surfaces write under, and *not* under the
-   * board's own `projectId`. The two are normally the same and the one time they are not — a board
-   * fetched for one project while the app has moved to another — reading the board's id would look
-   * up trails nobody stored there and show none of them.
-   */
-  const [cardOrigins, setCardOrigins] = useState<CardOrigins>({});
-  const [originsReadFor, setOriginsReadFor] = useState<string | null>(null);
-
-  // Keyed by project *and* revision: the origins follow the hire across a project, and a card
-  // saved from the buddy dock while this page is open writes them without leaving it.
-  const originsStoredFor = `${selectedProjectId}:${storageRevision}`;
-
-  if (originsStoredFor !== originsReadFor) {
-    setOriginsReadFor(originsStoredFor);
-    setCardOrigins(readCardOrigins(selectedProjectId));
-  }
-
-  /**
-   * Now and Behind you, read off the onboarding path — see `pathStages.ts`. Nothing on this page
-   * sets a stage: the path is the one plan, and the board files its cards against it.
-   */
-  const { path, settled: pathSettled } = useOnboardingPath();
-  const phases = useMemo(() => (path ? pathPhases(path) : null), [path]);
-  const stageOf = useMemo(() => pathStages(phases, cardOrigins), [phases, cardOrigins]);
-  const boardPath = useMemo(
-    () => ({ path, phases, settled: pathSettled }),
-    [path, phases, pathSettled],
-  );
-
-  /**
-   * The phase the board was opened for: `/board?phase=<id>`.
-   *
-   * What "N cards on your board from this phase" in the path card links to. In the address rather
-   * than in router state so it survives a reload and can be opened in a second tab, and so the
-   * browser's Back goes from the narrowed board to where it came from.
-   */
-  const [searchParams, setSearchParams] = useSearchParams();
-  const pathPlace = searchParams.get("phase");
-
-  /** What the phase is called, for the line saying the board is narrowed to it. */
-  const pathPlaceTitle = useMemo(
-    () =>
-      pathPlace ? (path?.phases.find((phase) => phase.id === pathPlace)?.title ?? null) : null,
-    [path, pathPlace],
-  );
+  const {
+    path,
+    pathSettled,
+    phases,
+    stageOf,
+    boardPath,
+    cardOrigins,
+    pathPlace,
+    pathPlaceTitle,
+    clearPathPlace,
+  } = useBoardPath(selectedProjectId, storageRevision);
 
   const { states, stackOnto } = useBoardStructure(boardId, allCards, stageOf);
 
@@ -349,87 +294,17 @@ export function BoardPage() {
       stackOnto,
     });
 
-  /**
-   * Which stage bands are open.
-   *
-   * A fold, not a mode: taking the cards that are not due *off the board* would leave the hire
-   * taking the rest on trust. The bands put all of it on the page, named, counted and one click
-   * from being read.
-   *
-   * Decided once per board rather than remembered: which shape is right
-   * is a question about how big *this* board is, and a hire who opened everything on a six-card
-   * board last month should not meet a forty-card one wide open. A small board arrives with every
-   * band open, because folding four cards into three headings is ceremony, not help.
-   */
-  const [openStages, setOpenStages] = useState<Set<BoardStage>>(new Set(BOARD_STAGES));
-  const [bandsDecidedFor, setBandsDecidedFor] = useState<string | null>(null);
-
-  if (board && boardId !== bandsDecidedFor) {
-    setBandsDecidedFor(boardId);
-    // "Behind you" never arrives open, at any size: it holds what is finished, and it fills in only
-    // once the path has been read, after this is decided.
-    setOpenStages(
-      allCards.length > FOLD_THRESHOLD
-        ? new Set([currentStage(states)])
-        : new Set(BOARD_STAGES.filter((stage) => stage !== "BEHIND")),
-    );
-  }
-
-  /**
-   * "Behind you" opens when cards have moved into it since the hire last looked.
-   *
-   * It arrives folded, but cards move there without the hire touching the board: a phase finished
-   * in the dock or on the Onboarding page, a note kept from a step of a finished phase. A band that
-   * silently swallows them reads as the cards being gone. So what was behind last time is
-   * remembered (`behindSeen.ts`) — across visits, and while the board stays open — and any card
-   * that is new there unfolds the band once. Folding it again is the hire's call and sticks.
-   */
-  const behindIds = useMemo(
-    () =>
-      pathSettled
-        ? allCards
-            .filter((card) => states.get(card.id)?.stage === "BEHIND")
-            .map((card) => card.id)
-            .sort()
-        : null,
-    [allCards, pathSettled, states],
-  );
-  const behindKey = behindIds?.join("|") ?? null;
-  const [knownBehind, setKnownBehind] = useState<{ boardId: string; key: string } | null>(null);
-
-  if (
-    board &&
-    behindIds !== null &&
-    behindKey !== null &&
-    (knownBehind?.boardId !== boardId || knownBehind.key !== behindKey)
-  ) {
-    const before =
-      knownBehind?.boardId === boardId
-        ? new Set(knownBehind.key.split("|").filter(Boolean))
-        : readBehindSeen(boardId);
-    setKnownBehind({ boardId, key: behindKey });
-    if (hasNewlyBehind(before, behindIds)) {
-      setOpenStages((current) => new Set([...current, "BEHIND"]));
-    }
-  }
-
-  useEffect(() => {
-    if (board && behindIds !== null) writeBehindSeen(boardId, behindIds);
-  }, [board, boardId, behindIds]);
-
-  function toggleStage(stage: BoardStage) {
-    setOpenStages((current) => {
-      const next = new Set(current);
-      if (next.has(stage)) next.delete(stage);
-      else next.add(stage);
-
-      return next;
-    });
-  }
+  const { openStages, toggleStage, openAllStages } = useStageBands({
+    board,
+    boardId,
+    allCards,
+    states,
+    pathSettled,
+  });
 
   /** Planning opens every band: a dependency you cannot see is one you cannot set. */
   function beginPlanning() {
-    setOpenStages(new Set(BOARD_STAGES));
+    openAllStages();
     startArranging();
   }
 
@@ -445,11 +320,11 @@ export function BoardPage() {
    * above it says.
    */
   function showEverything() {
-    setOpenStages(new Set(BOARD_STAGES));
+    openAllStages();
     setSectionId(null);
     setFilter("all");
     openAllPiles();
-    if (pathPlace) setSearchParams({}, { replace: true });
+    if (pathPlace) clearPathPlace();
   }
 
   const cutBy = useMemo(
