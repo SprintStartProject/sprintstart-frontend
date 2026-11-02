@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
 import type { BoardCard } from "../types";
 import { ALL_SECTIONS, sectionTabOrder, summariseSections } from "../layout/boardSections";
 import type { BoardGroup } from "../layout/boardGroups";
@@ -12,7 +11,7 @@ type Params = {
   groups: BoardGroup[];
   states: Map<string, CardState>;
   pinnedIds: ReadonlySet<string>;
-  /** The section the hire chose; null is everything. It may name one that no longer exists. */
+  /** The section the hire chose; null is everything. It may name one that is gone. */
   sectionId: string | null;
   setSectionId: (sectionId: string | null) => void;
 };
@@ -61,7 +60,7 @@ export function useBoardSections(params: Params) {
    * A colour row exists only while something is marked in that colour, so rubbing out the last green
    * highlight takes the green dot off the rail -- and the board would go on filtering by a colour
    * with no control left to switch it off. An area behaves the same way when it is dissolved from
-   * somewhere other than this page. A section id that no longer names a section means everything.
+   * somewhere other than this page. A section id that names nothing means everything.
    */
   const shownSectionId = useMemo(
     () =>
@@ -78,16 +77,18 @@ export function useBoardSections(params: Params) {
   const sectionIndex = Math.max(sectionOrder.indexOf(sectionValue), 0);
 
   /**
-   * Two-finger swipe between the sections, the same gesture every other tabbed page in the app
-   * answers to. Off on an undivided board, and off while a colour is being shown: the colours are
-   * not in this order, so a swipe from one would land on whichever tab happens to be first.
+   * What the two-finger swipe between the sections needs, the same gesture every other tabbed page
+   * in the app answers to; the page hands it to `useSwipeableTabs` itself, because the ref that
+   * comes back must not travel inside an object. Off on an undivided board, and off while a colour
+   * is being shown: the colours are not in this order, so a swipe from one would land on whichever
+   * tab happens to be first.
    */
-  const swipeRef = useSwipeableTabs<string, HTMLElement>({
+  const swipe = {
     order: sectionOrder,
     value: sectionValue,
-    onChange: (value) => setSectionId(value === ALL_SECTIONS ? null : value),
+    onChange: (value: string) => setSectionId(value === ALL_SECTIONS ? null : value),
     enabled: hasSectionTabs && sectionOrder.includes(sectionValue),
-  });
+  };
 
   return {
     sections,
@@ -97,7 +98,7 @@ export function useBoardSections(params: Params) {
     shownSectionId,
     sectionValue,
     sectionIndex,
-    swipeRef,
+    swipe,
     cardMarks,
   };
 }

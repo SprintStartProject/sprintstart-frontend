@@ -257,7 +257,7 @@ export function BoardToolRail(props: BoardToolRailProps) {
         aria-label="Board tools"
         className={[
           "flex w-fit max-w-full flex-row flex-wrap items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur lg:flex-col lg:flex-nowrap",
-          // Fixed to the viewport it can no longer grow past the fold, so it scrolls in itself on a
+          // Fixed to the viewport it cannot grow past the fold, so it scrolls in itself on a
           // short screen rather than losing its last buttons off the bottom.
           isFocused ? "lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto" : "lg:sticky lg:top-6",
         ].join(" ")}

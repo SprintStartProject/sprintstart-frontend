@@ -60,7 +60,7 @@ export function useBoardAreas({ boardId, storedFor, sectionId, setSectionId }: P
   /** Takes the area away and leaves its cards exactly where they are on the board. */
   function handleDissolveGroup(groupId: string) {
     saveGroups(dissolveGroup(groups, groupId));
-    // A rail pointed at an area that no longer exists would show an empty pane, so the view falls
+    // A rail pointed at an area that is gone would show an empty pane, so the view falls
     // back to the whole board rather than to nothing.
     if (sectionId === groupId) setSectionId(null);
   }
