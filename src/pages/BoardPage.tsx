@@ -12,7 +12,7 @@ import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
 import { BoardPathContext } from "../features/board/hooks/boardPath";
-import { isCardAt, pathPhases, pathStages } from "../features/board/layout/pathStages";
+import { pathPhases, pathStages } from "../features/board/layout/pathStages";
 import { AddCardForm } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
@@ -39,7 +39,6 @@ import { readTaskPoolShown, writeTaskPoolShown } from "../features/board/layout/
 import { readPinnedCards, writePinnedCards } from "../features/board/layout/pinnedCards";
 import {
   ALL_SECTIONS,
-  cardsInSection,
   markSectionColor,
   markedIn,
   sectionTabOrder,
@@ -50,11 +49,7 @@ import {
   currentStage,
   type BoardStage,
 } from "../features/board/layout/boardStructure";
-import {
-  filterLabel,
-  matchesFilter,
-  type BoardFilter,
-} from "../features/board/layout/boardFilters";
+import type { BoardFilter } from "../features/board/layout/boardFilters";
 import type { AreaAccent } from "../features/board/layout/areaAccents";
 import {
   isDefault,
@@ -69,6 +64,7 @@ import {
   subscribeToBoardStorageReplaced,
   subscribeToBoardStorageWritten,
 } from "../features/board/layout/boardStorage";
+import { describeCuts, selectShownCards } from "../features/board/layout/boardCuts";
 import { forgetCard } from "../features/board/layout/forgetCard";
 import { useBoardStructureSync } from "../features/board/sync/useBoardStructureSync";
 import {
@@ -84,7 +80,7 @@ import {
   type PlanSnapshot,
 } from "../features/board/layout/planChanges";
 import { useCardMarks, useMarkableBoard } from "../features/board/marks/useCardMarks";
-import { buildStacks, collapseStacks } from "../features/board/layout/cardStacks";
+import { buildStacks } from "../features/board/layout/cardStacks";
 import {
   assignToGroup,
   dissolveGroup,
@@ -888,99 +884,45 @@ export function BoardPage() {
     if (pathPlace) setSearchParams({}, { replace: true });
   }
 
-  /**
-   * The cards on screen: the phase the board was opened for, then the owner filter, then the
-   * section, then the focus view.
-   *
-   * Pinned last and stably, so pinning one card lifts that card and disturbs nothing else. A
-   * display sort, not a write: what gets sent on a reorder is what is on screen, so pinning and
-   * dragging cannot disagree about where a card is.
-   *
-   * The focus view keeps pinned cards whatever their stage. A pin is the hire saying *this one
-   * matters to me now*, and a mode that overrode it would be the board arguing with them.
-   */
-  const shownCards = useMemo(() => {
-    // The phase the board was opened for, first: it is the narrowest question anybody asks
-    // of this page, and the other cuts still apply within it.
-    // Piles fold first, so every later cut sees one card where there is one pile.
-    const folded = collapseStacks(allCards, stacks, visibleStackIds);
-    const atPlace = pathPlace
-      ? folded.filter((card) => isCardAt(card, pathPlace, phases, cardOrigins))
-      : folded;
-    const bySource = atPlace.filter((card) => matchesFilter(card, filter));
-    const visible = cardsInSection(
-      bySource,
+  const cutBy = useMemo(
+    () => ({
+      allCards,
+      stacks,
+      visibleStackIds,
+      pathPlace,
+      phases,
+      cardOrigins,
+      filter,
       groups,
       shownSectionId,
-      { states, pinnedIds },
+      states,
+      pinnedIds,
       cardMarks,
-    );
-
-    // A pile counts as pinned when any card in it is, so a pinned card does not stay buried at
-    // the bottom of the board because it happens to lie in a pile.
-    const lifted = (cardId: string) =>
-      pinnedIds.has(cardId) ||
-      (stacks.get(cardId)?.memberIds.some((memberId) => pinnedIds.has(memberId)) ?? false);
-
-    return [...visible].sort((a, b) => Number(lifted(b.id)) - Number(lifted(a.id)));
-  }, [
-    allCards,
-    cardMarks,
-    cardOrigins,
-    filter,
-    groups,
-    visibleStackIds,
-    pathPlace,
-    phases,
-    pinnedIds,
-    shownSectionId,
-    stacks,
-    states,
-  ]);
+    }),
+    [
+      allCards,
+      stacks,
+      visibleStackIds,
+      pathPlace,
+      phases,
+      cardOrigins,
+      filter,
+      groups,
+      shownSectionId,
+      states,
+      pinnedIds,
+      cardMarks,
+    ],
+  );
+  const shownCards = useMemo(() => selectShownCards(cutBy), [cutBy]);
 
   const griddedBoard = board ? { ...board, cards: shownCards } : null;
   const hiddenCount = allCards.length - shownCards.length;
 
-  /**
-   * Every cut currently taking cards off the screen, named the way its own control names it.
-   *
-   * In the order they are applied, so the line reads as the pipeline it describes. A cut that is
-   * set but removing nothing — a filter matching every card, a section holding all of them — is
-   * left out: the line exists to explain cards that are missing, and naming a control that took
-   * nothing away would send the hire to reset something that was never the problem.
-   */
-  const activeCuts = useMemo(() => {
-    const cuts: string[] = [];
-
-    const piled = allCards.length - collapseStacks(allCards, stacks, visibleStackIds).length;
-    if (piled > 0) cuts.push(`${piled} under other cards in piles`);
-
-    if (pathPlace) {
-      cuts.push(pathPlaceTitle ? `From “${pathPlaceTitle}”` : "From one phase");
-    }
-
-    const cut = filterLabel(filter);
-    if (cut) cuts.push(cut);
-
-    if (shownSectionId !== null) {
-      const section = sections.find((candidate) => candidate.id === shownSectionId);
-      if (section) cuts.push(section.name);
-    }
-
-    // Folded bands are deliberately not listed. They are the one cut that says so where it happens
-    // — a heading on the board reading "Later · 8 to do" — and repeating it up here would be the
-    // page explaining something that is not hidden.
-    return cuts;
-  }, [
-    allCards,
-    filter,
-    visibleStackIds,
-    pathPlace,
-    pathPlaceTitle,
-    shownSectionId,
-    sections,
-    stacks,
-  ]);
+  const activeCuts = useMemo(
+    () => describeCuts(cutBy, { pathPlaceTitle, shownSectionId, sections }),
+    [cutBy, pathPlaceTitle, shownSectionId, sections],
+  );
 
   const handleReorder = (cardIds: string[]) => void reorder(cardIds);
 
