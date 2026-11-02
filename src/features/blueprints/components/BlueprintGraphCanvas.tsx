@@ -1,11 +1,6 @@
 import { useMemo, useRef, useState } from "react";
-import { Flag, Info, LayoutGrid, Plus, Search, TriangleAlert, Waypoints } from "lucide-react";
-import { Badge } from "../../../components/ui/Badge.tsx";
-import { Button } from "../../../components/ui/Button.tsx";
-import { Spinner } from "../../../components/ui/Spinner.tsx";
 import { SWIPE_IGNORE_ATTRIBUTE } from "../../../hooks/useHorizontalWheelNavigation.ts";
 import {
-  CanvasButton,
   JourneyCanvas,
   type JourneyCameraHandle,
   type JourneyEdgeTone,
@@ -17,6 +12,16 @@ import { useGraphKeyboard } from "../hooks/useGraphKeyboard.ts";
 import { useGraphPositions, NODE_SIZE } from "../hooks/useGraphPositions.ts";
 import { useNodeDetail } from "../hooks/useNodeDetail.ts";
 import { useTidyUp } from "../hooks/useTidyUp.ts";
+import {
+  CanvasHeader,
+  CanvasToolbar,
+  EmptyNotice,
+  NodeFrame,
+  NodeSearch,
+  RunSummary,
+  SaveStatus,
+  TidyProposal,
+} from "./BlueprintCanvasParts.tsx";
 import { GraphLegend } from "./GraphLegend.tsx";
 import { NodeCover } from "./BlueprintNodeCover.tsx";
 import type { BlueprintGraphCanvasNode, Props } from "./blueprintGraphCanvasTypes.ts";
@@ -26,13 +31,6 @@ export type {
   BlueprintGraphCanvasNodeProps,
   JourneyEdgeTone,
 } from "./blueprintGraphCanvasTypes.ts";
-
-/** What each half wears. Orange is what has to come first; the brand colour is what comes after. */
-const HALF_RING: Record<ChainHalf, string> = {
-  focus: "ring-2 ring-app-brand ring-offset-2 ring-offset-app-bg-soft",
-  behind: "ring-2 ring-app-orange-text ring-offset-2 ring-offset-app-bg-soft",
-  ahead: "ring-2 ring-app-brand/60 ring-offset-2 ring-offset-app-bg-soft",
-};
 
 /**
  * The canvas's edge style for each half: a solid orange line behind, the brand line ahead.
@@ -189,23 +187,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
           : "overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-sm"
       }
     >
-      {/*
-        Only where there is something to head. A canvas embedded in something that has already
-        named it — a strip on a board, a panel about one card — was drawing an empty `h2` and an
-        empty paragraph above itself: sixty pixels of nothing in a two-hundred-pixel strip, and a
-        heading with no text in it, which is a heading a screen reader announces and cannot read.
-      */}
-      {title || headerAction ? (
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-app-border px-5 py-4">
-          <div className="min-w-0">
-            {title ? <h2 className="text-base font-semibold text-app-text">{title}</h2> : null}
-            {description ? <p className="mt-1 text-sm text-app-text-muted">{description}</p> : null}
-          </div>
-          {headerAction ? (
-            <div className="flex shrink-0 flex-wrap items-center gap-2">{headerAction}</div>
-          ) : null}
-        </div>
-      ) : null}
+      <CanvasHeader title={title} description={description} headerAction={headerAction} />
 
       <div
         className={`relative flex min-h-0 ${
@@ -323,206 +305,77 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                 .filter(Boolean)
                 .join(", ")
             }
-            renderNode={(node, state) => {
-              // Two reasons a node goes quiet, and they stack: it is outside the run being looked
-              // at, or it does not match what was typed.
-              const dimmed =
-                (chainIds !== null && !chainIds.has(node.id)) ||
-                (matchIds !== null && !matchIds.has(node.id));
-              const half = chain.halfOfNode(node.id);
-              return (
-                <div
-                  data-testid={`graph-node-${node.id}`}
-                  // Which half of the lit run this card is in, as an attribute as well as a
-                  // colour: the colour is the answer for a reader, and this is the one thing a
-                  // test can hold on to without asserting a class name.
-                  data-chain-half={half ?? undefined}
-                  onMouseEnter={() => chain.setHoveredId(node.id)}
-                  onMouseLeave={() =>
-                    chain.setHoveredId((current) => (current === node.id ? null : current))
-                  }
-                  className={`relative h-full w-full rounded-xl transition-opacity duration-200 ${
-                    dimmed ? "opacity-35" : "opacity-100"
-                  } ${
-                    half
-                      ? HALF_RING[half]
-                      : node.id === chain.selectedId
-                        ? "ring-2 ring-app-brand-border-strong"
-                        : ""
-                  }`}
-                >
-                  {renderNode(node, {
-                    disabled: isSaving,
-                    zoom: state.zoom,
-                    highlighted: node.id === chain.focusId,
-                    chainPosition: chainPositionById.get(node.id),
-                  })}
-
-                  {entryPoints.has(node.id) ? (
-                    <span className="pointer-events-none absolute -top-2.5 left-3 z-10">
-                      <Badge variant="brand" size="sm" className="gap-1 shadow-sm">
-                        <Flag className="h-3 w-3" aria-hidden="true" /> Start
-                      </Badge>
-                    </span>
-                  ) : null}
-                </div>
-              );
-            }}
+            renderNode={(node, state) => (
+              <NodeFrame
+                id={node.id}
+                half={chain.halfOfNode(node.id)}
+                // Two reasons a node goes quiet, and they stack: it is outside the run being looked
+                // at, or it does not match what was typed.
+                dimmed={
+                  (chainIds !== null && !chainIds.has(node.id)) ||
+                  (matchIds !== null && !matchIds.has(node.id))
+                }
+                selected={node.id === chain.selectedId}
+                isEntry={entryPoints.has(node.id)}
+                onEnter={() => chain.setHoveredId(node.id)}
+                onLeave={() =>
+                  chain.setHoveredId((current) => (current === node.id ? null : current))
+                }
+              >
+                {renderNode(node, {
+                  disabled: isSaving,
+                  zoom: state.zoom,
+                  highlighted: node.id === chain.focusId,
+                  chainPosition: chainPositionById.get(node.id),
+                })}
+              </NodeFrame>
+            )}
             overlay={
               <div className="flex flex-col items-start gap-2">
-                {/*
-                  The search sits on the canvas rather than in the header: what it does happens
-                  here, and a control whose effect is three inches away from it reads as a page
-                  filter rather than as a way of looking at this graph.
-                */}
                 {nodes.length > 4 && !isEmbedded ? (
-                  <div className="relative">
-                    <Search
-                      className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-app-text-subtle"
-                      aria-hidden="true"
-                    />
-                    <input
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Find a node"
-                      aria-label="Find a node on the canvas"
-                      className="h-8 w-44 rounded-lg border border-app-border bg-app-surface/95 pr-2 pl-8 text-xs text-app-text shadow-sm backdrop-blur placeholder:text-app-text-subtle"
-                    />
-                  </div>
+                  <NodeSearch value={query} onChange={setQuery} />
                 ) : null}
-
                 {focus ? (
-                  // What pointing at a node actually told you, in words. The picture says which
-                  // nodes are in the run; this says how much of it there is — the number nobody
-                  // can count off a picture, and the one that decides whether a node is worth
-                  // doing early. "Opens 4" is the difference between a node in the way and a node
-                  // in a corner.
-                  <div className="max-w-56 rounded-xl border border-app-border bg-app-surface/95 px-3 py-2 shadow-md backdrop-blur">
-                    <p className="truncate text-xs font-semibold text-app-text">{focusTitle}</p>
-                    <p className="mt-1 flex flex-col gap-1 text-xs text-app-text-muted">
-                      <span className="flex items-center gap-1.5">
-                        <span
-                          aria-hidden="true"
-                          className="h-0.5 w-3 shrink-0 rounded-full bg-app-orange-text"
-                        />
-                        {focus.behind.size === 0
-                          ? "Nothing has to happen first"
-                          : `${focus.behind.size} must happen first`}
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <span
-                          aria-hidden="true"
-                          className="h-0.5 w-3 shrink-0 rounded-full bg-app-brand"
-                        />
-                        {focus.ahead.size === 0
-                          ? "Nothing waits on this"
-                          : `Finishing it opens ${focus.ahead.size}`}
-                      </span>
-                    </p>
-                  </div>
+                  <RunSummary
+                    title={focusTitle}
+                    behind={focus.behind.size}
+                    ahead={focus.ahead.size}
+                  />
                 ) : null}
               </div>
             }
             aside={
               layout.preview ? (
-                // The proposal states what it did and what happens next, because "Tidy up" has
-                // already redrawn the canvas by the time this is read: without the sentence, an
-                // author cannot tell an applied change from an offered one.
-                <div className="flex flex-col gap-2 rounded-2xl border border-app-brand-border bg-app-surface p-3 shadow-app-brand-lift">
-                  <p className="text-sm font-semibold text-app-text">Laid out by prerequisite</p>
-                  <p className="text-xs text-app-text-muted">
-                    Nothing is saved yet. Drag any card to adjust it first, or put the old
-                    layout.arrangement back.
-                  </p>
-                  <div className="flex gap-2">
-                    <Button variant="primary" size="sm" onClick={tidy.handleAcceptPreview}>
-                      Keep this
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={tidy.handleDiscardPreview}>
-                      Put it back
-                    </Button>
-                  </div>
-                </div>
+                <TidyProposal
+                  onAccept={tidy.handleAcceptPreview}
+                  onDiscard={tidy.handleDiscardPreview}
+                />
               ) : isLegendOpen && !isEmbedded ? (
                 <GraphLegend editable={editable} onClose={() => setIsLegendOpen(false)} />
               ) : undefined
             }
             toolbar={
-              <>
-                {canAuthor && onCreateNode
-                  ? createKinds.map((kind) => (
-                      <CanvasButton
-                        key={kind.id}
-                        label={kind.label}
-                        onClick={() =>
-                          edits.createAt(kind.id, camera.current?.viewCenter() ?? zero)
-                        }
-                      >
-                        <Plus className="h-4 w-4" />
-                      </CanvasButton>
-                    ))
-                  : null}
-                {isEmbedded ? null : (
-                  <CanvasButton
-                    label={chainOnly ? "Show the whole graph again" : "Show only the selected run"}
-                    active={chainOnly}
-                    disabled={chainIds === null}
-                    onClick={() => setChainOnly((only) => !only)}
-                  >
-                    <Waypoints className="h-4 w-4" />
-                  </CanvasButton>
-                )}
-                {isEmbedded ? null : (
-                  <CanvasButton
-                    label={isLegendOpen ? "Hide the legend" : "What the symbols mean"}
-                    active={isLegendOpen}
-                    onClick={() => setIsLegendOpen((open) => !open)}
-                  >
-                    <Info className="h-4 w-4" />
-                  </CanvasButton>
-                )}
-                {canAuthor ? (
-                  <CanvasButton label="Tidy up" onClick={tidy.handleTidyUp}>
-                    <LayoutGrid className="h-4 w-4" />
-                  </CanvasButton>
-                ) : null}
-              </>
+              <CanvasToolbar
+                canAuthor={canAuthor}
+                createKinds={createKinds}
+                hasCreate={!!onCreateNode}
+                onCreate={(kindId) => edits.createAt(kindId, camera.current?.viewCenter() ?? zero)}
+                isEmbedded={isEmbedded}
+                chainOnly={chainOnly}
+                hasRun={chainIds !== null}
+                onToggleChainOnly={() => setChainOnly((only) => !only)}
+                isLegendOpen={isLegendOpen}
+                onToggleLegend={() => setIsLegendOpen((open) => !open)}
+                onTidyUp={tidy.handleTidyUp}
+              />
             }
           />
 
-          {/*
-            An empty canvas is indistinguishable from one that failed to load, and a first-time
-            author has no way to guess what makes a node. This says both — and it does not
-            intercept the pointer, so a double-click through it still makes one.
-          */}
           {nodes.length === 0 ? (
-            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
-              <div className="max-w-sm rounded-2xl border border-dashed border-app-border bg-app-surface/90 px-6 py-5 text-center">
-                <Waypoints className="mx-auto h-8 w-8 text-app-text-disabled" aria-hidden="true" />
-                <p className="mt-3 text-sm font-semibold text-app-text">{emptyTitle}</p>
-                <p className="mt-1 text-sm text-app-text-muted">
-                  {canAuthor && createKinds.length > 0
-                    ? "Double-click anywhere here to make one, or use the button below."
-                    : "Nothing has been placed here yet."}
-                </p>
-              </div>
-            </div>
+            <EmptyNotice title={emptyTitle} canMake={canAuthor && createKinds.length > 0} />
           ) : null}
 
-          {isSaving ? (
-            <p className="absolute bottom-4 left-4 z-40 flex items-center gap-2 rounded-lg bg-app-surface px-3 py-2 text-xs text-app-text-muted shadow-lg">
-              <Spinner size="sm" silent /> Saving graph…
-            </p>
-          ) : null}
-          {saveError ? (
-            <p
-              role="alert"
-              className="absolute bottom-4 left-4 z-40 flex max-w-sm items-start gap-1.5 rounded-lg bg-app-danger-bg px-3 py-2 text-xs text-app-danger-text shadow-lg"
-            >
-              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              {saveError}
-            </p>
-          ) : null}
+          <SaveStatus isSaving={isSaving} saveError={saveError} />
         </div>
       </div>
     </section>

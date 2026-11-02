@@ -435,11 +435,8 @@
     "complexity": {
       "count": 1
     },
-    "max-lines": {
-      "count": 1
-    },
     "max-lines-per-function": {
-      "count": 3
+      "count": 1
     }
   },
   "src/features/blueprints/components/BlueprintGraphEditor.tsx": {

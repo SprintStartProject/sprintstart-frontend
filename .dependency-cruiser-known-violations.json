@@ -891,64 +891,8 @@
   {
     "type": "dependency",
     "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
-    "to": "src/features/graph-diagram/EdgeLegend.tsx",
-    "unresolvedTo": "../../graph-diagram/EdgeLegend.tsx",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
-    "to": "src/features/graph-diagram/graphLayout.ts",
-    "unresolvedTo": "../../graph-diagram/graphLayout.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
-    "to": "src/features/graph-diagram/lockWords.ts",
-    "unresolvedTo": "../../graph-diagram/lockWords.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
     "to": "src/features/onboarding/graph/JourneyCanvas.tsx",
     "unresolvedTo": "../../onboarding/graph/JourneyCanvas.tsx",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
-    "to": "src/features/onboarding/graph/layout.ts",
-    "unresolvedTo": "../../onboarding/graph/layout.ts",
     "dependencyTypes": [
       "local",
       "import"
