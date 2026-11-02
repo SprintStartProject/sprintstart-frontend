@@ -1,52 +1,41 @@
 import { MainContent } from "../components/layout/MainContent";
-import {
-  AlertCircle,
-  AlertTriangle,
-  GitBranch,
-  ListChecks,
-  Loader2,
-  Lock,
-  RefreshCw,
-  Rocket,
-} from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
-import { PageHeader } from "../components/layout/PageHeader";
-import { Badge } from "../components/ui/Badge";
-import { Button } from "../components/ui/Button";
-import { SegmentedTabs } from "../components/ui/SegmentedTabs";
-import { SLIDING_PANEL_EXIT_MS, SlidingTabPanel } from "../components/ui/SlidingTabPanel";
+import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useAuth } from "../context/useAuth";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
-import { CenteredState, StateIcon } from "../features/onboarding/components/journey/CenteredState";
+import {
+  LoadErrorScreen,
+  LoadingScreen,
+} from "../features/onboarding/components/journey/StatusScreens";
 import { EmptyJourney } from "../features/onboarding/components/journey/EmptyJourney";
-import { PhaseHeaderCard } from "../features/onboarding/components/journey/PhaseHeaderCard";
-import { UpNextCard } from "../features/onboarding/components/journey/UpNextCard";
+import { ItemBody } from "../features/onboarding/components/journey/ItemBody";
+import {
+  JourneyHeader,
+  ViewToolbar,
+} from "../features/onboarding/components/journey/JourneyHeader";
+import { ListPanel } from "../features/onboarding/components/journey/ListPanel";
+import { NoPhasesState } from "../features/onboarding/components/journey/NoPhasesState";
 import { GenerationScreen } from "../features/onboarding/components/journey/GenerationScreen";
 import { JourneyGraph } from "../features/onboarding/components/journey/JourneyGraph";
-import { PhaseChooser } from "../features/onboarding/components/journey/PhaseChooser";
-import { PhaseItemList } from "../features/onboarding/components/journey/PhaseItemList";
-import { PhaseNavigator } from "../features/onboarding/components/journey/PhaseNavigator";
-import { QuestionWorkspace } from "../features/onboarding/components/journey/QuestionWorkspace";
-import { StepWorkspace } from "../features/onboarding/components/journey/StepWorkspace";
 import { useOnboardingJourney } from "../features/onboarding/generation/OnboardingJourneyContext";
-import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
-import { continueAfter } from "../features/onboarding/pageRules";
 import { useOnboardingPlace } from "../features/onboarding/hooks/useOnboardingPlace";
+import { useItemNavigation } from "../features/onboarding/hooks/useItemNavigation";
 import { useStepActions } from "../features/onboarding/hooks/useStepActions";
-import { useArrival, useScrollToOpened } from "../features/onboarding/hooks/useArrival";
+import {
+  useArrival,
+  useScrollToChooser,
+  useScrollToOpened,
+} from "../features/onboarding/hooks/useArrival";
 import { useGenerationScreen } from "../features/onboarding/hooks/useGenerationScreen";
 import { useJourneyView, type ViewMode } from "../features/onboarding/hooks/useJourneyView";
 import { usePathLoading } from "../features/onboarding/hooks/usePathLoading";
 import { useGenerationFollowUp } from "../features/onboarding/hooks/useGenerationFollowUp";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
 import {
-  blockingPhases,
-  itemState,
   pathProgress,
   phaseItems,
   sortedPhases,
-  waitingOn,
   type PhaseItem,
 } from "../features/onboarding/journey";
 import { resolveNextAction } from "../features/onboarding/nextAction";
@@ -60,11 +49,7 @@ import {
   askAboutPhase,
 } from "../features/onboarding/buddyDrafts";
 import { onboardingGraphService } from "../services/onboardingGraphService";
-import { GenerationIssueSummary } from "../features/onboarding/components/GenerationIssueSummary";
-import { issueStatusLabel, retryCouldHelp } from "../features/onboarding/generationIssues";
 import { hireJourneyViewKey } from "../features/onboarding/journeyViewMemory";
-
-/** How a step came to be opened: by its address, or by the member on the page. */
 
 const VIEW_ORDER: readonly ViewMode[] = ["graph", "list"];
 
@@ -134,19 +119,7 @@ export function OnBoardingPage() {
   // The item unfolded in the list, and the one zoomed into on the graph.
   const [expandedItemId, setExpandedItemId] = useState<string | null>(focusItemId ?? null);
   const [graphItemId, setGraphItemId] = useState<string | null>(null);
-  const chooserScrollTimer = useRef(0);
-  useEffect(() => () => window.clearTimeout(chooserScrollTimer.current), []);
-  /** Brings the phase chooser into view, once the panel holding it has slid in. */
-  const scrollToChooser = useCallback(() => {
-    window.clearTimeout(chooserScrollTimer.current);
-    chooserScrollTimer.current = window.setTimeout(
-      () =>
-        document
-          .querySelector("#phase-chooser")
-          ?.scrollIntoView?.({ behavior: "smooth", block: "center" }),
-      SLIDING_PANEL_EXIT_MS,
-    );
-  }, []);
+  const scrollToChooser = useScrollToChooser();
   const {
     lastGeneration,
     isDinoActive: isDinoActiveInGeneration,
@@ -208,14 +181,6 @@ export function OnBoardingPage() {
   });
   const overall = path ? pathProgress(path) : null;
   const generationIssues = path?.generationIssues ?? [];
-  const generationIssueSummary = generationIssues
-    .map((issue) => `${issue.title} — ${issueStatusLabel(issue.status)}`)
-    .join("\n");
-
-  const phaseOf = (item: PhaseItem) =>
-    phases.find(
-      (phase) => phase.id === (item.kind === "step" ? item.step.phaseId : item.question.phaseId),
-    );
 
   const { beginStepIfWaiting, acknowledgeSkipAnswer, handleAnswered } = useStepActions({
     phases,
@@ -241,119 +206,38 @@ export function OnBoardingPage() {
     },
   });
 
-  /** Start, continue or answer: the item opens where it is -- unfolded in the list, or on the graph. */
-  const openItem = (item: PhaseItem) => {
-    const phase = phaseOf(item);
-    if (phase) setSelectedPhaseId(phase.id);
-    if (viewMode === "graph") {
-      setGraphPhaseId(phase?.id ?? null);
-      setGraphItemId(item.id);
-    } else {
-      scrollWhenOpened(item.id);
-      setExpandedItemId(item.id);
-    }
-    void beginStepIfWaiting(item);
-  };
-
-  const toggleItem = (item: PhaseItem) => {
-    if (expandedItemId === item.id) {
-      setExpandedItemId(null);
-      return;
-    }
-    openItem(item);
-  };
-
-  const selectPhase = (phaseId: string) => {
-    setSelectedPhaseId(phaseId);
-    setExpandedItemId(null);
-    clearLinkHighlight();
-  };
-
-  const choosePhase = (phaseId: string) => {
-    setChosenPhaseId(phaseId);
-    selectPhase(phaseId);
-  };
-
-  /** What "continue" does once an item in a phase is behind the member, and what its button says. */
-  const continueFrom = (phaseId: string): { label: string; run: () => void } => {
-    const step = continueAfter(path, phaseId);
-    if (step.kind === "item") {
-      return {
-        label: step.label,
-        run: () => {
-          if (step.item) openItem(step.item);
-        },
-      };
-    }
-    if (step.kind === "choose") {
-      return {
-        label: step.label,
-        run: () => {
-          setExpandedItemId(null);
-          setGraphItemId(null);
-          setGraphPhaseId(null);
-          // The chooser lives in the list; from inside the graph there is nothing to scroll to.
-          chooseViewMode("list");
-          scrollToChooser();
-        },
-      };
-    }
-    return {
-      label: step.label,
-      run: () => {
-        setExpandedItemId(null);
-        setGraphItemId(null);
-      },
-    };
-  };
+  const { phaseOf, openItem, toggleItem, selectPhase, choosePhase, continueFrom } =
+    useItemNavigation({
+      path,
+      phases,
+      viewMode,
+      expandedItemId,
+      setExpandedItemId,
+      setGraphItemId,
+      setGraphPhaseId,
+      setSelectedPhaseId,
+      setChosenPhaseId,
+      chooseViewMode,
+      scrollToChooser,
+      scrollWhenOpened,
+      clearLinkHighlight,
+      beginStepIfWaiting,
+    });
 
   /** The item itself: a step to work through, a question to answer, or why it is not open yet. */
   const renderItemBody = (item: PhaseItem, layout: "inline" | "focus") => {
     const phase = phaseOf(item);
     if (!phase) return null;
-    const state = itemState(item, phase.locked);
-    const next = continueFrom(phase.id);
-
-    if (state === "locked") {
-      const blockers = waitingOn(item, phaseItems(phase));
-      const phaseBlockers = phase.locked ? blockingPhases(phase, phases) : [];
-      return (
-        <div className="space-y-3 text-sm text-app-text-muted">
-          {item.kind === "step" && item.step.description ? <p>{item.step.description}</p> : null}
-          <p className="flex items-start gap-2 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-3 py-2.5">
-            <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            {phaseBlockers.length > 0
-              ? `Opens once ${phaseBlockers.map((blocker) => blocker.title).join(" and ")} ${phaseBlockers.length === 1 ? "is" : "are"} complete.`
-              : blockers.length > 0
-                ? `Opens once you have finished ${blockers.map((blocker) => blocker.title).join(" and ")}.`
-                : "Not open yet."}
-          </p>
-        </div>
-      );
-    }
-
-    if (item.kind === "question") {
-      return (
-        <QuestionWorkspace
-          key={item.id}
-          question={item.question}
-          phaseTitle={phase.title}
-          onAnswered={(result) => handleAnswered(item.question, result)}
-          continueLabel={next.label}
-          onContinue={next.run}
-        />
-      );
-    }
     return (
-      <StepWorkspace
-        key={item.id}
-        stepId={item.id}
-        stepStatus={item.step.status}
+      <ItemBody
+        item={item}
+        phase={phase}
+        phases={phases}
         layout={layout}
+        next={continueFrom(phase.id)}
+        onAnswered={handleAnswered}
         onPathChanged={refreshPath}
         onSkipAnswerSeen={acknowledgeSkipAnswer}
-        continueLabel={next.label}
-        onContinue={next.run}
       />
     );
   };
@@ -401,28 +285,10 @@ export function OnBoardingPage() {
   }
 
   if (loadingState === "loading" || (loadingState === "empty" && isProjectLoading)) {
-    return (
-      <CenteredState>
-        <Loader2 className="h-8 w-8 animate-spin text-app-brand" aria-hidden="true" />
-        <p className="mt-4 text-sm text-app-text-muted">Loading onboarding path...</p>
-      </CenteredState>
-    );
+    return <LoadingScreen />;
   }
 
-  if (loadingState === "error") {
-    return (
-      <CenteredState>
-        <StateIcon tone="danger">
-          <AlertCircle className="h-7 w-7" />
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">Onboarding could not be loaded</h2>
-        <p className="mt-2 max-w-md text-sm text-app-text-muted">{errorMessage}</p>
-        <Button className="mt-6" variant="primary" onClick={() => window.location.reload()}>
-          Try again
-        </Button>
-      </CenteredState>
-    );
-  }
+  if (loadingState === "error") return <LoadErrorScreen message={errorMessage} />;
 
   if (loadingState === "empty" || !path) {
     return (
@@ -443,200 +309,62 @@ export function OnBoardingPage() {
 
   if (!selectedPhase) {
     return (
-      <CenteredState>
-        <StateIcon tone="warning">
-          <AlertTriangle className="h-7 w-7" />
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">
-          {generationIssues.length > 0
-            ? "No onboarding phases were generated"
-            : "No onboarding phases are available"}
-        </h2>
-        <p className="mt-2 mb-5 max-w-lg text-sm text-app-text-muted">
-          {generationIssues.length > 0
-            ? "Every phase in this blueprint is written by the AI service when your path is built, and none of them could be. Nothing has been left half-finished — the journey is simply empty until one of them lands."
-            : "This onboarding path does not contain any phases for your current role and skills."}
-        </p>
-        {generationIssues.length > 0 ? (
-          <div className="w-full max-w-lg">
-            <GenerationIssueSummary issues={generationIssues} />
-            {/* Retrying a phase that was skipped for lack of material changes nothing, so when that
-                is all there is, the button says so rather than inviting the same answer. */}
-            {canManageSelected && (
-              <p className="mt-5 text-xs text-app-text-subtle">
-                {retryCouldHelp(generationIssues)
-                  ? "Trying again re-runs assembly for every phase."
-                  : "Another run will produce the same result until the project has more material."}
-              </p>
-            )}
-          </div>
-        ) : null}
-        {/* Building an existing path again replaces it, which is the project manager's call: the
-            backend refuses it to members, so they are pointed at the PM instead of a button that
-            can only fail. */}
-        {canManageSelected ? (
-          <Button
-            className="mt-6"
-            variant={
-              generationIssues.length === 0 || retryCouldHelp(generationIssues)
-                ? "primary"
-                : "secondary"
-            }
-            onClick={requestGeneration}
-            icon={<RefreshCw className="h-4 w-4" />}
-            disabled={!selectedProjectId}
-          >
-            Try generation again
-          </Button>
-        ) : (
-          <p className="mt-6 max-w-lg text-sm text-app-text-muted">
-            Your project manager can rebuild your path from your page in the team area.
-          </p>
-        )}
-        {/* Generating again is the wrong hope when the corpus is what was thin -- it comes back
-            empty a second time. The conversation is the one thing here that can produce
-            something, so it is offered beside the retry (or the pointer to the PM) rather than
-            instead of it. */}
-        {generationIssues.length > 0 ? (
+      <NoPhasesState
+        issues={generationIssues}
+        canManage={canManageSelected}
+        hasProject={!!selectedProjectId}
+        onStart={requestGeneration}
+        buddy={
           <AskTheBuddy
             question={askAboutEmptyPhases(generationIssues.map((issue) => issue.title))}
             label="Work it out with your buddy instead"
           />
-        ) : null}
-      </CenteredState>
+        }
+      />
     );
   }
 
-  const isFinished = nextAction?.kind === "done";
-
   return (
     <div className="min-h-screen" ref={swipeRef}>
-      <header className="border-b border-app-border bg-app-bg">
-        <div className="app-page-frame py-6">
-          <PageHeader
-            icon={Rocket}
-            title="Onboarding"
-            subtitle={
-              isFinished
-                ? "You made it through every phase. Everything stays here to look back on."
-                : "Your path into the project. Phases that are open can be done in any order."
-            }
-            // Rebuilding a path throws the member's progress away, so it is the PM's call: it lives
-            // on the member's page in the PM area, not here.
-            actions={
-              generationIssues.length > 0 && (
-                <span
-                  role="status"
-                  aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
-                >
-                  <Badge variant="warning" size="sm" title={generationIssueSummary}>
-                    <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                    {generationIssues.length}
-                  </Badge>
-                </span>
-              )
-            }
-          />
-        </div>
-      </header>
+      <JourneyHeader isFinished={nextAction?.kind === "done"} issues={generationIssues} />
 
       <MainContent className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <SegmentedTabs
-            layoutId="onboarding-view-mode"
-            ariaLabel="Onboarding view"
-            value={viewMode}
-            onChange={chooseViewMode}
-            options={[
-              { value: "graph", label: "Graph", icon: <GitBranch className="h-4 w-4" /> },
-              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
-            ]}
-          />
-          {overall ? (
-            <div className="flex items-center gap-3">
-              <ProgressRing value={overall.percentage} size={44} stroke={4.5}>
-                <span className="text-2xs font-bold text-app-text tabular-nums">
-                  {overall.percentage}%
-                </span>
-              </ProgressRing>
-              <div className="text-sm leading-tight">
-                <p className="font-semibold text-app-text tabular-nums">
-                  {overall.phasesDone} of {phases.length} phases complete
-                </p>
-                <p className="text-xs text-app-text-muted tabular-nums">
-                  {overall.stepsDone} {overall.stepsDone === 1 ? "step" : "steps"} done
-                  {overall.phasesDone > 0 ? " — keep it up" : ""}
-                </p>
-              </div>
-            </div>
-          ) : null}
-        </div>
+        <ViewToolbar
+          viewMode={viewMode}
+          onChange={chooseViewMode}
+          overall={overall}
+          phaseCount={phases.length}
+        />
 
         <SlidingTabPanel activeKey={viewMode} index={VIEW_ORDER.indexOf(viewMode)}>
           {viewMode === "list" ? (
-            <div className="space-y-5">
-              {nextAction?.kind === "choose" ? (
-                <div id="phase-chooser">
-                  <PhaseChooser
-                    phases={nextAction.phases}
-                    allPhases={phases}
-                    onChoose={choosePhase}
-                  />
-                </div>
-              ) : nextAction && (nextAction.kind === "step" || nextAction.kind === "question") ? (
-                <UpNextCard
-                  phase={nextAction.phase}
-                  phaseIndex={phases.findIndex((phase) => phase.id === nextAction.phase.id)}
-                  item={phaseItems(nextAction.phase).find((item) => item.id === nextItemId)}
-                  onPrimary={openItem}
-                  onShowPhase={() => selectPhase(nextAction.phase.id)}
+            <ListPanel
+              phases={phases}
+              selectedPhase={selectedPhase}
+              nextAction={nextAction}
+              nextItemId={nextItemId}
+              focusPhaseId={focusPhaseId}
+              expandedItemId={expandedItemId}
+              linkedItemId={linkHighlight?.id ?? null}
+              onLinkHighlightEnd={clearLinkHighlight}
+              onChoosePhase={choosePhase}
+              onSelectPhase={selectPhase}
+              onToggle={toggleItem}
+              onPrimary={openItem}
+              renderExpanded={(item) => renderItemBody(item, "inline")}
+              renderBuddy={(isEmpty) => (
+                <AskTheBuddy
+                  question={
+                    isEmpty ? askAboutEmptyPhase(selectedPhase.title) : askAboutPhase(selectedPhase)
+                  }
+                  label={
+                    isEmpty
+                      ? "This phase is empty — talk it through with your buddy"
+                      : "Ask your buddy about this phase"
+                  }
                 />
-              ) : null}
-
-              <div className="grid items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
-                <PhaseNavigator
-                  phases={phases}
-                  selectedPhaseId={selectedPhase.id}
-                  focusPhaseId={focusPhaseId}
-                  onSelect={selectPhase}
-                  showUpdates
-                  className="lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:max-h-[44rem]"
-                />
-
-                <section aria-labelledby="phase-title" className="min-w-0 space-y-4">
-                  <PhaseHeaderCard
-                    phase={selectedPhase}
-                    phases={phases}
-                    isFocus={selectedPhase.id === focusPhaseId}
-                    onSelectPhase={selectPhase}
-                    renderBuddy={(isEmpty) => (
-                      <AskTheBuddy
-                        question={
-                          isEmpty
-                            ? askAboutEmptyPhase(selectedPhase.title)
-                            : askAboutPhase(selectedPhase)
-                        }
-                        label={
-                          isEmpty
-                            ? "This phase is empty — talk it through with your buddy"
-                            : "Ask your buddy about this phase"
-                        }
-                      />
-                    )}
-                  />
-                  <PhaseItemList
-                    phase={selectedPhase}
-                    nextItemId={nextItemId}
-                    expandedItemId={expandedItemId}
-                    linkedItemId={linkHighlight?.id ?? null}
-                    onLinkHighlightEnd={clearLinkHighlight}
-                    onToggle={toggleItem}
-                    onPrimary={openItem}
-                    renderExpanded={(item) => renderItemBody(item, "inline")}
-                  />
-                </section>
-              </div>
-            </div>
+              )}
+            />
           ) : (
             <JourneyGraph
               phases={phases}

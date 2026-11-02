@@ -91,6 +91,22 @@ function useLinkHighlight(loadingState: LoadingState, selectedPhaseId: string, v
   return { highlight, setHighlight, clearHighlight };
 }
 
+/** Brings the phase chooser into view, once the panel holding it has slid in. */
+export function useScrollToChooser() {
+  const timer = useRef(0);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  return useCallback(() => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(
+      () =>
+        document
+          .querySelector("#phase-chooser")
+          ?.scrollIntoView?.({ behavior: "smooth", block: "center" }),
+      SLIDING_PANEL_EXIT_MS,
+    );
+  }, []);
+}
+
 /**
  * Scrolls to an item the page opened on the member's behalf -- a link, "up next", "continue" -- once
  * it is the one unfolded. `scrollWhenOpened` names the item to scroll to.
