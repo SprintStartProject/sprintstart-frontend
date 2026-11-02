@@ -4,7 +4,7 @@ import type { BuddyMessage, BuddyMessageView } from "../types";
 import { streamGreeting, type GreetTarget, type GreetView } from "./greet";
 import { withHistory } from "./messageReducers";
 import type { OpeningLatches } from "./openingLatches";
-import { HISTORY_FAILED } from "./replyMessages";
+import { reportOpenFailure } from "./openFailure";
 import type { BuddySessionSummary } from "../../../services/buddyService";
 
 /** What opening a conversation reads and writes. */
@@ -113,12 +113,10 @@ export async function ensureOpened(env: OpenEnv): Promise<void> {
     }
   } catch (e) {
     console.error(e);
-    // This failure owns the banner: a retry must redo *this* read, not a stale move.
-    env.latches.setRetryMove(null);
     // The latch goes back, or one blip is permanent: this runs as the app root mounts, the widget
     // never unmounts, and `retryOpen` is the only way back.
     env.latches.releaseLoad();
-    env.view.setOpenError(HISTORY_FAILED);
+    reportOpenFailure(env.latches, env.view.setOpenError);
   } finally {
     env.view.setIsOpening(false);
   }
