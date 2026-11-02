@@ -1,5 +1,5 @@
 import { MainContent } from "../components/layout/MainContent";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AlertCircle, Check, LayoutDashboard, RefreshCw } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
@@ -9,6 +9,8 @@ import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { Spinner } from "../components/ui/Spinner";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
+import { useBoardPlanning } from "../features/board/hooks/useBoardPlanning";
+import { useCardRemovals } from "../features/board/hooks/useCardRemovals";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
 import { BoardPathContext } from "../features/board/hooks/boardPath";
@@ -59,26 +61,9 @@ import {
   type CardSizes,
 } from "../features/board/layout/cardSizes";
 import { readCardOrigins, type CardOrigins } from "../features/board/layout/cardOrigins";
-import {
-  notifyBoardStorageWritten,
-  subscribeToBoardStorageReplaced,
-  subscribeToBoardStorageWritten,
-} from "../features/board/layout/boardStorage";
+import { subscribeToBoardStorageReplaced } from "../features/board/layout/boardStorage";
 import { describeCuts, selectShownCards } from "../features/board/layout/boardCuts";
-import { forgetCard } from "../features/board/layout/forgetCard";
 import { useBoardStructureSync } from "../features/board/sync/useBoardStructureSync";
-import {
-  applyBoardDocument,
-  readBoardDocument,
-  type BoardDocument,
-} from "../features/board/sync/boardDocument";
-import {
-  countPlanChanges,
-  revertedDocument,
-  revertedOrder,
-  sameOrder,
-  type PlanSnapshot,
-} from "../features/board/layout/planChanges";
 import { useCardMarks, useMarkableBoard } from "../features/board/marks/useCardMarks";
 import { buildStacks } from "../features/board/layout/cardStacks";
 import {
@@ -122,15 +107,6 @@ import {
  * The reason for all three is the same. A board that shows everything at once is fine at eight
  * cards and unusable at forty. See `layout/boardStructure.ts` for the model.
  */
-
-/**
- * How long a removed card can be brought back, in milliseconds.
- *
- * The window exists because dismissal is sticky by design — the board never re-adds a card the
- * hire said no to, and there is no undo behind it. So the undo has to happen *before* the write:
- * the card leaves the screen at once and the server hears about it only when the window closes.
- */
-const UNDO_WINDOW_MS = 7000;
 
 /**
  * The board size at which the stage bands arrive folded.
@@ -182,11 +158,6 @@ export function BoardPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFocused, setFocused]);
 
-  const [isArranging, setIsArranging] = useState(false);
-  /** The arrangement as it stood when planning began, so Cancel can put it back. */
-  const [planStart, setPlanStart] = useState<PlanSnapshot | null>(null);
-  /** The arrangement as it is now while planning, read again on every write to it. */
-  const [planDocument, setPlanDocument] = useState<BoardDocument | null>(null);
   const [filter, setFilter] = useState<BoardFilter>("all");
   const [sectionId, setSectionId] = useState<string | null>(null);
 
@@ -249,15 +220,8 @@ export function BoardPage() {
   // down on the first load of a visit. See `sync/useBoardStructureSync.ts`.
   const localOnly = useBoardStructureSync(boardId, selectedProjectId);
 
-  useEffect(() => {
-    if (!isArranging) return;
-
-    // Read after the write has finished: some layers are written from inside a state updater,
-    // and setting state from there would be an update during render.
-    return subscribeToBoardStorageWritten(() =>
-      queueMicrotask(() => setPlanDocument(readBoardDocument(boardId, selectedProjectId))),
-    );
-  }, [isArranging, boardId, selectedProjectId]);
+  const { isArranging, planChanges, startArranging, finishArranging, cancelArranging } =
+    useBoardPlanning({ board, boardId, projectId: selectedProjectId, reorder });
 
   /**
    * Bumped whenever the stored arrangement is replaced under this page — by the sync above pulling
@@ -449,62 +413,13 @@ export function BoardPage() {
     [boardId],
   );
 
-  // Cards on their way out: gone from the board on screen, not yet gone from the server. Held here
-  // rather than in `useBoard` because it is a property of this page's undo affordance, not of the
-  // board itself — the hook still knows only about writes that actually happened.
-  //
-  // Plain functions rather than `useCallback`: this project compiles with the React Compiler, which
-  // memoizes them itself and rejects hand-written dependency lists it cannot verify.
-  const [pendingRemovals, setPendingRemovals] = useState<Set<string>>(new Set());
-  const removalTimers = useRef(new Map<string, number>());
-
-  // A page left while a removal is still pending drops the timer with it: the card stays on the
-  // board rather than disappearing from under somebody who navigated away mid-undo.
-  useEffect(() => {
-    const timers = removalTimers.current;
-
-    return () => {
-      timers.forEach((timer) => window.clearTimeout(timer));
-      timers.clear();
-    };
-  }, []);
-
-  function keepCard(cardId: string) {
-    setPendingRemovals((current) => {
-      const next = new Set(current);
-      next.delete(cardId);
-
-      return next;
-    });
-  }
-
-  function handleDismiss(cardId: string) {
-    if (board?.cards.find((card) => card.id === cardId)?.content.kind === "TASK_POOL") {
-      removeTaskPool();
-      return;
-    }
-
-    setPendingRemovals((current) => new Set(current).add(cardId));
-
-    const timer = window.setTimeout(() => {
-      removalTimers.current.delete(cardId);
-      void dismiss(cardId).then(() => forgetCard(boardId, selectedProjectId, cardId));
-      keepCard(cardId);
-    }, UNDO_WINDOW_MS);
-    removalTimers.current.set(cardId, timer);
-
-    toast.info("Removed from your board", {
-      duration: UNDO_WINDOW_MS,
-      action: {
-        label: "Undo",
-        onClick: () => {
-          window.clearTimeout(timer);
-          removalTimers.current.delete(cardId);
-          keepCard(cardId);
-        },
-      },
-    });
-  }
+  const { pendingRemovals, handleDismiss } = useCardRemovals({
+    board,
+    boardId,
+    projectId: selectedProjectId,
+    dismiss,
+    removeTaskPool,
+  });
 
   /**
    * Every card the board is holding, whatever the current view.
@@ -838,6 +753,12 @@ export function BoardPage() {
     });
   }
 
+  /** Planning opens every band: a dependency you cannot see is one you cannot set. */
+  function beginPlanning() {
+    setOpenStages(new Set(BOARD_STAGES));
+    startArranging();
+  }
+
   /** The kind of card being written, or null when nothing is being added. */
   const [addingKind, setAddingKind] = useState<AuthoredCardKind | null>(null);
 
@@ -925,68 +846,6 @@ export function BoardPage() {
   );
 
   const handleReorder = (cardIds: string[]) => void reorder(cardIds);
-
-  /**
-   * How much planning has changed so far, read again on every write to the arrangement and every
-   * new card order. Zero outside planning.
-   */
-  const planChanges = useMemo(() => {
-    if (!isArranging || !planStart || !planDocument || !board) return 0;
-
-    return countPlanChanges(
-      planStart,
-      planDocument,
-      board.cards.map((card) => card.id),
-    );
-  }, [isArranging, planStart, planDocument, board]);
-
-  /**
-   * Opens the planning mode, with nothing folded away.
-   *
-   * **It keeps the filter and the section.** A reorder replaces the board's order outright, so the
-   * grid is given the whole order and every move names the card it is going next to; a hire can
-   * plan one area without the board jumping to everything first.
-   *
-   * What is still opened is what is *folded*: planning is about what comes after what, and a
-   * dependency you cannot see is one you cannot set.
-   */
-  function startArranging() {
-    const document = readBoardDocument(boardId, selectedProjectId);
-    setOpenStages(new Set(BOARD_STAGES));
-    setPlanStart({ document, order: board?.cards.map((card) => card.id) ?? [] });
-    setPlanDocument(document);
-    setIsArranging(true);
-  }
-
-  /** Leaves planning and keeps what was changed — every change is already saved as it is made. */
-  function finishArranging() {
-    setIsArranging(false);
-    setPlanStart(null);
-    setPlanDocument(null);
-  }
-
-  /**
-   * Leaves planning and puts the board back the way it was when planning began.
-   *
-   * Planning writes as it goes, so Cancel is not "don't save" but "undo all of it": the snapshot
-   * taken on the way in is written back over the layers (and announced as a change, so the sync
-   * sends it up), and the old card order is sent again if it moved.
-   */
-  function cancelArranging() {
-    if (planStart && board) {
-      applyBoardDocument(
-        boardId,
-        selectedProjectId,
-        revertedDocument(planStart, readBoardDocument(boardId, selectedProjectId)),
-      );
-      notifyBoardStorageWritten();
-
-      const current = board.cards.map((card) => card.id);
-      const order = revertedOrder(planStart, current);
-      if (!sameOrder(order, current)) void reorder(order);
-    }
-    finishArranging();
-  }
 
   /**
    * The gutters the page draws in.
@@ -1082,7 +941,7 @@ export function BoardPage() {
               isArranging={isArranging}
               planChanges={planChanges}
               namingArea={namingArea}
-              onTogglePlanning={() => (isArranging ? finishArranging() : startArranging())}
+              onTogglePlanning={() => (isArranging ? finishArranging() : beginPlanning())}
               onCancelPlanning={cancelArranging}
               onNameArea={() => setNamingArea(true)}
               isPathShown={isPathShown}
