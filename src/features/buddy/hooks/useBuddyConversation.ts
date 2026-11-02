@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
 import {
   getMessages,
   getSessions,
@@ -13,8 +12,6 @@ import {
   type BuddyOpeningAction,
   type BuddySessionSummary,
 } from "../../../services/buddyService";
-import { useQueryClient } from "@tanstack/react-query";
-import { queryKeys } from "../../../services/queryKeys";
 import { announceBuddyPathChanged } from "../aiBuddyBus";
 import { buddySessionIdFromPath } from "../buddyPagePath";
 import { actionDraftKey } from "../actionDrafts";
@@ -37,12 +34,6 @@ import {
   isNotFound,
 } from "../conversation/replyMessages";
 import { placesOnBoard } from "../conversation/boardActions";
-import {
-  readStoredMentorTools,
-  readStoredTeamMode,
-  writeStoredMentorTools,
-  writeStoredTeamMode,
-} from "../conversation/buddyPreferences";
 import {
   addActions,
   addCitation,
@@ -74,20 +65,15 @@ import {
   reusableBlankSession,
 } from "../conversation/sessionRules";
 import { createDraftBuffer, createWatchdog } from "../conversation/turnTimers";
+import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
+import { useDinoSurface } from "./useDinoSurface";
+import { useMentorTools } from "./useMentorTools";
+import { useMessageQueue } from "./useMessageQueue";
+import { useSessionStore } from "./useSessionStore";
+import { useTeamMode } from "./useTeamMode";
 
-/**
- * The slice of the global project context the buddy needs to keep team mode honest: team mode
- * is bound to the globally selected project, and only exists while this user manages it. Passed
- * in by [BuddyProvider] rather than read here, so the hook stays testable without a provider
- * above it.
- */
-export type ProjectSelectionSlice = {
-  selectedProjectId: string;
-  hasSelectedProject: boolean;
-  canManageSelected: boolean;
-  isLoading: boolean;
-  setSelectedProjectId: (projectId: string) => void;
-};
+export type { ProjectSelectionSlice } from "../conversation/projectSelection";
+import type { ProjectSelectionSlice } from "../conversation/projectSelection";
 
 /**
  * The conversation core behind every buddy surface: the message list, the optimistic
@@ -127,39 +113,11 @@ export function useBuddyConversation(
   // in place of a generic spinner. Cleared as soon as the answer starts streaming.
   const [activeTool, setActiveTool] = useState<string | null>(null);
 
-  // Dino waiting game: an unlocked user may press Space while the buddy thinks, as in the AI chat.
-  // The hook closes it on exit, at the end of the turn, or when the unlock flag flips off.
   const dinoUnlocked = useDinoUnlocked();
-  // How many surfaces show this thread (the open dock, the mounted `/buddy` page). The game only
-  // arms while one is visible, so it can never run, or hold the shared slot, inside a minimised
-  // dock.
-  const [dinoSurfaceCount, setDinoSurfaceCount] = useState(0);
-  const dinoSurfaceVisible = dinoSurfaceCount > 0;
-  const [dinoGameActive, closeDinoGame] = useSpaceOpensDino(
-    isThinking && dinoSurfaceVisible,
-    dinoUnlocked,
-    {
-      // The game outlives the turn it was armed for and stays open until the player leaves it; the
-      // reply only flips its completion badge.
-      keepActiveUntilExit: true,
-    },
-  );
-
-  // The last visible surface went away (dock minimised, page left): the game it hosted is gone
-  // from screen, so it must not keep running — or keep the shared slot — behind it.
-  useEffect(() => {
-    if (!dinoSurfaceVisible) closeDinoGame();
-  }, [dinoSurfaceVisible, closeDinoGame]);
-
-  /**
-   * Declares that a surface showing this thread is on screen. Returns the matching release;
-   * meant to be called from an effect; the returned release is the effect's cleanup (see
-   * `BuddyWidget` / `BuddyPage`).
-   */
-  const registerDinoSurface = useCallback(() => {
-    setDinoSurfaceCount((count) => count + 1);
-    return () => setDinoSurfaceCount((count) => count - 1);
-  }, []);
+  const { dinoGameActive, closeDinoGame, registerDinoSurface } = useDinoSurface(isThinking, {
+    unlocked: dinoUnlocked,
+    useGame: useSpaceOpensDino,
+  });
 
   // The one suggested next step the opening greeting invites, until the hire acts or asks.
   const [openerAction, setOpenerAction] = useState<BuddyOpeningAction | null>(null);
@@ -177,50 +135,18 @@ export function useBuddyConversation(
   // failed, which carries its own reason. Nothing is on screen to hang that on, so it is state.
   const [openError, setOpenError] = useState<string | null>(null);
 
-  /**
-   * The conversations this hire owns, newest first — read once at the first open, then kept in
-   * step by the two moves across it ([newConversation], [selectSession]). The ref shadows the
-   * list for the same reason every other ref here does: a decision made mid-flight reads the
-   * current value without every token re-creating its callbacks.
-   */
-  const [sessions, setSessions] = useState<BuddySessionSummary[]>([]);
-  const sessionsRef = useRef<BuddySessionSummary[]>([]);
-  /**
-   * The conversations this app session has binned, by id.
-   *
-   * A list read that started before a bin still carries the binned row — the read is a moment,
-   * and `refreshSessions` merges what it returns — so the ids are remembered and filtered out
-   * of every later read. The backend never returns a binned conversation again, so the set only
-   * ever grows within one app session, and never needs clearing.
-   */
-  const binnedSessionIdsRef = useRef<Set<string>>(new Set());
-  /** Which conversation is on screen. `null` only before the first open has resolved one. */
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const currentSessionIdRef = useRef<string | null>(null);
-  /**
-   * One resolution per app session, shared by every caller that can start one.
-   *
-   * The composer is live from the first paint, so a send can beat the opening read; without
-   * this, two lookups racing an empty list would create two first conversations.
-   */
-  const resolvingRef = useRef<Promise<string> | null>(null);
-
-  // The dashboard's "Recent conversations" card reads the same list from the query cache, so every
-  // change here is written through to it.
-  const queryClient = useQueryClient();
-  const applySessions = useCallback(
-    (next: BuddySessionSummary[]) => {
-      sessionsRef.current = next;
-      setSessions(next);
-      queryClient.setQueryData(queryKeys.buddy.sessions(), next);
-    },
-    [queryClient],
-  );
-
-  const applyCurrentSession = useCallback((sessionId: string | null) => {
-    currentSessionIdRef.current = sessionId;
-    setCurrentSessionId(sessionId);
-  }, []);
+  const {
+    sessions,
+    currentSessionId,
+    applySessions,
+    applyCurrentSession,
+    sessionsNow,
+    currentSessionNow,
+    isBinned,
+    binnedNow,
+    markBinned,
+    shareResolution,
+  } = useSessionStore();
 
   /**
    * The hire's wording for the proposals that carry an editable message — a flag's question, the
@@ -239,105 +165,16 @@ export function useBuddyConversation(
    */
   const [presentedGreetingId, setPresentedGreetingId] = useState<string | null>(null);
 
-  /**
-   * Whether the manager has pointed the buddy at a project instead of their own onboarding.
-   * Persisted per signed-in user; the *project* it means is never stored independently — it is
-   * whichever project the global context currently vouches for (see the derivation below), so
-   * team mode and the rest of the app can never disagree about which project is being discussed.
-   */
-  const [isTeamMode, setIsTeamMode] = useState(false);
-
   const { profile } = useAuth();
   const userId = profile?.id ?? null;
-  const userIdRef = useRef<string | null>(null);
-  // Declared before the effect that resets it: the target binding must not outlive the user whose
-  // thread created it.
-  const teamTargetRef = useRef<string | null>(null);
-  useEffect(() => {
-    userIdRef.current = userId;
-    // A user change drops the old user's project binding, not just the visible mode, so the adopt
-    // effect cannot compare the next user's selection against it.
-    teamTargetRef.current = null;
-    // Re-read on every subject change, so a logout or account switch inherits nothing. Deferred to
-    // a microtask so setState never runs synchronously in the effect body.
-    void (async () => {
-      await Promise.resolve();
-      setIsTeamMode(userId === null ? false : readStoredTeamMode(userId));
-    })();
-  }, [userId]);
-
-  /**
-   * Which project the *thread on screen* is bound to — the conversation may lag the derived
-   * target while a switch is pending. `null` means team mode is on but has not adopted a
-   * project yet (a restored preference waiting for the list to vouch).
-   */
-
-  const setTeamMode = useCallback((value: boolean) => {
-    setIsTeamMode(value);
-    const id = userIdRef.current;
-
-    if (id !== null) writeStoredTeamMode(id, value);
-    if (!value) teamTargetRef.current = null;
-  }, []);
-
-  /**
-   * The managed project this conversation is about, or `null` for the hire's own. Derived,
-   * never stored: it exists only while the team preference is on *and* the loaded project list
-   * vouches that this user manages the selected project. That derivation is the scoping
-   * guarantee — before the list arrives, or once management is gone, the value collapses to the
-   * hire conversation, so no team-scoped request can go to a project the buddy has no business
-   * touching. Held as a ref alongside the state so the streaming calls read the current
-   * conversation mid-turn without every token re-creating their callbacks.
-   */
-  const teamProjectId =
-    isTeamMode && selection.hasSelectedProject && selection.canManageSelected
-      ? selection.selectedProjectId
-      : null;
-  const teamProjectIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    teamProjectIdRef.current = teamProjectId;
-  }, [teamProjectId]);
-
-  /**
-   * Team mode ends involuntarily when the ground moves under it: the selected project is no
-   * longer manageable, or the manager moved the global selection somewhere else while the buddy
-   * was discussing the old one. The conversation then falls back to the hire thread — audibly,
-   * via [onTeamModeLeft], because a silent fallback is exactly the drift this binding exists to
-   * prevent. Voluntary switches never pass through here: they go through
-   * [switchTeamProject], which binds the new target before the state settles, so this effect
-   * sees a matching pair and stays out of the way.
-   */
-  useEffect(() => {
-    if (!isTeamMode || selection.isLoading) return;
-
-    void (async () => {
-      await Promise.resolve();
-      if (teamTargetRef.current === null) {
-        // A restored preference adopting whatever the loaded list vouches for. Nothing to bind
-        // to — no selection, or none of it manageable — and team mode ends audibly.
-        if (selection.hasSelectedProject && selection.canManageSelected) {
-          teamTargetRef.current = selection.selectedProjectId;
-        } else {
-          setTeamMode(false);
-          onTeamModeLeft?.();
-        }
-        return;
-      }
-
-      if (!selection.canManageSelected || selection.selectedProjectId !== teamTargetRef.current) {
-        setTeamMode(false);
-        onTeamModeLeft?.();
-      }
-    })();
-  }, [
+  const {
     isTeamMode,
-    selection.isLoading,
-    selection.hasSelectedProject,
-    selection.canManageSelected,
-    selection.selectedProjectId,
+    teamProjectId,
     setTeamMode,
-    onTeamModeLeft,
-  ]);
+    teamProjectNow,
+    adoptTeamProject,
+    bindTeamTarget,
+  } = useTeamMode(selection, userId, onTeamModeLeft);
 
   /**
    * True while a proposal confirm or dismissal is in flight. Unlike the message streams, these
@@ -387,29 +224,8 @@ export function useBuddyConversation(
     onTurnStoppedRef.current = onTurnStopped;
   });
 
-  /**
-   * Messages submitted while a turn was still running, oldest first — the visible queue.
-   *
-   * Held in a ref as well as in state, both written through `commitQueued`: the drain runs from
-   * the send path's terminal `finally` (a callback, not a render) and has to read the queue as
-   * it is *now*, while the state half is what the composer's strip renders.
-   */
-  const [queued, setQueued] = useState<QueuedBuddyMessage[]>([]);
-  const queuedRef = useRef<QueuedBuddyMessage[]>([]);
-  const commitQueued = useCallback((next: QueuedBuddyMessage[]) => {
-    queuedRef.current = next;
-    setQueued(next);
-  }, []);
-
-  // Same split for the paused flag: Stop sets it and the drain reads it, neither inside a
-  // render. A paused queue keeps its messages, visible in the strip with a "Send queued"
-  // button — Stop means "stop doing things", not "throw away what I wrote".
-  const [queuePaused, setQueuePausedState] = useState(false);
-  const queuePausedRef = useRef(false);
-  const setQueuePaused = useCallback((paused: boolean) => {
-    queuePausedRef.current = paused;
-    setQueuePausedState(paused);
-  }, []);
+  const { queued, queuePaused, commitQueued, setQueuePaused, queuedNow, pausedNow } =
+    useMessageQueue();
 
   /**
    * The drain, reached from the send path's terminal `finally` through a ref: the callback is
@@ -438,23 +254,7 @@ export function useBuddyConversation(
     filtersRef.current = filters;
   }, [filters]);
 
-  const [capabilitiesEnabled, setCapabilitiesEnabledState] = useState(true);
-  const capabilitiesEnabledRef = useRef(true);
-  // Read once per user, the way team mode is: a preference, not conversation state. Deferred to
-  // a microtask so the setState never runs synchronously in the effect body.
-  useEffect(() => {
-    void (async () => {
-      await Promise.resolve();
-      const stored = userId === null ? true : readStoredMentorTools(userId);
-      setCapabilitiesEnabledState(stored);
-      capabilitiesEnabledRef.current = stored;
-    })();
-  }, [userId]);
-  const setCapabilitiesEnabled = useCallback((next: boolean) => {
-    setCapabilitiesEnabledState(next);
-    capabilitiesEnabledRef.current = next;
-    if (userIdRef.current !== null) writeStoredMentorTools(userIdRef.current, next);
-  }, []);
+  const { capabilitiesEnabled, setCapabilitiesEnabled, capabilitiesNow } = useMentorTools(userId);
 
   /**
    * Streams the buddy's opening greeting into the thread.
@@ -545,14 +345,12 @@ export function useBuddyConversation(
    * opening read must land on the same conversation, not create a second.
    */
   const resolveHireSession = useCallback(async (): Promise<string> => {
-    if (resolvingRef.current) return resolvingRef.current;
-
-    const pending = (async () => {
+    return shareResolution(async () => {
       const list = await getSessions();
 
       if (list.length > 0) {
         const addressed = buddySessionIdFromPath(window.location.pathname);
-        const chosen = chooseSession(list, addressed, currentSessionIdRef.current);
+        const chosen = chooseSession(list, addressed, currentSessionNow());
         applySessions(list);
         applyCurrentSession(chosen);
         return chosen;
@@ -562,16 +360,8 @@ export function useBuddyConversation(
       applySessions([blankSession(createdId, new Date().toISOString())]);
       applyCurrentSession(createdId);
       return createdId;
-    })();
-
-    resolvingRef.current = pending;
-
-    try {
-      return await pending;
-    } finally {
-      resolvingRef.current = null;
-    }
-  }, [applySessions, applyCurrentSession]);
+    });
+  }, [applySessions, applyCurrentSession, shareResolution, currentSessionNow]);
 
   /**
    * Re-reads the conversation list.
@@ -592,7 +382,7 @@ export function useBuddyConversation(
       // A conversation binned while this read was in flight is still in it — the read is a
       // moment — so the tombstone wins over the row (see `binnedSessionIdsRef`); and one created
       // while it was in flight is newer than that moment, so it stays in front.
-      const next = mergeFetchedSessions(read, binnedSessionIdsRef.current, sessionsRef.current);
+      const next = mergeFetchedSessions(read, binnedNow(), sessionsNow());
       applySessions(next);
       return next;
     } catch (e) {
@@ -600,7 +390,7 @@ export function useBuddyConversation(
       console.error(e);
       return null;
     }
-  }, [applySessions]);
+  }, [applySessions, binnedNow, sessionsNow]);
 
   /**
    * Brings one conversation on screen: reads it, merges its window in front of anything the
@@ -626,13 +416,13 @@ export function useBuddyConversation(
 
         // A read for a conversation that has left the screen is not this thread's to show. Every
         // switch refuses while an open runs, so this guards the invariant for the next caller.
-        if (currentSessionIdRef.current !== sessionId) return;
+        if (currentSessionNow() !== sessionId) return;
 
         mergeHistory(history);
 
         if (
           history.length === 0 &&
-          sessionsRef.current.length === 1 &&
+          sessionsNow().length === 1 &&
           !messagesRef.current.some((message) => message.role === "USER")
         ) {
           greetingRef.current = true;
@@ -646,7 +436,7 @@ export function useBuddyConversation(
         setIsOpening(false);
       }
     },
-    [greet, mergeHistory],
+    [greet, mergeHistory, currentSessionNow, sessionsNow],
   );
 
   /**
@@ -674,7 +464,7 @@ export function useBuddyConversation(
     setOpenError(null);
 
     try {
-      const teamId = teamProjectIdRef.current;
+      const teamId = teamProjectNow();
 
       if (teamId === null) {
         const sessionId = await resolveHireSession();
@@ -684,7 +474,7 @@ export function useBuddyConversation(
 
         // Same invariant as `openSession`'s: a switch that happened while this read was in
         // flight makes the read stale, and stale history does not merge.
-        if (teamProjectIdRef.current !== teamId) return;
+        if (teamProjectNow() !== teamId) return;
 
         mergeHistory(history);
 
@@ -711,7 +501,7 @@ export function useBuddyConversation(
     } finally {
       setIsOpening(false);
     }
-  }, [resolveHireSession, openSession, mergeHistory, greet]);
+  }, [resolveHireSession, openSession, mergeHistory, greet, teamProjectNow]);
 
   /**
    * Cuts the running answer short and waits until its close-out has run — the first half of
@@ -748,8 +538,8 @@ export function useBuddyConversation(
    */
   const selectSession = useCallback(
     async (sessionId: string): Promise<boolean> => {
-      if (sessionId === currentSessionIdRef.current) return true;
-      if (teamProjectIdRef.current !== null) return false;
+      if (sessionId === currentSessionNow()) return true;
+      if (teamProjectNow() !== null) return false;
       const blocked = () =>
         greetingRef.current || isOpening || isDeciding || pendingDecisionsRef.current > 0;
       if (blocked()) return false;
@@ -758,8 +548,8 @@ export function useBuddyConversation(
         await stopRunningTurn();
         // Anything may have moved during the wait (another switch, a queued message that started as
         // the turn ended); whoever is ahead keeps the thread.
-        if (blocked() || streamingRef.current || teamProjectIdRef.current !== null) return false;
-        if (sessionId === currentSessionIdRef.current) return true;
+        if (blocked() || streamingRef.current || teamProjectNow() !== null) return false;
+        if (sessionId === currentSessionNow()) return true;
       }
       greetingRef.current = true;
 
@@ -805,6 +595,8 @@ export function useBuddyConversation(
       openSession,
       commitQueued,
       setQueuePaused,
+      currentSessionNow,
+      teamProjectNow,
     ],
   );
 
@@ -835,7 +627,7 @@ export function useBuddyConversation(
     // The conversations list is the hire's surface; team mode has one conversation per project
     // and nothing to start. The controls that call this are hidden there too, but a stale
     // keyboard shortcut must not switch a manager into an empty hire thread.
-    if (teamProjectIdRef.current !== null) return;
+    if (teamProjectNow() !== null) return;
     const blocked = () =>
       greetingRef.current || isOpening || isDeciding || pendingDecisionsRef.current > 0;
     if (blocked()) return;
@@ -843,12 +635,12 @@ export function useBuddyConversation(
     if (streamingRef.current) {
       await stopRunningTurn();
       // As in `selectSession`: what moved during the wait is ahead of this click.
-      if (blocked() || streamingRef.current || teamProjectIdRef.current !== null) return;
+      if (blocked() || streamingRef.current || teamProjectNow() !== null) return;
     }
 
     // An untitled newest conversation is one nobody has written into (the backend titles from the
     // first message), so it is brought back instead of stacking a second empty one.
-    const newest = reusableBlankSession(sessionsRef.current, currentSessionIdRef.current);
+    const newest = reusableBlankSession(sessionsNow(), currentSessionNow());
     if (newest) {
       await selectSession(newest.id);
       return;
@@ -858,7 +650,7 @@ export function useBuddyConversation(
     // What this click saw, for the re-check after the create: a send that begins during the round
     // trip would otherwise land in the conversation being left and lose its optimistic turn to the
     // clears below.
-    const sessionAtEntry = currentSessionIdRef.current;
+    const sessionAtEntry = currentSessionNow();
     const sendsAtEntry = sendCountRef.current;
 
     try {
@@ -867,8 +659,8 @@ export function useBuddyConversation(
       if (
         sendCountRef.current !== sendsAtEntry ||
         pendingDecisionsRef.current > 0 ||
-        teamProjectIdRef.current !== null ||
-        currentSessionIdRef.current !== sessionAtEntry
+        teamProjectNow() !== null ||
+        currentSessionNow() !== sessionAtEntry
       ) {
         // Something moved while the create was in flight; the new conversation stays unadopted (a
         // later refresh lists it) and the user's actual move keeps its turn.
@@ -876,7 +668,7 @@ export function useBuddyConversation(
       }
 
       // Newest first, like the backend's own ordering.
-      applySessions([blankSession(createdId, new Date().toISOString()), ...sessionsRef.current]);
+      applySessions([blankSession(createdId, new Date().toISOString()), ...sessionsNow()]);
       applyCurrentSession(createdId);
 
       setMessages([]);
@@ -911,6 +703,9 @@ export function useBuddyConversation(
     selectSession,
     commitQueued,
     setQueuePaused,
+    currentSessionNow,
+    sessionsNow,
+    teamProjectNow,
   ]);
 
   /**
@@ -941,7 +736,7 @@ export function useBuddyConversation(
    */
   const binSession = useCallback(
     async (sessionId: string) => {
-      if (teamProjectIdRef.current !== null)
+      if (teamProjectNow() !== null)
         throw new Error("Conversations can't be binned while you're in team mode.");
       if (greetingRef.current || isOpening || isDeciding || pendingDecisionsRef.current > 0)
         throw new Error("Your buddy is still working — try again once the reply finishes.");
@@ -953,15 +748,15 @@ export function useBuddyConversation(
         // Anything else is a real failure and belongs to the caller.
         if (!isNotFound(e)) throw e;
       }
-      binnedSessionIdsRef.current.add(sessionId);
+      markBinned(sessionId);
       // Its draft goes with it. The box files its words under a conversation as it leaves it —
       // `isSessionBinned` is what keeps that write from bringing the entry back.
       clearDraft(userId, sessionId);
 
-      const remaining = sessionsRef.current.filter((session) => session.id !== sessionId);
+      const remaining = sessionsNow().filter((session) => session.id !== sessionId);
       applySessions(remaining);
 
-      if (currentSessionIdRef.current !== sessionId) return;
+      if (currentSessionNow() !== sessionId) return;
 
       // The answer being written belongs to the binned conversation; stopping it once here keeps
       // the two paths from toasting twice.
@@ -976,9 +771,21 @@ export function useBuddyConversation(
 
       // The move can fail and still resolve (see `newConversation`'s catch); if the hire is still
       // on the binned conversation, the caller must hear it.
-      if (currentSessionIdRef.current === sessionId) throw new Error(BIN_MOVE_FAILED);
+      if (currentSessionNow() === sessionId) throw new Error(BIN_MOVE_FAILED);
     },
-    [applySessions, isOpening, isDeciding, stopRunningTurn, selectSession, newConversation, userId],
+    [
+      applySessions,
+      isOpening,
+      isDeciding,
+      stopRunningTurn,
+      selectSession,
+      newConversation,
+      userId,
+      currentSessionNow,
+      markBinned,
+      sessionsNow,
+      teamProjectNow,
+    ],
   );
 
   /**
@@ -986,10 +793,7 @@ export function useBuddyConversation(
    * files a draft under one it is leaving, since a binned conversation has nothing to keep it
    * for. Reads the tombstones `binSession` leaves, so it is true from the moment of the bin.
    */
-  const isSessionBinned = useCallback(
-    (sessionId: string) => binnedSessionIdsRef.current.has(sessionId),
-    [],
-  );
+  const isSessionBinned = useCallback((sessionId: string) => isBinned(sessionId), [isBinned]);
 
   /**
    * Tries again after [ensureOpened] failed.
@@ -1096,9 +900,9 @@ export function useBuddyConversation(
       // from the first paint, so a send can beat the opening read; resolution is shared and
       // memoised in flight (`resolveHireSession`), so both land on the same conversation.
       let sessionId: string | undefined;
-      if (teamProjectIdRef.current === null) {
+      if (teamProjectNow() === null) {
         try {
-          sessionId = currentSessionIdRef.current ?? (await resolveHireSession());
+          sessionId = currentSessionNow() ?? (await resolveHireSession());
         } catch (e) {
           console.error(e);
           // The banner this puts up owns the retry, like every other failure site: a stale
@@ -1173,7 +977,7 @@ export function useBuddyConversation(
        */
       const refreshTitleIfUntitled = () => {
         if (sessionId === undefined) return;
-        const summary = sessionsRef.current.find((session) => session.id === sessionId);
+        const summary = sessionsNow().find((session) => session.id === sessionId);
         if (summary && summary.title.trim() === "") void refreshSessions();
       };
 
@@ -1310,13 +1114,13 @@ export function useBuddyConversation(
           },
           // Read at call time: a turn speaks to whichever conversation is current when it starts.
           sessionId,
-          teamProjectIdRef.current ?? undefined,
+          teamProjectNow() ?? undefined,
           // The page the dock floats over, for the buddy's app guide; read from the window at send
           // time so the app-wide conversation does not re-render on every navigation.
           window.location.pathname,
           controller.signal,
           {
-            capabilitiesEnabled: capabilitiesEnabledRef.current,
+            capabilitiesEnabled: capabilitiesNow(),
             filters: toWireFilters(filtersRef.current),
           },
         );
@@ -1356,7 +1160,16 @@ export function useBuddyConversation(
         drainRef.current();
       }
     },
-    [failReply, invalidateBoard, resolveHireSession, refreshSessions],
+    [
+      failReply,
+      invalidateBoard,
+      resolveHireSession,
+      refreshSessions,
+      capabilitiesNow,
+      currentSessionNow,
+      sessionsNow,
+      teamProjectNow,
+    ],
   );
 
   /**
@@ -1391,12 +1204,12 @@ export function useBuddyConversation(
       if (!text.trim()) return;
       setQueuePaused(false);
       if (streamingRef.current) {
-        commitQueued([...queuedRef.current, { id: crypto.randomUUID(), text }]);
+        commitQueued([...queuedNow(), { id: crypto.randomUUID(), text }]);
         return;
       }
       void sendMessage(text);
     },
-    [commitQueued, setQueuePaused, sendMessage],
+    [commitQueued, setQueuePaused, sendMessage, queuedNow],
   );
 
   /**
@@ -1428,20 +1241,20 @@ export function useBuddyConversation(
   /** Drops one queued message without sending it. */
   const removeQueued = useCallback(
     (id: string) => {
-      commitQueued(queuedRef.current.filter((item) => item.id !== id));
+      commitQueued(queuedNow().filter((item) => item.id !== id));
     },
-    [commitQueued],
+    [commitQueued, queuedNow],
   );
 
   /** Takes one queued message back out, for the composer to put in the box and edit. */
   const pullQueuedMessage = useCallback(
     (id: string): string | null => {
-      const item = queuedRef.current.find((queued) => queued.id === id);
+      const item = queuedNow().find((queued) => queued.id === id);
       if (!item) return null;
-      commitQueued(queuedRef.current.filter((queued) => queued.id !== id));
+      commitQueued(queuedNow().filter((queued) => queued.id !== id));
       return item.text;
     },
-    [commitQueued],
+    [commitQueued, queuedNow],
   );
 
   /**
@@ -1453,10 +1266,10 @@ export function useBuddyConversation(
    */
   const startQueuedTurn = useCallback(
     (item: QueuedBuddyMessage) => {
-      commitQueued(queuedRef.current.filter((queued) => queued.id !== item.id));
+      commitQueued(queuedNow().filter((queued) => queued.id !== item.id));
       void sendMessage(item.text);
     },
-    [commitQueued, sendMessage],
+    [commitQueued, sendMessage, queuedNow],
   );
 
   /**
@@ -1466,10 +1279,10 @@ export function useBuddyConversation(
    * race the answer it follows.
    */
   const drainNextQueued = useCallback(() => {
-    if (queuePausedRef.current) return;
-    const next = queuedRef.current[0];
+    if (pausedNow()) return;
+    const next = queuedNow()[0];
     if (next) startQueuedTurn(next);
-  }, [startQueuedTurn]);
+  }, [startQueuedTurn, pausedNow, queuedNow]);
 
   useEffect(() => {
     drainRef.current = drainNextQueued;
@@ -1487,9 +1300,9 @@ export function useBuddyConversation(
   const resumeQueue = useCallback(() => {
     setQueuePaused(false);
     if (streamingRef.current) return;
-    const next = queuedRef.current[0];
+    const next = queuedNow()[0];
     if (next) startQueuedTurn(next);
-  }, [setQueuePaused, startQueuedTurn]);
+  }, [setQueuePaused, startQueuedTurn, queuedNow]);
 
   /** Patches one proposed action in place, keyed by its message and action id. */
   const patchAction = useCallback((messageId: string, actionId: string, patch: ActionPatch) => {
@@ -1705,7 +1518,7 @@ export function useBuddyConversation(
       return;
 
     openedForRef.current = target;
-    teamProjectIdRef.current = teamProjectId;
+    adoptTeamProject(teamProjectId);
 
     setMessages([]);
     setOpenerAction(null);
@@ -1740,6 +1553,7 @@ export function useBuddyConversation(
     closeDinoGame,
     commitQueued,
     setQueuePaused,
+    adoptTeamProject,
   ]);
 
   /**
@@ -1773,10 +1587,19 @@ export function useBuddyConversation(
       selection.setSelectedProjectId(projectId);
       // Bind the conversation target before the derived value settles, so the adopt/exit
       // effect sees a matching pair and does not read the buddy's own switch as an exit.
-      teamTargetRef.current = projectId;
+      bindTeamTarget(projectId);
       setTeamMode(true);
     },
-    [isThinking, isStreaming, isOpening, isGreeting, isDeciding, selection, setTeamMode],
+    [
+      isThinking,
+      isStreaming,
+      isOpening,
+      isGreeting,
+      isDeciding,
+      selection,
+      setTeamMode,
+      bindTeamTarget,
+    ],
   );
 
   return {
