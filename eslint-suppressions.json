@@ -2228,13 +2228,10 @@
   },
   "src/pages/OnBoardingPage.tsx": {
     "complexity": {
-      "count": 8
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 4
+      "count": 1
     }
   },
   "src/pages/PmDashboardPage.tsx": {
