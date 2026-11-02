@@ -1,21 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  createSession,
-  binSession as binSessionApi,
-  type BuddyOpeningAction,
-} from "../../../services/buddyService";
-import { clearDraft } from "../buddyDraftStorage";
+import type { BuddyOpeningAction } from "../../../services/buddyService";
 import { useAuth } from "../../../context/useAuth";
 import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
 import type { BuddyMessageView } from "../types";
 import type { BuddySessionFilters, QueuedBuddyMessage } from "../types";
-import {
-  BIN_MOVE_FAILED,
-  CONVERSATION_FAILED,
-  HISTORY_FAILED,
-  isNotFound,
-} from "../conversation/replyMessages";
-import { blankSession, reusableBlankSession } from "../conversation/sessionRules";
+import { HISTORY_FAILED } from "../conversation/replyMessages";
 import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
 import { useDinoSurface } from "./useDinoSurface";
 import { useProposalActions } from "./useProposalActions";
@@ -26,6 +15,7 @@ import { useSessionStore } from "./useSessionStore";
 import { useTeamMode } from "./useTeamMode";
 import { useTurnRunner } from "./useTurnRunner";
 import { useOpening } from "./useOpening";
+import { useSessionMoves } from "./useSessionMoves";
 import { useSessionResolution } from "./useSessionResolution";
 import { createOpeningLatches } from "../conversation/openingLatches";
 
@@ -222,256 +212,25 @@ export function useBuddyConversation(
     resolveHireSession,
   });
 
-  /**
-   * Brings a conversation the hire picked from the list on screen.
-   *
-   * Reads it and shows it — no greeting: only the first, never-spoken conversation opens with
-   * one (see `openSession`), and everything else is a continuing thing the hire asked to see
-   * again, not a fresh start. A running answer is cut short first (see `stopRunningTurn`);
-   * anything else that is in flight refuses, like every other move that clears the thread.
-   *
-   * @returns Whether the conversation asked for is the one on screen now — `false` only for a
-   *   refusal, so a caller acting on someone else's behalf (the page following its address) can
-   *   tell "switched" from "nothing happened" instead of guessing from state a render behind.
-   *   A running answer is not a refusal.
-   */
-  const selectSession = useCallback(
-    async (sessionId: string): Promise<boolean> => {
-      if (sessionId === currentSessionNow()) return true;
-      if (teamProjectNow() !== null) return false;
-      const blocked = () => latches.isBusy() || isOpening || isDeciding || decidingNow();
-      if (blocked()) return false;
-
-      if (tracker.isStreaming()) {
-        await stopRunningTurn();
-        // Anything may have moved during the wait (another switch, a queued message that started as
-        // the turn ended); whoever is ahead keeps the thread.
-        if (blocked() || tracker.isStreaming() || teamProjectNow() !== null) return false;
-        if (sessionId === currentSessionNow()) return true;
-      }
-      latches.setBusy(true);
-
-      applyCurrentSession(sessionId);
-      clearThread();
-
-      try {
-        await openSession(sessionId);
-      } catch (e) {
-        console.error(e);
-        // Release the latch so the banner's "Try again" can re-run the read for this
-        // conversation; the switch itself stays, and the banner says what failed.
-        latches.releaseLoad();
-        // This failure owns the banner: a retry must redo this read, not a stale move.
-        latches.setRetryMove(null);
-        setOpenError(HISTORY_FAILED);
-      } finally {
-        latches.setBusy(false);
-      }
-
-      // Switched even when the read failed: the conversation on screen is the one asked for,
-      // and the banner owns the failure.
-      return true;
-    },
-    [
-      latches,
-      tracker,
-      isOpening,
-      isDeciding,
-      stopRunningTurn,
-      applyCurrentSession,
-      openSession,
-      currentSessionNow,
-      teamProjectNow,
-      clearThread,
-      decidingNow,
-    ],
-  );
-
-  /**
-   * Starts a new conversation: creates it server-side and switches to it, empty.
-   *
-   * A new conversation starts with an empty thread and the composer the hire's — they speak
-   * first, and the title is written from that first message server-side. Only the hire's
-   * first, never-spoken conversation opens with a greeting (see `openSession`), so nothing is
-   * requested here.
-   *
-   * A still-untouched conversation the hire already has comes back instead of a second one
-   * being created, and the create re-checks after its round trip: a turn or decision that
-   * starts while it is in flight wins, and the new conversation is not adopted.
-   *
-   * Nothing is deleted: the conversation being left keeps its transcript and stays in the
-   * list. The buddy's durable memory note is untouched — it is what keeps "new" from meaning
-   * "starting over". Only the hire's scrollback moves on — together with any offer wording they
-   * had half-edited, which belonged to the offers in it.
-   *
-   * A running answer is cut short first (see `stopRunningTurn`), because a stream cannot call its
-   * callbacks into a thread that has just been cleared. Anything else in flight refuses, for the
-   * same reason every other transcript-clearing move does. `pendingDecisionsRef` is read
-   * alongside the state — a decision and this click can land in one frame, before the
-   * "deciding" state has re-rendered.
-   */
-  const newConversation = useCallback(async () => {
-    // The conversations list is the hire's surface; team mode has one conversation per project
-    // and nothing to start. The controls that call this are hidden there too, but a stale
-    // keyboard shortcut must not switch a manager into an empty hire thread.
-    if (teamProjectNow() !== null) return;
-    const blocked = () => latches.isBusy() || isOpening || isDeciding || decidingNow();
-    if (blocked()) return;
-
-    if (tracker.isStreaming()) {
-      await stopRunningTurn();
-      // As in `selectSession`: what moved during the wait is ahead of this click.
-      if (blocked() || tracker.isStreaming() || teamProjectNow() !== null) return;
-    }
-
-    // An untitled newest conversation is one nobody has written into (the backend titles from the
-    // first message), so it is brought back instead of stacking a second empty one.
-    const newest = reusableBlankSession(sessionsNow(), currentSessionNow());
-    if (newest) {
-      await selectSession(newest.id);
-      return;
-    }
-
-    latches.setBusy(true);
-    // What this click saw, for the re-check after the create: a send that begins during the round
-    // trip would otherwise land in the conversation being left and lose its optimistic turn to the
-    // clears below.
-    const sessionAtEntry = currentSessionNow();
-    const sendsAtEntry = tracker.sendCount();
-
-    try {
-      const createdId = await createSession();
-
-      if (
-        tracker.sendCount() !== sendsAtEntry ||
-        decidingNow() ||
-        teamProjectNow() !== null ||
-        currentSessionNow() !== sessionAtEntry
-      ) {
-        // Something moved while the create was in flight; the new conversation stays unadopted (a
-        // later refresh lists it) and the user's actual move keeps its turn.
-        return;
-      }
-
-      // Newest first, like the backend's own ordering.
-      applySessions([blankSession(createdId, new Date().toISOString()), ...sessionsNow()]);
-      applyCurrentSession(createdId);
-
-      clearThread();
-    } catch (e) {
-      console.error(e);
-      // "Try again" redoes the create itself: `ensureOpened` would no-op out of a loaded
-      // conversation, so the retry has to be this move, not the opening read.
-      latches.setRetryMove("newConversation");
-      setOpenError(CONVERSATION_FAILED);
-    } finally {
-      latches.setBusy(false);
-    }
-  }, [
+  const { selectSession, newConversation, binSession, isSessionBinned } = useSessionMoves({
     latches,
     tracker,
     isOpening,
     isDeciding,
-    stopRunningTurn,
-    applySessions,
-    applyCurrentSession,
-    selectSession,
+    decidingNow,
     currentSessionNow,
     sessionsNow,
     teamProjectNow,
+    applySessions,
+    applyCurrentSession,
+    markBinned,
+    isBinned,
     clearThread,
-    decidingNow,
-  ]);
-
-  /**
-   * Bins one of the hire's conversations and takes it out of the list.
-   *
-   * Binned, not deleted: the backend keeps the conversation — messages included — until its
-   * retention window ends, and simply stops returning it. So the local removal is the same
-   * thing the next read would show, and the id is tombstoned so a read already in flight
-   * cannot put the row back (see `binnedSessionIdsRef`).
-   *
-   * When the conversation binned was the one on screen, the next newest takes its place — or,
-   * with none left, a fresh conversation starts, so the hire is never left on a thread they
-   * just binned. `selectSession`/`newConversation` own that move and its clears; both are
-   * called with nothing in flight (a running answer in the binned conversation is cut short
-   * first, see `stopRunningTurn`), so neither refuses.
-   *
-   * Refused while the conversation is opening or a decision is in flight — the rail's own
-   * controls are disabled for the same window, so this is the guard behind them — and unlike the
-   * other moves that clear the thread, the refusal throws: the list tells the user the bin
-   * worked, so returning silently would toast "Conversation binned" over a conversation that
-   * never left. A running answer in *another* conversation is left alone; binning a row does not
-   * touch it.
-   *
-   * A `404` is settled, not failed: the conversation was binned in another tab, or purged after
-   * its retention window — the local removal below is what the next read would show anyway. And
-   * the throw is not only for refusals: if the move off a binned conversation fails, this throws
-   * too, so the success toast cannot sit over a screen still showing the thread that was binned.
-   */
-  const binSession = useCallback(
-    async (sessionId: string) => {
-      if (teamProjectNow() !== null)
-        throw new Error("Conversations can't be binned while you're in team mode.");
-      if (latches.isBusy() || isOpening || isDeciding || decidingNow())
-        throw new Error("Your buddy is still working — try again once the reply finishes.");
-
-      try {
-        await binSessionApi(sessionId);
-      } catch (e) {
-        // See the doc above: "gone already" is settled, and settled for this call only.
-        // Anything else is a real failure and belongs to the caller.
-        if (!isNotFound(e)) throw e;
-      }
-      markBinned(sessionId);
-      // Its draft goes with it. The box files its words under a conversation as it leaves it —
-      // `isSessionBinned` is what keeps that write from bringing the entry back.
-      clearDraft(userId, sessionId);
-
-      const remaining = sessionsNow().filter((session) => session.id !== sessionId);
-      applySessions(remaining);
-
-      if (currentSessionNow() !== sessionId) return;
-
-      // The answer being written belongs to the binned conversation; stopping it once here keeps
-      // the two paths from toasting twice.
-      if (tracker.isStreaming()) await stopRunningTurn();
-
-      const next = remaining[0];
-      if (next) {
-        await selectSession(next.id);
-      } else {
-        await newConversation();
-      }
-
-      // The move can fail and still resolve (see `newConversation`'s catch); if the hire is still
-      // on the binned conversation, the caller must hear it.
-      if (currentSessionNow() === sessionId) throw new Error(BIN_MOVE_FAILED);
-    },
-    [
-      latches,
-      tracker,
-      applySessions,
-      isOpening,
-      isDeciding,
-      stopRunningTurn,
-      selectSession,
-      newConversation,
-      userId,
-      currentSessionNow,
-      markBinned,
-      sessionsNow,
-      teamProjectNow,
-      decidingNow,
-    ],
-  );
-
-  /**
-   * Whether a conversation was binned in this app session — what the composer asks before it
-   * files a draft under one it is leaving, since a binned conversation has nothing to keep it
-   * for. Reads the tombstones `binSession` leaves, so it is true from the moment of the bin.
-   */
-  const isSessionBinned = useCallback((sessionId: string) => isBinned(sessionId), [isBinned]);
+    setOpenError,
+    stopRunningTurn,
+    openSession,
+    userId,
+  });
 
   /**
    * Tries again after [ensureOpened] failed.
