@@ -10,7 +10,7 @@ import {
   Rocket,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -32,6 +32,7 @@ import { QuestionWorkspace } from "../features/onboarding/components/journey/Que
 import { StepWorkspace } from "../features/onboarding/components/journey/StepWorkspace";
 import { useOnboardingJourney } from "../features/onboarding/generation/OnboardingJourneyContext";
 import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
+import { useArrival, useScrollToOpened } from "../features/onboarding/hooks/useArrival";
 import { useGenerationScreen } from "../features/onboarding/hooks/useGenerationScreen";
 import { useJourneyView, type ViewMode } from "../features/onboarding/hooks/useJourneyView";
 import { usePathLoading } from "../features/onboarding/hooks/usePathLoading";
@@ -43,7 +44,6 @@ import {
   itemState,
   pathProgress,
   phaseItems,
-  linkedCardId,
   sortedPhases,
   waitingOn,
   type PhaseItem,
@@ -106,7 +106,6 @@ export function OnBoardingPage() {
   // `/onboarding/:stepId` -- the old address of a step page -- now opens the path with that step
   // unfolded, so links from the dashboard and the buddy keep landing on the step.
   const { stepId: routeStepId } = useParams<{ stepId?: string }>();
-  const navigate = useNavigate();
   // Whose remembered view this is. Browser storage is per browser, so without this two accounts
   // on one machine share the List/Graph mode and the phase the graph was left on. Empty only
   // before the profile is there, which `AuthGuard` does not render this page without -- the
@@ -130,25 +129,6 @@ export function OnBoardingPage() {
   const focusItemId = routeStepId ?? navigationState?.focusQuestionId;
   // Set by the board's "where you are" strip when a phase on it is pressed.
   const openPhaseId = navigationState?.openPhaseId;
-  /**
-   * Where a link from the buddy points: `?step=<id>`, `?question=<id>` or `?phase=<id>`.
-   *
-   * The mentor is handed each item's link so it can write "you are on [#3](...)" and have that be
-   * clickable. In the URL rather than in router state because the model writes it into text the hire
-   * can copy, keep or open in a second tab, and state survives none of that.
-   *
-   * A link *lands* rather than starts: the phase opens, the page scrolls to the item and lights it up
-   * briefly. Unlike `/onboarding/:stepId`, nothing is unfolded or started -- following a link in a
-   * conversation is a way of finding something, and starting it is the hire's own click.
-   */
-  const [searchParams, setSearchParams] = useSearchParams();
-  const linkedStepId = searchParams.get("step");
-  // `&open=1` beside `?step=`: unfold the step as well as finding it -- still without starting it.
-  // What a card's "Back to" on the board sends, since the words it was kept from are inside the step.
-  const linkOpensStep = searchParams.get("open") === "1";
-  const linkedQuestionId = searchParams.get("question");
-  const linkedPhaseId = searchParams.get("phase");
-
   const {
     path,
     setPath,
@@ -184,13 +164,12 @@ export function OnBoardingPage() {
     isDinoActive: isDinoActiveInGeneration,
     setIsDinoActive: setIsDinoActiveInGeneration,
   } = useGenerationScreen(generation);
-  // Set when the page itself moves the member on, so the item they land on is scrolled to.
-  const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
-  // The item a buddy link landed on, for as long as its light plays. `key` changes per arrival, so
-  // following the same link again scrolls to it again. Cleared when the light has played or the
-  // member moves to another phase, so neither the scroll nor the light comes back on its own later.
-  const [linkHighlight, setLinkHighlight] = useState<{ id: string; key: string } | null>(null);
-  const clearLinkHighlight = useCallback(() => setLinkHighlight(null), []);
+  const scrollWhenOpened = useScrollToOpened(
+    focusItemId ?? null,
+    expandedItemId,
+    loadingState,
+    selectedPhaseId,
+  );
 
   usePathRevealMoment(loadingState === "success" ? path : null);
 
@@ -205,188 +184,6 @@ export function OnBoardingPage() {
       phases,
       loadingState,
     });
-
-  /**
-   * Everything this visit was sent here for, in one place: a step in the address, a question or
-   * the phase chooser in the router's state.
-   *
-   * One effect rather than one per instruction, and keyed on the instruction rather than run once
-   * on mount. `/onboarding` and `/onboarding/:stepId` are the same component in the same position,
-   * so a second link arriving while the page is open remounts nothing -- which is how the first
-   * version came to follow a changed step id but not a changed question, and to bring the chooser
-   * into view exactly once per visit however often somebody was sent to it.
-   *
-   * Each arrival does the same four things: check the target is still on the path, put the view
-   * where the target unfolds, start a step that was opened for the first time, and scroll to it.
-   */
-  const focusQuestionId = navigationState?.focusQuestionId;
-  const wantsChooser = Boolean(navigationState?.choosePhase);
-  const arrival = useMemo(
-    () =>
-      routeStepId
-        ? { kind: "step" as const, id: routeStepId }
-        : focusQuestionId
-          ? { kind: "question" as const, id: focusQuestionId }
-          : wantsChooser
-            ? { kind: "choose" as const, id: "" }
-            : linkedStepId
-              ? { kind: "link-step" as const, id: linkedStepId }
-              : linkedQuestionId
-                ? { kind: "link-question" as const, id: linkedQuestionId }
-                : linkedPhaseId
-                  ? { kind: "link-phase" as const, id: linkedPhaseId }
-                  : null,
-    [focusQuestionId, linkedPhaseId, linkedQuestionId, linkedStepId, routeStepId, wantsChooser],
-  );
-  // A link carries the navigation's key as well: the hire who scrolled away and clicks the same link
-  // in the conversation again should land again.
-  const arrivalKey = arrival
-    ? `${arrival.kind}:${arrival.id}${arrival.kind.startsWith("link") ? `:${location.key}` : ""}`
-    : "";
-  const handledArrivalRef = useRef("");
-
-  // Read by the arrival effect, which must not re-run every time one of these is recreated.
-  const startStepRef = useRef<(item: PhaseItem, options: StartOptions) => void>(() => undefined);
-  const scrollToChooserRef = useRef<() => void>(() => undefined);
-  /**
-   * Takes a handled link out of the address, so a reload or the hire's own next click decides what
-   * they are looking at rather than the link lighting the same card up again.
-   */
-  const clearLinkRef = useRef<() => void>(() => undefined);
-
-  useEffect(() => {
-    if (loadingState !== "success" || !path || !arrival) return;
-    if (handledArrivalRef.current === arrivalKey) return;
-    handledArrivalRef.current = arrivalKey;
-
-    // Deferred to a microtask: React 19's lint rejects a synchronous setState in an effect body,
-    // and this is the pattern the repo already passes with.
-    queueMicrotask(() => {
-      // The list, whichever view was last used: a step, a question and the chooser all unfold
-      // there. Marked as forced, so it is not written back as a preference the member chose.
-      showListByArrival();
-
-      if (arrival.kind === "choose") {
-        setExpandedItemId(null);
-        scrollToChooserRef.current();
-        return;
-      }
-
-      // A link is followed in the list, so a step left open on the graph is let go of too --
-      // otherwise swiping stayed off and the graph reopened it on the way back.
-      if (arrival.kind.startsWith("link")) setGraphItemId(null);
-
-      if (arrival.kind === "link-phase") {
-        const linkedPhase = path.phases.find((phase) => phase.id === arrival.id);
-        if (linkedPhase) {
-          setSelectedPhaseId(arrival.id);
-          // An item open in the linked phase stays open: it may hold a typed answer.
-          setExpandedItemId((current) =>
-            phaseItems(linkedPhase).some((item) => item.id === current) ? current : null,
-          );
-        } else {
-          toast.error("That phase is not on your path", {
-            description: "It may have been replaced when your path was rebuilt.",
-          });
-        }
-        clearLinkRef.current();
-        return;
-      }
-
-      const owningPhase = path.phases.find((phase) =>
-        phaseItems(phase).some((item) => item.id === arrival.id),
-      );
-      if (!owningPhase) {
-        toast.error(
-          arrival.kind === "question" || arrival.kind === "link-question"
-            ? "That question is not on your path"
-            : "That step is not on your path",
-          { description: "It may have been replaced when your path was rebuilt." },
-        );
-        // Only the step has an address of its own to go back from; a question arrives in router
-        // state, which is dropped by navigating to the same place without it.
-        void navigate("/onboarding", { replace: true, state: null });
-        return;
-      }
-
-      if (arrival.kind === "link-step" || arrival.kind === "link-question") {
-        setSelectedPhaseId(owningPhase.id);
-        // "You're on #3" is most likely clicked while #3 is open -- collapsing it would throw away
-        // a typed answer or skip reason. A link that asks for the step open unfolds it instead.
-        if (arrival.kind === "link-step" && linkOpensStep) {
-          scrollToItemRef.current = arrival.id;
-          setExpandedItemId(arrival.id);
-        } else {
-          setExpandedItemId((current) => (current === arrival.id ? current : null));
-        }
-        setLinkHighlight({ id: arrival.id, key: arrivalKey });
-        clearLinkRef.current();
-        return;
-      }
-
-      setSelectedPhaseId(owningPhase.id);
-      scrollToItemRef.current = arrival.id;
-      setExpandedItemId(arrival.id);
-
-      // A step opened by its address is started like one opened by a click -- including the
-      // second link of a visit, which the load-time version could not see.
-      const item = phaseItems(owningPhase).find((candidate) => candidate.id === arrival.id);
-      if (item) startStepRef.current(item, { byAddress: true });
-    });
-  }, [
-    arrival,
-    arrivalKey,
-    linkOpensStep,
-    loadingState,
-    navigate,
-    path,
-    setSelectedPhaseId,
-    showListByArrival,
-    toast,
-  ]);
-
-  useEffect(() => {
-    clearLinkRef.current = () =>
-      setSearchParams(
-        (params) => {
-          params.delete("step");
-          params.delete("question");
-          params.delete("phase");
-          params.delete("open");
-          return params;
-        },
-        { replace: true },
-      );
-  }, [setSearchParams]);
-
-  // Scrolls to the card a link landed on, once per link. A link followed from the graph switches to
-  // the list, which `SlidingTabPanel` mounts only after the graph has slid out -- so a card that is
-  // not there yet is looked for again once it can be, the same wait `scrollToChooser` makes.
-  const scrolledLinkRef = useRef("");
-  useEffect(() => {
-    if (loadingState !== "success" || !linkHighlight) return;
-    if (scrolledLinkRef.current === linkHighlight.key) return;
-    const scroll = () => {
-      const card = document.getElementById(linkedCardId(linkHighlight.id));
-      if (!card) return false;
-      scrolledLinkRef.current = linkHighlight.key;
-      card.scrollIntoView?.({ behavior: "smooth", block: "center" });
-      return true;
-    };
-    if (scroll()) return;
-    const timer = window.setTimeout(scroll, SLIDING_PANEL_EXIT_MS);
-    return () => window.clearTimeout(timer);
-  }, [linkHighlight, loadingState, selectedPhaseId, viewMode]);
-
-  // Scrolls to an item the page opened on the member's behalf -- a link, "up next", "continue".
-  useEffect(() => {
-    const target = scrollToItemRef.current;
-    if (loadingState !== "success" || !target || target !== expandedItemId) return;
-    scrollToItemRef.current = null;
-    document
-      .querySelector(`[data-item-id="${target}"]`)
-      ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-  }, [expandedItemId, loadingState, selectedPhaseId]);
 
   const swipeRef = useSwipeableTabs<ViewMode, HTMLDivElement>({
     order: VIEW_ORDER,
@@ -472,11 +269,20 @@ export function OnBoardingPage() {
     }
   };
 
-  // Refreshed every render, so the arrival effect can call the latest of each without taking a
-  // dependency on a function that is recreated on every render.
-  useEffect(() => {
-    startStepRef.current = (item, options) => void beginStepIfWaiting(item, options);
-    scrollToChooserRef.current = scrollToChooser;
+  const { linkHighlight, clearLinkHighlight } = useArrival({
+    path,
+    loadingState,
+    selectedPhaseId,
+    viewMode,
+    effects: {
+      showListByArrival,
+      setSelectedPhaseId,
+      setExpandedItemId,
+      setGraphItemId,
+      scrollToChooser,
+      scrollWhenOpened,
+      startStep: (item) => void beginStepIfWaiting(item, { byAddress: true }),
+    },
   });
 
   /**
@@ -515,7 +321,7 @@ export function OnBoardingPage() {
       setGraphPhaseId(phase?.id ?? null);
       setGraphItemId(item.id);
     } else {
-      scrollToItemRef.current = item.id;
+      scrollWhenOpened(item.id);
       setExpandedItemId(item.id);
     }
     void beginStepIfWaiting(item);
@@ -532,7 +338,7 @@ export function OnBoardingPage() {
   const selectPhase = (phaseId: string) => {
     setSelectedPhaseId(phaseId);
     setExpandedItemId(null);
-    setLinkHighlight(null);
+    clearLinkHighlight();
   };
 
   const choosePhase = (phaseId: string) => {
