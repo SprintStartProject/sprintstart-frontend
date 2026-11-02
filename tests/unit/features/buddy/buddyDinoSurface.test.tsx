@@ -158,7 +158,7 @@ describe("buddy dino waiting-game surfaces", () => {
       rerender({ selection: sel("p1", true) });
     });
     await waitFor(() => expect(result.current.teamProjectId).toBe("p1"));
-    expect(result.current.dinoGameActive).toBe(false);
+    await waitFor(() => expect(result.current.dinoGameActive).toBe(false));
     unmount();
   });
 });

@@ -5,29 +5,22 @@ import {
   createSession,
   binSession as binSessionApi,
   streamOpenBuddy,
-  performAction,
-  confirmStoredProposal,
-  dismissStoredProposal,
   streamMessage,
   type BuddyOpeningAction,
   type BuddySessionSummary,
 } from "../../../services/buddyService";
-import { announceBuddyPathChanged } from "../aiBuddyBus";
 import { buddySessionIdFromPath } from "../buddyPagePath";
-import { actionDraftKey } from "../actionDrafts";
 import { clearDraft } from "../buddyDraftStorage";
-import type { ActionDrafts } from "../actionDrafts";
 import { useAuth } from "../../../context/useAuth";
 import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
 import { toWireFilters } from "../utils/filterRange";
-import type { ActionPatch, BuddyMessage, BuddyMessageView, ProposedAction } from "../types";
+import type { BuddyMessage, BuddyMessageView, ProposedAction } from "../types";
 import type { BuddySessionFilters, QueuedBuddyMessage } from "../types";
 import {
   BIN_MOVE_FAILED,
   CONVERSATION_FAILED,
   GREETING_FAILED,
   HISTORY_FAILED,
-  PROPOSAL_GONE,
   REPLY_FAILED,
   REPLY_TIMED_OUT,
   STREAM_TIMEOUT_MS,
@@ -42,22 +35,12 @@ import {
   clearContent,
   greetingPlaceholder,
   markStopped as markMessageStopped,
-  patchAction as patchActionIn,
   setError,
   settleGreeting,
   withHistory,
   withTurn,
 } from "../conversation/messageReducers";
-import {
-  actionExtras,
-  hireProposal,
-  isStored,
-  mayConfirm,
-  mayDismissStored,
-  movesPath,
-  storedProposal,
-  touchesBoard,
-} from "../conversation/proposals";
+import { hireProposal, storedProposal } from "../conversation/proposals";
 import {
   blankSession,
   chooseSession,
@@ -67,6 +50,8 @@ import {
 import { createDraftBuffer, createWatchdog } from "../conversation/turnTimers";
 import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
 import { useDinoSurface } from "./useDinoSurface";
+import { useProposalActions } from "./useProposalActions";
+import { useThreadReset } from "./useThreadReset";
 import { useMentorTools } from "./useMentorTools";
 import { useMessageQueue } from "./useMessageQueue";
 import { useSessionStore } from "./useSessionStore";
@@ -109,6 +94,15 @@ export function useBuddyConversation(
   const [isThinking, setIsThinking] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const invalidateBoard = useInvalidateBoard();
+  const {
+    actionDrafts,
+    setActionDraft,
+    clearActionDrafts,
+    isDeciding,
+    decidingNow,
+    confirmAction,
+    dismissAction,
+  } = useProposalActions({ setMessages, invalidateBoard });
   // The tool the buddy is running right now, if any -- drives "Checking your progress…"
   // in place of a generic spinner. Cleared as soon as the answer starts streaming.
   const [activeTool, setActiveTool] = useState<string | null>(null);
@@ -149,16 +143,6 @@ export function useBuddyConversation(
   } = useSessionStore();
 
   /**
-   * The hire's wording for the proposals that carry an editable message — a flag's question, the
-   * only payload a person reads and the hire therefore rewords (see `actionDrafts` for the key).
-   *
-   * Session state rather than card state, for the same reason the composer's words are: the dock
-   * unmounts when it closes, the full page mounts a second card for the same action, and either
-   * one would otherwise throw away words the hire was halfway through. Unlike the composer's,
-   * nothing below this provider needs to write it, so it lives here rather than in a context.
-   */
-  const [actionDrafts, setActionDrafts] = useState<ActionDrafts>({});
-  /**
    * The last greeting a surface has actually put in front of the hire — either watched while it
    * streamed, or revealed by `useGreetingReveal`. Held here, not per surface, so a greeting the
    * dock already played is not played again on `/buddy`, and the other way round.
@@ -175,16 +159,6 @@ export function useBuddyConversation(
     adoptTeamProject,
     bindTeamTarget,
   } = useTeamMode(selection, userId, onTeamModeLeft);
-
-  /**
-   * True while a proposal confirm or dismissal is in flight. Unlike the message streams, these
-   * decisions mutate state without setting any of the streaming flags, and every operation that
-   * clears the transcript (a switch, a fresh visit) must wait for them: a manager who confirms
-   * a destructive change and immediately switches projects would otherwise lose the one place
-   * the outcome was going to be shown.
-   */
-  const pendingDecisionsRef = useRef(0);
-  const [isDeciding, setIsDeciding] = useState(false);
 
   const loadedRef = useRef(false);
   // Guards the greeting against overlapping calls — see `newConversation` and `selectSession`.
@@ -226,6 +200,18 @@ export function useBuddyConversation(
 
   const { queued, queuePaused, commitQueued, setQueuePaused, queuedNow, pausedNow } =
     useMessageQueue();
+
+  const clearThread = useThreadReset({
+    setMessages,
+    setOpenerAction,
+    setOpenError,
+    setActiveTool,
+    setPresentedGreetingId,
+    commitQueued,
+    setQueuePaused,
+    clearActionDrafts,
+    closeDinoGame,
+  });
 
   /**
    * The drain, reached from the send path's terminal `finally` through a ref: the callback is
@@ -540,8 +526,7 @@ export function useBuddyConversation(
     async (sessionId: string): Promise<boolean> => {
       if (sessionId === currentSessionNow()) return true;
       if (teamProjectNow() !== null) return false;
-      const blocked = () =>
-        greetingRef.current || isOpening || isDeciding || pendingDecisionsRef.current > 0;
+      const blocked = () => greetingRef.current || isOpening || isDeciding || decidingNow();
       if (blocked()) return false;
 
       if (streamingRef.current) {
@@ -554,19 +539,7 @@ export function useBuddyConversation(
       greetingRef.current = true;
 
       applyCurrentSession(sessionId);
-      setMessages([]);
-      setOpenerAction(null);
-      setOpenError(null);
-      // The composer's words follow the session by themselves (`BuddyDraftProvider` keys drafts on
-      // it); anything queued was written for the conversation being left.
-      commitQueued([]);
-      setQueuePaused(false);
-      // Bound to the offers of the conversation being left, not to the tab: a switch starts
-      // with no wording of its own, like every other piece of session state here.
-      setActionDrafts({});
-      setActiveTool(null);
-      setPresentedGreetingId(null);
-      closeDinoGame();
+      clearThread();
 
       try {
         await openSession(sessionId);
@@ -587,16 +560,15 @@ export function useBuddyConversation(
       return true;
     },
     [
-      closeDinoGame,
       isOpening,
       isDeciding,
       stopRunningTurn,
       applyCurrentSession,
       openSession,
-      commitQueued,
-      setQueuePaused,
       currentSessionNow,
       teamProjectNow,
+      clearThread,
+      decidingNow,
     ],
   );
 
@@ -628,8 +600,7 @@ export function useBuddyConversation(
     // and nothing to start. The controls that call this are hidden there too, but a stale
     // keyboard shortcut must not switch a manager into an empty hire thread.
     if (teamProjectNow() !== null) return;
-    const blocked = () =>
-      greetingRef.current || isOpening || isDeciding || pendingDecisionsRef.current > 0;
+    const blocked = () => greetingRef.current || isOpening || isDeciding || decidingNow();
     if (blocked()) return;
 
     if (streamingRef.current) {
@@ -658,7 +629,7 @@ export function useBuddyConversation(
 
       if (
         sendCountRef.current !== sendsAtEntry ||
-        pendingDecisionsRef.current > 0 ||
+        decidingNow() ||
         teamProjectNow() !== null ||
         currentSessionNow() !== sessionAtEntry
       ) {
@@ -671,19 +642,7 @@ export function useBuddyConversation(
       applySessions([blankSession(createdId, new Date().toISOString()), ...sessionsNow()]);
       applyCurrentSession(createdId);
 
-      setMessages([]);
-      setOpenerAction(null);
-      setOpenError(null);
-      // The composer's words follow the session by themselves, and anything queued was written for
-      // the conversation being left.
-      commitQueued([]);
-      setQueuePaused(false);
-      // Wording the hire had half-edited belonged to the offers that are going with the
-      // transcript — it is not a composer draft and must not outlive them.
-      setActionDrafts({});
-      setActiveTool(null);
-      setPresentedGreetingId(null);
-      closeDinoGame();
+      clearThread();
     } catch (e) {
       console.error(e);
       // "Try again" redoes the create itself: `ensureOpened` would no-op out of a loaded
@@ -694,18 +653,17 @@ export function useBuddyConversation(
       greetingRef.current = false;
     }
   }, [
-    closeDinoGame,
     isOpening,
     isDeciding,
     stopRunningTurn,
     applySessions,
     applyCurrentSession,
     selectSession,
-    commitQueued,
-    setQueuePaused,
     currentSessionNow,
     sessionsNow,
     teamProjectNow,
+    clearThread,
+    decidingNow,
   ]);
 
   /**
@@ -738,7 +696,7 @@ export function useBuddyConversation(
     async (sessionId: string) => {
       if (teamProjectNow() !== null)
         throw new Error("Conversations can't be binned while you're in team mode.");
-      if (greetingRef.current || isOpening || isDeciding || pendingDecisionsRef.current > 0)
+      if (greetingRef.current || isOpening || isDeciding || decidingNow())
         throw new Error("Your buddy is still working — try again once the reply finishes.");
 
       try {
@@ -785,6 +743,7 @@ export function useBuddyConversation(
       markBinned,
       sessionsNow,
       teamProjectNow,
+      decidingNow,
     ],
   );
 
@@ -1304,194 +1263,6 @@ export function useBuddyConversation(
     if (next) startQueuedTurn(next);
   }, [setQueuePaused, startQueuedTurn, queuedNow]);
 
-  /** Patches one proposed action in place, keyed by its message and action id. */
-  const patchAction = useCallback((messageId: string, actionId: string, patch: ActionPatch) => {
-    setMessages((prev) => patchActionIn(prev, messageId, actionId, patch));
-  }, []);
-
-  // The proposal currently on its way to the backend, per message and action id: two clicks inside
-  // one React frame both see the pre-render state, so the second is refused here.
-  const inFlightRef = useRef<Set<string>>(new Set());
-
-  /**
-   * Records what the hire typed into a proposal's field, so it survives a closed dock, a handed-
-   * over conversation and the retry a refusal offers — see `actionDrafts` for why it is session
-   * state and not the card's own.
-   */
-  const setActionDraft = useCallback((key: string, text: string) => {
-    setActionDrafts((current) => ({ ...current, [key]: text }));
-  }, []);
-
-  /**
-   * Forgets a draft whose proposal is done with — it was sent, or the hire declined it. Nothing
-   * is left to edit, and a card re-rendered later must not offer wording that has already left
-   * the product.
-   */
-  const clearActionDraft = useCallback((key: string) => {
-    setActionDrafts((current) => {
-      if (!(key in current)) return current;
-      const next = { ...current };
-      delete next[key];
-      return next;
-    });
-  }, []);
-
-  /**
-   * Confirms a proposed action: the one call that mutates. Reflects the outcome inline — a
-   * legible line whether it changed something (`ok`) or legibly couldn't, or a retryable error
-   * if the request itself failed.
-   *
-   * The two kinds confirm differently, and the split is what keeps each honest: a hire offer
-   * echoes its own payload back (`performAction`), while a stored team proposal confirms by id
-   * alone (`confirmStoredProposal`) — the client sends back exactly what it was given, nothing
-   * derived. A `404` from either stored call arrives as a *resolved* outcome: the proposal was
-   * already confirmed or dismissed (a reload between sessions, or a second tab), and the
-   * backend's message says so legibly — not an error to retry.
-   */
-  const beginDecision = useCallback(() => {
-    pendingDecisionsRef.current += 1;
-    setIsDeciding(true);
-  }, []);
-
-  const endDecision = useCallback(() => {
-    pendingDecisionsRef.current -= 1;
-    if (pendingDecisionsRef.current === 0) setIsDeciding(false);
-  }, []);
-
-  const confirmAction = useCallback(
-    (messageId: string, action: ProposedAction) => {
-      // Retryable after a transport error or a hire offer's legible "couldn't"; a stored team
-      // proposal that resolved is spent, because confirming a success twice claims the same task
-      // twice.
-      if (!mayConfirm(action)) return;
-
-      // One lock per proposal card, shared by confirm and dismiss, so the slower response cannot
-      // overwrite the faster one.
-      const flightKey = `${messageId}:${action.id}`;
-      if (inFlightRef.current.has(flightKey)) return;
-      inFlightRef.current.add(flightKey);
-      beginDecision();
-
-      patchAction(messageId, action.id, { status: "confirming" });
-      // Fire-and-forget: the outcome lands back in message state, so the handler stays a plain
-      // void callback (no Promise handed to a JSX prop).
-      void (async () => {
-        try {
-          const result = isStored(action)
-            ? await confirmStoredProposal(action.proposalId)
-            : await performAction(action.action, actionExtras(action));
-          patchAction(messageId, action.id, {
-            status: "resolved",
-            ok: result.ok,
-            outcome: result.message,
-          });
-          // It went out: the wording has left the product, so the session keeps none of it. A
-          // refusal keeps it — that card is about to be handed the hire's text back to correct.
-          if (result.ok) clearActionDraft(actionDraftKey(messageId, action.id));
-          // A path action just moved something on a page that may be open behind this dock. Told
-          // rather than polled, and only on success: a refused confirm changed nothing to refresh.
-          if (result.ok && movesPath(action)) {
-            announceBuddyPathChanged();
-          }
-
-          // `board.all()`, not a project key: the backend re-resolves the project server-side
-          // (the caller's single onboarding project) and never tells the client which board —
-          // see `useInvalidateBoard`.
-          if (result.ok && touchesBoard(action)) {
-            invalidateBoard();
-          }
-        } catch (e) {
-          console.error(e);
-          // A settled proposal answers 200 with ok: false, handled above; a 404 means no such
-          // proposal for this caller, so the card resolves instead of offering a retry.
-          patchAction(
-            messageId,
-            action.id,
-            isNotFound(e)
-              ? {
-                  status: "resolved",
-                  ok: false,
-                  outcome: PROPOSAL_GONE,
-                }
-              : { status: "error" },
-          );
-        } finally {
-          inFlightRef.current.delete(flightKey);
-          endDecision();
-        }
-      })();
-    },
-    [beginDecision, endDecision, patchAction, invalidateBoard, clearActionDraft],
-  );
-
-  /**
-   * Declines a proposed action — nothing changes; the conversation simply continues.
-   *
-   * The action itself arrives from the card that drew it, the way `confirmAction`'s does. It used
-   * to arrive as an id and be looked up in the transcript, which is what forced a
-   * `messagesRef` to keep this callback's identity stable — the callback now depends on nothing
-   * that a token can change, and the lookup (and its staleness question) is gone with it.
-   *
-   * A stored proposal is declined *at the backend* rather than only on screen, because it may
-   * also be sitting in another tab waiting to be confirmed: dismissal closes that door too, and
-   * only the backend can. A hire offer was never stored, so there is nothing to tell the
-   * backend — declining is purely local, as it has always been.
-   */
-  const dismissAction = useCallback(
-    (messageId: string, action: ProposedAction) => {
-      const actionId = action.id;
-
-      // A hire offer, or one that arrived without its details: nothing to decline at the backend,
-      // but still worth putting away here.
-      if (!isStored(action)) {
-        patchAction(messageId, actionId, { status: "dismissed" });
-        // A hire offer is the only kind that carries a draft, and this is the one place one is
-        // declined — the wording goes with the offer it belonged to.
-        clearActionDraft(actionDraftKey(messageId, actionId));
-        return;
-      }
-
-      if (!mayDismissStored(action)) return;
-
-      // The confirm's lock, shared: one question, one in-flight decision.
-      const flightKey = `${messageId}:${actionId}`;
-      if (inFlightRef.current.has(flightKey)) return;
-      inFlightRef.current.add(flightKey);
-      beginDecision();
-
-      patchAction(messageId, actionId, { status: "confirming" });
-      void (async () => {
-        try {
-          // A 200 with ok: false means the proposal was already confirmed, expired or beaten to it,
-          // and its message says which; that beats claiming nothing changed.
-          const result = await dismissStoredProposal(action.proposalId);
-          patchAction(
-            messageId,
-            actionId,
-            result.ok
-              ? { status: "dismissed" }
-              : { status: "resolved", ok: false, outcome: result.message },
-          );
-        } catch (e) {
-          console.error(e);
-          // 404: no such proposal for this caller, so the card resolves. Any other failure keeps
-          // the offer on the table and retryable.
-          patchAction(
-            messageId,
-            actionId,
-            isNotFound(e)
-              ? { status: "resolved", ok: false, outcome: PROPOSAL_GONE }
-              : { status: "idle" },
-          );
-        } finally {
-          inFlightRef.current.delete(flightKey);
-          endDecision();
-        }
-      })();
-    },
-    [beginDecision, endDecision, patchAction, clearActionDraft],
-  );
-
   /**
    * The thread on screen always belongs to exactly one conversation, and when the derived
    * target moves — a switch, a restored preference arriving, an involuntary exit — the thread
@@ -1507,41 +1278,24 @@ export function useBuddyConversation(
     if (openedForRef.current === target) return;
     // `pendingDecisionsRef` is read alongside the state: a decision and this move can land in
     // one frame, before the "deciding" state has re-rendered.
-    if (
-      isThinking ||
-      isStreaming ||
-      isOpening ||
-      isGreeting ||
-      isDeciding ||
-      pendingDecisionsRef.current > 0
-    )
-      return;
+    if (isThinking || isStreaming || isOpening || isGreeting || isDeciding || decidingNow()) return;
 
     openedForRef.current = target;
     adoptTeamProject(teamProjectId);
 
-    setMessages([]);
-    setOpenerAction(null);
-    setOpenError(null);
-    // Same rule as a fresh visit: the words belonged to the conversation that just went away,
-    // and `BuddyDraftProvider` swaps them for the new conversation's own when it keys on it.
-    commitQueued([]);
-    setQueuePaused(false);
-    // Bound to the offers of the conversation being left, not to the tab: a switch starts
-    // with no wording of its own, like every other piece of session state here.
-    setActionDrafts({});
-    setActiveTool(null);
-    setIsThinking(false);
-    setIsStreaming(false);
-    setPresentedGreetingId(null);
-    // The latch is per conversation: releasing it is what lets `ensureOpened` read and greet
-    // the one being switched to, exactly as it did the first time.
-    loadedRef.current = false;
-    // A game left open from the previous conversation would keep claiming "Reply ready" for a
-    // thread that has just been cleared.
-    closeDinoGame();
+    // Deferred to a microtask so setState never runs synchronously in the effect body; the latch
+    // and the target above are already set, so nothing can start the same switch twice.
+    void (async () => {
+      await Promise.resolve();
+      clearThread();
+      setIsThinking(false);
+      setIsStreaming(false);
+      // The latch is per conversation: releasing it is what lets `ensureOpened` read and greet
+      // the one being switched to, exactly as it did the first time.
+      loadedRef.current = false;
 
-    void ensureOpened();
+      void ensureOpened();
+    })();
   }, [
     teamProjectId,
     isThinking,
@@ -1554,6 +1308,8 @@ export function useBuddyConversation(
     commitQueued,
     setQueuePaused,
     adoptTeamProject,
+    clearThread,
+    decidingNow,
   ]);
 
   /**
@@ -1569,14 +1325,7 @@ export function useBuddyConversation(
     (projectId: string | null) => {
       // `pendingDecisionsRef` is read alongside the state: a decision and a switch can land in
       // one frame, before the "deciding" state has re-rendered.
-      if (
-        isThinking ||
-        isStreaming ||
-        isOpening ||
-        isGreeting ||
-        isDeciding ||
-        pendingDecisionsRef.current > 0
-      )
+      if (isThinking || isStreaming || isOpening || isGreeting || isDeciding || decidingNow())
         return;
 
       if (projectId === null) {
@@ -1599,6 +1348,7 @@ export function useBuddyConversation(
       selection,
       setTeamMode,
       bindTeamTarget,
+      decidingNow,
     ],
   );
 
