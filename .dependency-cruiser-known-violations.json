@@ -890,7 +890,7 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
+    "from": "src/features/blueprints/graphKit.ts",
     "to": "src/features/graph-diagram/EdgeLegend.tsx",
     "unresolvedTo": "../../graph-diagram/EdgeLegend.tsx",
     "dependencyTypes": [
@@ -904,7 +904,7 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
+    "from": "src/features/blueprints/graphKit.ts",
     "to": "src/features/graph-diagram/graphLayout.ts",
     "unresolvedTo": "../../graph-diagram/graphLayout.ts",
     "dependencyTypes": [
@@ -918,7 +918,7 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
+    "from": "src/features/blueprints/graphKit.ts",
     "to": "src/features/graph-diagram/lockWords.ts",
     "unresolvedTo": "../../graph-diagram/lockWords.ts",
     "dependencyTypes": [
@@ -932,7 +932,7 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
+    "from": "src/features/blueprints/graphKit.ts",
     "to": "src/features/onboarding/graph/JourneyCanvas.tsx",
     "unresolvedTo": "../../onboarding/graph/JourneyCanvas.tsx",
     "dependencyTypes": [
@@ -946,7 +946,7 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
+    "from": "src/features/blueprints/graphKit.ts",
     "to": "src/features/onboarding/graph/layout.ts",
     "unresolvedTo": "../../onboarding/graph/layout.ts",
     "dependencyTypes": [
