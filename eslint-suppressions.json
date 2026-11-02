@@ -885,9 +885,6 @@
     }
   },
   "src/features/buddy/hooks/useBuddyConversation.ts": {
-    "max-lines": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 1
     }
