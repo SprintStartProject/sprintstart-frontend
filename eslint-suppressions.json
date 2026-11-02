@@ -896,9 +896,6 @@
     }
   },
   "src/features/buddy/hooks/useBuddyConversation.ts": {
-    "complexity": {
-      "count": 2
-    },
     "max-lines": {
       "count": 1
     },
