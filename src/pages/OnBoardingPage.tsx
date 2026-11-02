@@ -10,7 +10,6 @@ import {
   Rocket,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Badge } from "../components/ui/Badge";
@@ -36,6 +35,8 @@ import {
   type GenerationPhaseProgress,
 } from "../features/onboarding/generation/OnboardingJourneyContext";
 import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
+import { usePathLoading } from "../features/onboarding/hooks/usePathLoading";
+import { useGenerationFollowUp } from "../features/onboarding/hooks/useGenerationFollowUp";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
 import {
   blockingPhases,
@@ -43,7 +44,6 @@ import {
   itemState,
   pathProgress,
   phaseItems,
-  phaseState,
   linkedCardId,
   sortedPhases,
   waitingOn,
@@ -51,8 +51,6 @@ import {
 } from "../features/onboarding/journey";
 import { resolveNextAction } from "../features/onboarding/nextAction";
 import type {
-  OnboardingPathEndpoint,
-  OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
   QuestionAttemptResult,
 } from "../features/onboarding/types";
@@ -66,10 +64,8 @@ import {
   askAboutEmptyPhases,
   askAboutPhase,
 } from "../features/onboarding/buddyDrafts";
-import { ApiError } from "../services/apiClient";
 import { onboardingGraphService } from "../services/onboardingGraphService";
 import { onboardingService } from "../services/onboardingService";
-import { queryKeys } from "../services/queryKeys";
 import { GenerationIssueSummary } from "../features/onboarding/components/GenerationIssueSummary";
 import { issueStatusLabel, retryCouldHelp } from "../features/onboarding/generationIssues";
 import {
@@ -83,7 +79,6 @@ import {
   writeJourneyView,
 } from "../features/onboarding/journeyViewMemory";
 
-type LoadingState = "loading" | "empty" | "success" | "error";
 type ViewMode = "list" | "graph";
 
 /** How a step came to be opened: by its address, or by the member on the page. */
@@ -97,29 +92,6 @@ type NavigationState = {
   /** A phase to land on, set by anything that sends the member here pointing at one. */
   openPhaseId?: string;
 } | null;
-
-/** The phase a visit opens on: what the member was sent for, else where they are, else a choice. */
-function initialPhaseId(
-  path: OnboardingPathEndpoint,
-  phases: OnboardingPhaseEndpoint[],
-  focusItemId: string | undefined,
-  openPhaseId: string | undefined,
-): string {
-  // A phase asked for by name wins over everything: whoever sent the member here was pointing at
-  // it, and landing them somewhere else answers a question they did not ask.
-  const named = openPhaseId ? phases.find((phase) => phase.id === openPhaseId) : undefined;
-  if (named) return named.id;
-  const requested = focusItemId
-    ? phases.find((phase) => phaseItems(phase).some((item) => item.id === focusItemId))
-    : undefined;
-  if (requested) return requested.id;
-  const next = resolveNextAction(path);
-  if (next.kind === "step" || next.kind === "question") return next.phase.id;
-  if (next.kind === "choose") return next.phases[0].id;
-  return (
-    (phases.find((phase) => phaseState(phase) !== "done") ?? phases[phases.length - 1])?.id ?? ""
-  );
-}
 
 /**
  * The hire's onboarding path.
@@ -184,10 +156,17 @@ export function OnBoardingPage() {
   const linkedQuestionId = searchParams.get("question");
   const linkedPhaseId = searchParams.get("phase");
 
-  const [path, setPath] = useState<OnboardingPathEndpoint | null>(null);
-  const [loadingState, setLoadingState] = useState<LoadingState>("loading");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [selectedPhaseId, setSelectedPhaseId] = useState("");
+  const {
+    path,
+    setPath,
+    loadingState,
+    errorMessage,
+    selectedPhaseId,
+    setSelectedPhaseId,
+    applyPath,
+    refreshPath,
+  } = usePathLoading({ focusItemId, openPhaseId, subscribeToChanges: onBuddyPathChanged });
+  useGenerationFollowUp({ generation, clearGeneration, path, loadingState, applyPath });
   // A phase picked from the chooser before anything in it was started -- until then nothing else
   // says that this is where the hire wants to be.
   const [chosenPhaseId, setChosenPhaseId] = useState<string | null>(null);
@@ -289,96 +268,6 @@ export function OnBoardingPage() {
   usePathRevealMoment(loadingState === "success" ? path : null);
 
   const phases = useMemo(() => (path ? sortedPhases(path) : []), [path]);
-
-  const queryClient = useQueryClient();
-  const applyPath = useCallback(
-    (next: OnboardingPathEndpoint, { keepSelection }: { keepSelection: boolean }) => {
-      setPath(next);
-      // The dashboard's "next step" card reads the same path through the query cache.
-      void queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() });
-      setSelectedPhaseId((current) => {
-        const ordered = sortedPhases(next);
-        if (keepSelection && ordered.some((phase) => phase.id === current)) return current;
-        return initialPhaseId(next, ordered, focusItemId, openPhaseId);
-      });
-      setLoadingState("success");
-    },
-    [focusItemId, openPhaseId, queryClient],
-  );
-
-  const hasLoadedRef = useRef(false);
-  useEffect(() => {
-    if (hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
-    void (async () => {
-      try {
-        // The step a link points at is started by the arrival effect below, which sees every
-        // link rather than only the one this visit started with.
-        applyPath(await onboardingService.fetchPath(), { keepSelection: false });
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 404) {
-          // Absence is a normal state; a path is only built when the user asks for one.
-          setLoadingState("empty");
-          return;
-        }
-        setLoadingState("error");
-        setErrorMessage(error instanceof Error ? error.message : "Unknown error");
-      }
-    })();
-  }, [applyPath]);
-
-  const refreshPath = useCallback(async () => {
-    try {
-      applyPath(await onboardingService.fetchPath(), { keepSelection: true });
-    } catch (error) {
-      console.error("Failed to refresh onboarding path:", error);
-      // Said out loud: after finishing a step, a silent failure leaves progress looking unchanged.
-      toast.error("Your path could not be refreshed", {
-        description: "What you did is saved. Reload the page to see it.",
-      });
-    }
-  }, [applyPath, toast]);
-
-  /**
-   * Re-reads the path after the buddy changed it.
-   *
-   * The buddy lives in a dock over this page, which is where a hire most likely is while talking
-   * about their path. Without this, confirming "mark this step as done" in the conversation left the
-   * list behind the dock still showing the step open. Told rather than polled; see
-   * `announceBuddyPathChanged`.
-   */
-  useEffect(() => onBuddyPathChanged(() => void refreshPath()), [refreshPath]);
-
-  // A generation that finished -- here or while the user was elsewhere -- means there is a new path.
-  // Read fresh rather than taken from the generation: the hire may have started working on it before
-  // coming back here, and the stream's copy knows nothing of that.
-  useEffect(() => {
-    if (generation.status !== "done") return;
-    let cancelled = false;
-    onboardingService
-      .fetchPath()
-      .then((next) => {
-        if (!cancelled) applyPath(next, { keepSelection: false });
-      })
-      .catch((error: unknown) => console.error("Failed to load the new onboarding path:", error))
-      .finally(() => clearGeneration());
-    return () => {
-      cancelled = true;
-    };
-  }, [applyPath, clearGeneration, generation]);
-
-  // A rebuild that failed leaves the path the member already had in place -- so the failure is said
-  // once, beside it, instead of taking the page over.
-  useEffect(() => {
-    if (generation.status !== "error" || loadingState !== "success" || !path) return;
-    toast.error("Your path could not be rebuilt", {
-      description:
-        generation.reason === "not-enough-knowledge"
-          ? "The project's knowledge base does not cover any phase yet. Your current path is unchanged."
-          : `${generation.message} Your current path is unchanged.`,
-    });
-    clearGeneration();
-  }, [clearGeneration, generation, loadingState, path, toast]);
 
   /**
    * Everything this visit was sent here for, in one place: a step in the address, a question or
@@ -508,7 +397,7 @@ export function OnBoardingPage() {
       const item = phaseItems(owningPhase).find((candidate) => candidate.id === arrival.id);
       if (item) startStepRef.current(item, { byAddress: true });
     });
-  }, [arrival, arrivalKey, linkOpensStep, loadingState, navigate, path, toast]);
+  }, [arrival, arrivalKey, linkOpensStep, loadingState, navigate, path, setSelectedPhaseId, toast]);
 
   useEffect(() => {
     clearLinkRef.current = () =>
@@ -676,7 +565,7 @@ export function OnBoardingPage() {
           });
         });
     },
-    [toast],
+    [setPath, toast],
   );
 
   /** Start, continue or answer: the item opens where it is -- unfolded in the list, or on the graph. */
