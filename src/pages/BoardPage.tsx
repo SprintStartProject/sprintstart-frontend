@@ -1,19 +1,7 @@
 import { MainContent } from "../components/layout/MainContent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import {
-  AlertCircle,
-  Check,
-  FolderPlus,
-  LayoutDashboard,
-  LayoutList,
-  ListTree,
-  Maximize2,
-  Milestone,
-  Minimize2,
-  RefreshCw,
-  X,
-} from "lucide-react";
+import { AlertCircle, Check, LayoutDashboard, RefreshCw } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -25,15 +13,14 @@ import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
 import { BoardPathContext } from "../features/board/hooks/boardPath";
 import { isCardAt, pathPhases, pathStages } from "../features/board/layout/pathStages";
-import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
+import { AddCardForm } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
 import { BoardPathWindow } from "../features/board/components/BoardPathWindow";
 import { BoardSectionTabs } from "../features/board/components/BoardSectionNav";
-import { BoardFilterTriggers } from "../features/board/components/BoardFilterTriggers";
 import { NewAreaForm } from "../features/board/components/NewAreaForm";
 import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
-import { MarkFilterRail } from "../features/board/components/MarkFilterRail";
+import { BoardToolRail } from "../features/board/components/BoardToolRail";
 import { BoardPhaseCheck } from "../features/board/components/BoardPhaseCheck";
 import { BoardPhaseRecap } from "../features/board/components/BoardPhaseRecap";
 import { BoardLocalOnlyNotice } from "../features/board/components/BoardLocalOnlyNotice";
@@ -158,12 +145,6 @@ const UNDO_WINDOW_MS = 7000;
  * is "forty cards appeared and I do not know where to start".
  */
 const FOLD_THRESHOLD = 8;
-
-/**
- * The rule between groups on the tool rail: a short horizontal line while the rail stands up the
- * margin from `lg` up, a short vertical one while it lies across the page above the cards.
- */
-const RAIL_SEPARATOR_CLASS = "mx-0.5 h-6 w-px bg-app-border lg:mx-0 lg:my-0.5 lg:h-px lg:w-6";
 
 /**
  * The hire's board: their own cards and the buddy's, arranged in areas and stages and synced with
@@ -1152,180 +1133,31 @@ export function BoardPage() {
             nothing to switch back with — in focus mode, where the header's "Done" is gone too,
             nothing at all. */}
           {selectedProjectId && (
-            <div
-              className={
-                // Centred on the viewport once the page is the whole screen. With the header gone
-                // there is nothing at the top for it to hang under, and a rail pinned to a corner
-                // of a screen this wide is a long way from wherever the pointer is.
-                //
-                // Below `lg` there is no margin to park it in, so it is the same rail lying flat in
-                // the page above the cards -- not a second, smaller set of controls.
-                isFocused
-                  ? "z-20 lg:fixed lg:top-1/2 lg:right-3 lg:-translate-y-1/2"
-                  : "z-20 lg:absolute lg:top-8 lg:right-3"
-              }
-            >
-              <div
-                // A group, not a toolbar: `toolbar` promises one tab stop with arrow keys between
-                // the buttons, and every button here is its own tab stop.
-                role="group"
-                aria-label="Board tools"
-                className={[
-                  "flex w-fit max-w-full flex-row flex-wrap items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur lg:flex-col lg:flex-nowrap",
-                  // Fixed to the viewport it can no longer grow past the fold, so it scrolls in
-                  // itself on a short screen rather than losing its last buttons off the bottom.
-                  isFocused
-                    ? "lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
-                    : "lg:sticky lg:top-6",
-                ].join(" ")}
-              >
-                {/* Widest change first: expanding takes the app's own navigation and this page's
-                  header off the screen, so it is the one switch that has to be found before any of
-                  the others are worth reaching for — and the one that has to stay put afterwards,
-                  because it is the way back. */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  onClick={() => setFocused(!isFocused)}
-                  aria-pressed={isFocused}
-                  title={isFocused ? "Back to the app (Esc)" : "Expand the board"}
-                  aria-label={isFocused ? "Back to the app" : "Expand the board"}
-                >
-                  {isFocused ? (
-                    <Minimize2 className="h-4 w-4" aria-hidden="true" />
-                  ) : (
-                    <Maximize2 className="h-4 w-4" aria-hidden="true" />
-                  )}
-                </Button>
-
-                <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
-
-                {/* Planning and making an area are the two ways of changing the board's *shape*,
-                  which is why they sit together and away from the three that add something to it.
-                  It is a toggle rather than a door: the way out has to be where the way in was,
-                  especially with the header's "Done" gone in focus mode. */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  onClick={() => (isArranging ? finishArranging() : startArranging())}
-                  disabled={!board}
-                  aria-pressed={isArranging}
-                  title={isArranging ? "Done planning" : "Plan the board"}
-                  aria-label={isArranging ? "Done planning" : "Plan the board"}
-                >
-                  {isArranging ? (
-                    <Check className="h-4 w-4" aria-hidden="true" />
-                  ) : (
-                    <ListTree className="h-4 w-4" aria-hidden="true" />
-                  )}
-                </Button>
-
-                {/* The header's Cancel, for focus mode where the header is gone. */}
-                {isArranging && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    onClick={cancelArranging}
-                    title={
-                      planChanges === 0
-                        ? "Cancel planning"
-                        : `Cancel planning and undo ${planChanges} ${planChanges === 1 ? "change" : "changes"}`
-                    }
-                    aria-label="Cancel planning"
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                )}
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  onClick={() => setNamingArea(true)}
-                  disabled={!board}
-                  aria-pressed={namingArea}
-                  title="New area"
-                  aria-label="New area"
-                >
-                  <FolderPlus className="h-4 w-4" aria-hidden="true" />
-                </Button>
-
-                {/* The strip saying where the hire stands, on or off this board. The switch lives
-                  here rather than on the strip, because the strip is the thing being switched: a
-                  control that takes its own surface away leaves nothing to press to get it back. */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  onClick={() => showPathWindow(!isPathShown)}
-                  disabled={!board}
-                  aria-pressed={isPathShown}
-                  title={isPathShown ? "Hide where you are in your path" : "Show where you are"}
-                  aria-label={
-                    isPathShown ? "Hide where you are in your path" : "Show where you are"
-                  }
-                >
-                  <Milestone className="h-4 w-4" aria-hidden="true" />
-                </Button>
-
-                {/* The task pool, on or off — the same kind of switch as the path strip above, and
-                  for the same reason: the card's own X only hides it, so the way back has to live
-                  somewhere the card is not. */}
-                {hasTaskPool && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    onClick={() => showTaskPool(!isTaskPoolShown)}
-                    aria-pressed={isTaskPoolShown}
-                    title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
-                    aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
-                  >
-                    <LayoutList className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                )}
-
-                {/* Which cards, by where they came from. It sits below the switches that change the
-                  board's shape because it changes neither the board nor its shape — it only
-                  narrows what is drawn, and it is the one control here that is undone by pressing
-                  a different button in the same group rather than the same one again. */}
-                {allCards.length > 2 && (
-                  <>
-                    <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
-                    <BoardFilterTriggers
-                      value={filter}
-                      onChange={setFilter}
-                      vertical={isRailVertical}
-                    />
-                  </>
-                )}
-
-                {/* Directly under it, because it is the same kind of thing: it narrows what is drawn
-                  and nothing else. Where they came from, then what you marked on them. */}
-                <MarkFilterRail
-                  sections={markSections}
-                  selectedId={shownSectionId}
-                  onSelect={setSectionId}
-                  vertical={isRailVertical}
-                />
-
-                {/* Nothing is added to a board somebody is rearranging: the three forms open over the
-                  cards, which is exactly where the arranging is happening. */}
-                {!isArranging && (
-                  <>
-                    <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
-                    <AddCardTriggers
-                      onPick={setAddingKind}
-                      active={addingKind}
-                      vertical={isRailVertical}
-                    />
-                  </>
-                )}
-              </div>
-            </div>
+            <BoardToolRail
+              isFocused={isFocused}
+              onToggle={() => setFocused(!isFocused)}
+              hasBoard={!!board}
+              isArranging={isArranging}
+              planChanges={planChanges}
+              namingArea={namingArea}
+              onTogglePlanning={() => (isArranging ? finishArranging() : startArranging())}
+              onCancelPlanning={cancelArranging}
+              onNameArea={() => setNamingArea(true)}
+              isPathShown={isPathShown}
+              onShowPath={showPathWindow}
+              hasTaskPool={hasTaskPool}
+              isTaskPoolShown={isTaskPoolShown}
+              onShowTaskPool={showTaskPool}
+              offerFilters={allCards.length > 2}
+              filter={filter}
+              onFilter={setFilter}
+              markSections={markSections}
+              shownSectionId={shownSectionId}
+              onSelectSection={setSectionId}
+              vertical={isRailVertical}
+              addingKind={addingKind}
+              onPickKind={setAddingKind}
+            />
           )}
 
           {!selectedProjectId && !projectsLoading ? (
