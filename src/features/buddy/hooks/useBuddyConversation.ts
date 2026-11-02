@@ -3,7 +3,7 @@ import type { BuddyOpeningAction } from "../../../services/buddyService";
 import { useAuth } from "../../../context/useAuth";
 import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
 import type { BuddyMessageView } from "../types";
-import type { BuddySessionFilters, QueuedBuddyMessage } from "../types";
+import type { BuddySessionFilters } from "../types";
 import { HISTORY_FAILED } from "../conversation/replyMessages";
 import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
 import { useDinoSurface } from "./useDinoSurface";
@@ -16,6 +16,8 @@ import { useTeamMode } from "./useTeamMode";
 import { useTurnRunner } from "./useTurnRunner";
 import { useOpening } from "./useOpening";
 import { useSessionMoves } from "./useSessionMoves";
+import { useQueueControls } from "./useQueueControls";
+import { useTargetSwitch } from "./useTargetSwitch";
 import { useSessionResolution } from "./useSessionResolution";
 import { createOpeningLatches } from "../conversation/openingLatches";
 
@@ -252,209 +254,31 @@ export function useBuddyConversation(
     await ensureOpened();
   }, [latches, ensureOpened, newConversation]);
 
-  /**
-   * The composer's entry point — and the only path a keypress or click takes to send.
-   *
-   * A turn already running → the message joins the queue instead of cutting the answer off;
-   * that is the whole point of the queue. Sending something new is also the hire taking over
-   * again, so a queue held back by Stop starts moving without another press — whether or not a
-   * turn is running when they send. (Idle, the new message goes out now and the held messages
-   * follow it once it closes; before, they stayed held behind a message that had overtaken them.)
-   */
-  const submitMessage = useCallback(
-    (text: string) => {
-      if (!text.trim()) return;
-      setQueuePaused(false);
-      if (tracker.isStreaming()) {
-        commitQueued([...queuedNow(), { id: crypto.randomUUID(), text }]);
-        return;
-      }
-      void sendMessage(text);
-    },
-    [tracker, commitQueued, setQueuePaused, sendMessage, queuedNow],
-  );
+  const { submitMessage, retryReply, removeQueued, pullQueuedMessage, resumeQueue } =
+    useQueueControls({
+      tracker,
+      sendMessage,
+      messagesNow,
+      commitQueued,
+      setQueuePaused,
+      queuedNow,
+      pausedNow,
+    });
 
-  /**
-   * Re-asks the question a failed turn was answering — the "Try again" under its error line.
-   *
-   * Goes through [submitMessage], the composer's own entry point: idle it sends, mid-turn it
-   * queues, exactly as if the hire had typed the question again. The failed pair stays in the
-   * thread — the retired chat's toast retry did the same; trying again does not erase what
-   * happened — and the question is read back out of the messages, so nothing extra is stored.
-   * A turn that failed before any question (the greeting) has nothing to re-ask, and the
-   * caller offers no button for it.
-   */
-  const retryReply = useCallback(
-    (messageId: string) => {
-      const list = messagesRef.current;
-      const index = list.findIndex((message) => message.id === messageId);
-      if (index < 0) return;
-      for (let i = index - 1; i >= 0; i -= 1) {
-        const message = list[i];
-        if (message.role === "USER") {
-          submitMessage(message.content);
-          return;
-        }
-      }
-    },
-    [submitMessage],
-  );
-
-  /** Drops one queued message without sending it. */
-  const removeQueued = useCallback(
-    (id: string) => {
-      commitQueued(queuedNow().filter((item) => item.id !== id));
-    },
-    [commitQueued, queuedNow],
-  );
-
-  /** Takes one queued message back out, for the composer to put in the box and edit. */
-  const pullQueuedMessage = useCallback(
-    (id: string): string | null => {
-      const item = queuedNow().find((queued) => queued.id === id);
-      if (!item) return null;
-      commitQueued(queuedNow().filter((queued) => queued.id !== id));
-      return item.text;
-    },
-    [commitQueued, queuedNow],
-  );
-
-  /**
-   * Removes one queued message and starts its turn — the queue's single exit.
-   *
-   * Takes the item out first, so a send that throws cannot leave the same message to be sent
-   * twice. Goes through `sendMessage`, never `submitMessage`: the caller has already decided
-   * this message's turn is due.
-   */
-  const startQueuedTurn = useCallback(
-    (item: QueuedBuddyMessage) => {
-      commitQueued(queuedNow().filter((queued) => queued.id !== item.id));
-      void sendMessage(item.text);
-    },
-    [commitQueued, sendMessage, queuedNow],
-  );
-
-  /**
-   * Sends the oldest queued message, unless Stop is holding the queue back.
-   *
-   * Called from a turn's terminal path, i.e. only ever when nothing is streaming, so it cannot
-   * race the answer it follows.
-   */
-  const drainNextQueued = useCallback(() => {
-    if (pausedNow()) return;
-    const next = queuedNow()[0];
-    if (next) startQueuedTurn(next);
-  }, [startQueuedTurn, pausedNow, queuedNow]);
-
-  useEffect(() => {
-    tracker.onEnd(drainNextQueued);
-  }, [tracker, drainNextQueued]);
-
-  /**
-   * Releases a queue Stop paused, starting with the oldest message.
-   *
-   * Unless a turn is running again — Stop holds the queue, but a message sent after it goes
-   * straight out while the hold stays (see `submitMessage`), and the hire may then ask for the
-   * queue before that turn is done. Starting a second stream beside it would interleave two
-   * answers; the release is then only the flag, and the running turn's close-out drains the
-   * queue, in order, the moment it finishes.
-   */
-  const resumeQueue = useCallback(() => {
-    setQueuePaused(false);
-    if (tracker.isStreaming()) return;
-    const next = queuedNow()[0];
-    if (next) startQueuedTurn(next);
-  }, [tracker, setQueuePaused, startQueuedTurn, queuedNow]);
-
-  /**
-   * The thread on screen always belongs to exactly one conversation, and when the derived
-   * target moves — a switch, a restored preference arriving, an involuntary exit — the thread
-   * is cleared and the new conversation opens exactly as an untouched visit would: read first,
-   * then greeted. The drafts of the thread it clears go with it, like every other piece of
-   * state that belonged to those offers. The backend keeps the conversations separate, so
-   * reusing the latch would show one inside the other. Mid-turn the move waits: the busy flags
-   * are in the dependency list, so the effect re-runs the moment the turn ends and applies then.
-   */
-  const openedForRef = useRef<string>("hire");
-  useEffect(() => {
-    const target = teamProjectId ?? "hire";
-    if (openedForRef.current === target) return;
-    // `pendingDecisionsRef` is read alongside the state: a decision and this move can land in
-    // one frame, before the "deciding" state has re-rendered.
-    if (isThinking || isStreaming || isOpening || isGreeting || isDeciding || decidingNow()) return;
-
-    openedForRef.current = target;
-    adoptTeamProject(teamProjectId);
-
-    // Deferred to a microtask so setState never runs synchronously in the effect body; the latch
-    // and the target above are already set, so nothing can start the same switch twice.
-    void (async () => {
-      await Promise.resolve();
-      clearThread();
-      setIsThinking(false);
-      setIsStreaming(false);
-      // The latch is per conversation: releasing it is what lets `ensureOpened` read and greet
-      // the one being switched to, exactly as it did the first time.
-      latches.releaseLoad();
-
-      void ensureOpened();
-    })();
-  }, [
-    latches,
+  const { switchTeamProject } = useTargetSwitch({
     teamProjectId,
-    isThinking,
-    isStreaming,
-    isOpening,
-    isGreeting,
-    isDeciding,
-    ensureOpened,
-    closeDinoGame,
-    commitQueued,
-    setQueuePaused,
     adoptTeamProject,
-    clearThread,
+    setTeamMode,
+    bindTeamTarget,
+    busy: isThinking || isStreaming || isOpening || isGreeting || isDeciding,
     decidingNow,
-  ]);
-
-  /**
-   * Points the buddy at a managed project (`null` returns to the hire's own onboarding). The
-   * conversation itself is switched by the target effect above; this only sets the preference
-   * and, for a project target, the global selection — team mode and the rest of the app then
-   * agree on the project by construction, because they share it.
-   *
-   * Refused while anything is in flight, for the same reason the switcher disables itself: a
-   * stream cannot call its callbacks into a thread that has just been cleared.
-   */
-  const switchTeamProject = useCallback(
-    (projectId: string | null) => {
-      // `pendingDecisionsRef` is read alongside the state: a decision and a switch can land in
-      // one frame, before the "deciding" state has re-rendered.
-      if (isThinking || isStreaming || isOpening || isGreeting || isDeciding || decidingNow())
-        return;
-
-      if (projectId === null) {
-        setTeamMode(false);
-        return;
-      }
-
-      selection.setSelectedProjectId(projectId);
-      // Bind the conversation target before the derived value settles, so the adopt/exit
-      // effect sees a matching pair and does not read the buddy's own switch as an exit.
-      bindTeamTarget(projectId);
-      setTeamMode(true);
-    },
-    [
-      isThinking,
-      isStreaming,
-      isOpening,
-      isGreeting,
-      isDeciding,
-      selection,
-      setTeamMode,
-      bindTeamTarget,
-      decidingNow,
-    ],
-  );
+    selection,
+    latches,
+    clearThread,
+    setIsThinking,
+    setIsStreaming,
+    ensureOpened,
+  });
 
   return {
     messages,
