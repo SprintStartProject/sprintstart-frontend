@@ -2,26 +2,17 @@ import { MainContent } from "../components/layout/MainContent";
 import {
   AlertCircle,
   AlertTriangle,
-  ArrowRight,
-  BookOpen,
-  CheckCircle2,
-  ChevronRight,
-  CircleHelp,
-  FolderKanban,
   GitBranch,
   ListChecks,
   Loader2,
   Lock,
-  PlayCircle,
   RefreshCw,
   Rocket,
-  Sparkles,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
-import { PageShell } from "../components/layout/PageShell";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { SegmentedTabs } from "../components/ui/SegmentedTabs";
@@ -29,19 +20,20 @@ import { SLIDING_PANEL_EXIT_MS, SlidingTabPanel } from "../components/ui/Sliding
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
+import { CenteredState, StateIcon } from "../features/onboarding/components/journey/CenteredState";
+import { EmptyJourney } from "../features/onboarding/components/journey/EmptyJourney";
+import { PhaseHeaderCard } from "../features/onboarding/components/journey/PhaseHeaderCard";
+import { UpNextCard } from "../features/onboarding/components/journey/UpNextCard";
 import { GenerationScreen } from "../features/onboarding/components/journey/GenerationScreen";
 import { JourneyGraph } from "../features/onboarding/components/journey/JourneyGraph";
 import { PhaseChooser } from "../features/onboarding/components/journey/PhaseChooser";
 import { PhaseItemList } from "../features/onboarding/components/journey/PhaseItemList";
 import { PhaseNavigator } from "../features/onboarding/components/journey/PhaseNavigator";
-import { primaryActionLabel } from "../features/onboarding/graph/nodeLabels";
 import { QuestionWorkspace } from "../features/onboarding/components/journey/QuestionWorkspace";
 import { StepWorkspace } from "../features/onboarding/components/journey/StepWorkspace";
 import {
   useOnboardingJourney,
-  type GenerationFailureReason,
   type GenerationPhaseProgress,
-  type UnavailableReason,
 } from "../features/onboarding/generation/OnboardingJourneyContext";
 import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
@@ -51,9 +43,7 @@ import {
   itemState,
   pathProgress,
   phaseItems,
-  phaseProgress,
   phaseState,
-  phasesUnlockedBy,
   linkedCardId,
   sortedPhases,
   waitingOn,
@@ -1093,6 +1083,20 @@ export function OnBoardingPage() {
                     phases={phases}
                     isFocus={selectedPhase.id === focusPhaseId}
                     onSelectPhase={selectPhase}
+                    renderBuddy={(isEmpty) => (
+                      <AskTheBuddy
+                        question={
+                          isEmpty
+                            ? askAboutEmptyPhase(selectedPhase.title)
+                            : askAboutPhase(selectedPhase)
+                        }
+                        label={
+                          isEmpty
+                            ? "This phase is empty — talk it through with your buddy"
+                            : "Ask your buddy about this phase"
+                        }
+                      />
+                    )}
                   />
                   <PhaseItemList
                     phase={selectedPhase}
@@ -1137,402 +1141,5 @@ export function OnBoardingPage() {
         </SlidingTabPanel>
       </MainContent>
     </div>
-  );
-}
-
-/** Loading, error and empty states: inside the page's own chrome, so the header never blinks away. */
-function CenteredState({ children }: { children: ReactNode }) {
-  return (
-    <PageShell
-      icon={Rocket}
-      title="Onboarding"
-      subtitle="Your path into the project. Phases that are open can be done in any order."
-    >
-      <div className="flex min-h-96 flex-col items-center justify-center py-12 text-center">
-        {children}
-      </div>
-    </PageShell>
-  );
-}
-
-function StateIcon({
-  tone,
-  children,
-}: {
-  tone: "brand" | "warning" | "danger";
-  children: ReactNode;
-}) {
-  const toneClass =
-    tone === "danger"
-      ? "bg-app-danger-bg text-app-danger-text"
-      : tone === "warning"
-        ? "bg-app-warning-bg text-app-warning-text"
-        : "bg-app-brand-soft text-app-brand-text";
-  return (
-    <span
-      className={`flex h-16 w-16 items-center justify-center rounded-3xl ${toneClass}`}
-      aria-hidden="true"
-    >
-      {children}
-    </span>
-  );
-}
-
-function PhaseLinks({
-  label,
-  phases,
-  onSelect,
-}: {
-  label: string;
-  phases: OnboardingPhaseEndpoint[];
-  onSelect: (phaseId: string) => void;
-}) {
-  if (phases.length === 0) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-1.5 text-xs">
-      <span className="text-app-text-subtle">{label}</span>
-      {phases.map((phase) => (
-        <button
-          key={phase.id}
-          type="button"
-          onClick={() => onSelect(phase.id)}
-          className="inline-flex items-center gap-1 rounded-full border border-app-border px-2.5 py-1 font-medium text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-text"
-        >
-          {phase.title}
-          <ArrowRight className="h-3 w-3" aria-hidden="true" />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** The selected phase: what it is, how far along, and how it hangs together with the others. */
-function PhaseHeaderCard({
-  phase,
-  phases,
-  isFocus,
-  onSelectPhase,
-}: {
-  phase: OnboardingPhaseEndpoint;
-  phases: OnboardingPhaseEndpoint[];
-  isFocus: boolean;
-  onSelectPhase: (phaseId: string) => void;
-}) {
-  const state = phaseState(phase);
-  const progress = phaseProgress(phase);
-  const waitsOn = blockingPhases(phase, phases);
-  const unlocks = phasesUnlockedBy(phase, phases);
-  const isEmpty = phase.steps.length === 0 && phase.questions.length === 0;
-
-  return (
-    <div className="rounded-3xl border border-app-border bg-app-surface p-5">
-      <p className="text-xs font-semibold tracking-wide text-app-text-subtle uppercase">
-        Phase {phases.indexOf(phase) + 1} of {phases.length}
-        {isFocus ? <span className="text-app-brand-text"> · You are here</span> : null}
-      </p>
-      <h2 id="phase-title" className="mt-1 text-xl font-semibold text-app-text">
-        {phase.title}
-      </h2>
-      {phase.description ? (
-        <p className="mt-1 max-w-3xl text-sm text-app-text-muted">{phase.description}</p>
-      ) : null}
-      {/* The phase-level way in. A hire who does not know why a phase is here is not helped by any
-          of the buttons below it -- and an empty phase is the case the buddy exists for: its title
-          still says what it was meant to cover, and the mentor can put the result on their path. */}
-      <AskTheBuddy
-        question={isEmpty ? askAboutEmptyPhase(phase.title) : askAboutPhase(phase)}
-        label={
-          isEmpty
-            ? "This phase is empty — talk it through with your buddy"
-            : "Ask your buddy about this phase"
-        }
-      />
-      <div className="mt-3 flex items-center gap-3">
-        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-app-border-muted">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-[width] duration-500"
-            style={{ width: `${progress.percentage}%` }}
-          />
-        </div>
-        <span className="text-xs text-app-text-muted tabular-nums">
-          {progress.completed}/{progress.total} done
-        </span>
-      </div>
-
-      {state === "locked" ? (
-        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-3 py-2.5 text-sm text-app-text-muted">
-          <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>
-            Opens once {waitsOn.map((blocker) => blocker.title).join(" and ")}{" "}
-            {waitsOn.length === 1 ? "is" : "are"} complete. You can look around already.
-          </span>
-        </div>
-      ) : state === "done" ? (
-        <div className="mt-4 flex items-center gap-2 rounded-2xl border border-app-success-border bg-app-success-bg px-3 py-2.5 text-sm text-app-success-text">
-          <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-          Phase complete.
-        </div>
-      ) : null}
-
-      {waitsOn.length > 0 || unlocks.length > 0 ? (
-        <div className="mt-4 space-y-2 border-t border-app-border pt-3">
-          <PhaseLinks label="Waits on" phases={waitsOn} onSelect={onSelectPhase} />
-          <PhaseLinks label="Leads to" phases={unlocks} onSelect={onSelectPhase} />
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * The one thing to do next, on top of everything else.
- */
-function UpNextCard({
-  phase,
-  phaseIndex,
-  item,
-  onPrimary,
-  onShowPhase,
-}: {
-  phase: OnboardingPhaseEndpoint;
-  phaseIndex: number;
-  item: PhaseItem | undefined;
-  onPrimary: (item: PhaseItem) => void;
-  onShowPhase: () => void;
-}) {
-  if (!item) return null;
-  const state = itemState(item, phase.locked);
-  const action = primaryActionLabel(item, state) ?? "Open";
-  const isQuestion = item.kind === "question";
-
-  return (
-    <div className="relative overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface">
-      <div className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-app-brand-soft blur-3xl" />
-      <div className="relative flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-        <div className="flex min-w-0 items-start gap-4">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-app-brand text-white shadow-[0_10px_30px_-10px_var(--color-app-brand)]">
-            {isQuestion ? (
-              <CircleHelp className="h-6 w-6" aria-hidden="true" />
-            ) : (
-              <PlayCircle className="h-6 w-6" aria-hidden="true" />
-            )}
-          </span>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-wide text-app-brand-text uppercase">
-              {state === "active" ? "In progress" : isQuestion ? "Knowledge question" : "Up next"} ·{" "}
-              <button
-                type="button"
-                onClick={onShowPhase}
-                className="uppercase underline-offset-2 hover:underline"
-              >
-                Phase {phaseIndex + 1}: {phase.title}
-              </button>
-            </p>
-            <h2 className="mt-1 text-lg leading-snug font-bold text-app-text sm:text-xl">
-              {isQuestion ? item.question.question : item.title}
-            </h2>
-            {item.kind === "step" && item.step.description ? (
-              <p className="mt-1 line-clamp-2 max-w-3xl text-sm text-app-text-muted">
-                {item.step.description}
-              </p>
-            ) : isQuestion ? (
-              <p className="mt-1 text-sm text-app-text-muted">
-                {state === "retry"
-                  ? "You got this one wrong before — answer it correctly to move on."
-                  : "Answer this question to move on in your onboarding."}
-              </p>
-            ) : null}
-          </div>
-        </div>
-        <Button
-          variant="primary"
-          size="lg"
-          className="shrink-0 self-start sm:self-center"
-          onClick={() => onPrimary(item)}
-          trailingIcon={<ChevronRight className="h-4 w-4" />}
-        >
-          {action === "Start" ? "Start now" : action === "Answer" ? "Answer now" : action}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/**
- * No path yet: either a clear way to build one, or a clear reason there is none -- never a raw
- * error from a generation that could only fail.
- */
-function EmptyJourney({
-  hasProject,
-  isSwitcherEnabled,
-  canManage,
-  unavailableReason,
-  lastError,
-  failureReason,
-  checking,
-  onStart,
-}: {
-  hasProject: boolean;
-  isSwitcherEnabled: boolean;
-  canManage: boolean;
-  unavailableReason: UnavailableReason | null;
-  lastError: string | null;
-  /** Why the last generation came back without a path, when the backend could say. */
-  failureReason: GenerationFailureReason | null;
-  /** Whether a start could succeed is still being worked out. */
-  checking: boolean;
-  onStart: () => void;
-}) {
-  if (!hasProject || unavailableReason === "no-project") {
-    return (
-      <CenteredState>
-        <StateIcon tone="warning">
-          <FolderKanban className="h-7 w-7" />
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">No project selected</h2>
-        <p className="mt-2 max-w-md text-sm text-app-text-muted">
-          {isSwitcherEnabled
-            ? "Select a project from the project switcher before creating your personalized onboarding path."
-            : "You need to be assigned to a project before a personalized onboarding path can be created. Ask your project manager or administrator for access."}
-        </p>
-      </CenteredState>
-    );
-  }
-
-  if (
-    unavailableReason === "no-blueprint" ||
-    unavailableReason === "several-blueprints" ||
-    unavailableReason === "no-content"
-  ) {
-    const several = unavailableReason === "several-blueprints";
-    const noBlueprint = unavailableReason === "no-blueprint" || several;
-    return (
-      <CenteredState>
-        <StateIcon tone="brand">
-          {noBlueprint ? <GitBranch className="h-7 w-7" /> : <BookOpen className="h-7 w-7" />}
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">
-          {several
-            ? "This project has more than one onboarding blueprint"
-            : noBlueprint
-              ? "Onboarding isn't set up for this project yet"
-              : "There's nothing to learn from yet"}
-        </h2>
-        <p className="mt-2 max-w-md text-sm text-app-text-muted">
-          {several
-            ? "An onboarding path is built from one published blueprint, and this project has several — so it can't tell which to use."
-            : noBlueprint
-              ? "An onboarding path is built from the project's published blueprint, and this project doesn't have one."
-              : "An onboarding path is built from the project's knowledge base, and nothing has been added to it yet."}{" "}
-          {canManage
-            ? ""
-            : "Your project manager can set this up — your path will be ready to build afterwards."}
-        </p>
-        {canManage ? (
-          <Link
-            to={noBlueprint ? "/blueprints" : "/data-ingestion"}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-semibold text-white hover:bg-app-brand-hover"
-          >
-            {noBlueprint ? "Open blueprints" : "Add knowledge"}
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        ) : null}
-      </CenteredState>
-    );
-  }
-
-  // The AI ran and found nothing in the project's knowledge to build a phase from. Usually that is
-  // material that was just added and is still being processed; either way another start right now
-  // would end the same, so it is not the button this page leads with.
-  if (failureReason === "not-enough-knowledge") {
-    return (
-      <CenteredState>
-        <StateIcon tone="warning">
-          <BookOpen className="h-7 w-7" />
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">
-          Not enough project knowledge yet
-        </h2>
-        <p className="mt-2 max-w-md text-sm text-app-text-muted">
-          Your path is written from what the project’s knowledge base covers, and right now that is
-          not enough for any phase. If documents were added just now, they may still be processed —
-          give it a few minutes.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          {canManage ? (
-            <Link
-              to="/data-ingestion"
-              className="inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-semibold text-white hover:bg-app-brand-hover"
-            >
-              Add knowledge
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          ) : null}
-          <Button variant="secondary" onClick={onStart} icon={<RefreshCw className="h-4 w-4" />}>
-            Check again
-          </Button>
-        </div>
-        {canManage ? null : (
-          <p className="mt-4 max-w-md text-xs text-app-text-subtle">
-            Your project manager can add documentation to the knowledge base.
-          </p>
-        )}
-      </CenteredState>
-    );
-  }
-
-  if (failureReason === "no-phases") {
-    return (
-      <CenteredState>
-        <StateIcon tone="warning">
-          <GitBranch className="h-7 w-7" />
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">
-          The blueprint has nothing for your role yet
-        </h2>
-        <p className="mt-2 max-w-md text-sm text-app-text-muted">
-          Every phase of this project’s blueprint is meant for other roles or skills. Your project
-          manager can open a phase up for you.
-        </p>
-      </CenteredState>
-    );
-  }
-
-  const unreachable = failureReason === "ai-unavailable";
-
-  return (
-    <CenteredState>
-      <StateIcon tone={unreachable ? "warning" : "brand"}>
-        {unreachable ? <AlertTriangle className="h-7 w-7" /> : <Sparkles className="h-7 w-7" />}
-      </StateIcon>
-      <h2 className="mt-5 text-2xl font-bold text-app-text">
-        {unreachable ? "The onboarding service is not reachable" : "Build your onboarding path"}
-      </h2>
-      <p className="mt-2 max-w-md text-sm text-app-text-muted">
-        {unreachable
-          ? "Your path could not be put together because the AI service did not answer. Nothing was changed — try again in a moment."
-          : "Your path is put together from your project’s blueprint and knowledge base: phases, steps and a few questions to check what stuck. It takes a few minutes and keeps running in the background."}
-      </p>
-      {lastError && !unreachable ? (
-        <div
-          role="alert"
-          className="mt-5 flex max-w-md items-start gap-2 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-left text-sm text-app-danger-text"
-        >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          {lastError}
-        </div>
-      ) : null}
-      <Button
-        className="mt-6"
-        variant="primary"
-        size="lg"
-        onClick={onStart}
-        loading={checking}
-        disabled={checking}
-        icon={<PlayCircle className="h-4 w-4" />}
-      >
-        {checking ? "Checking the project…" : lastError ? "Try again" : "Start personalization"}
-      </Button>
-    </CenteredState>
   );
 }
