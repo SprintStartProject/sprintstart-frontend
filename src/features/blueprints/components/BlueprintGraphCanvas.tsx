@@ -1,37 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Flag, Info, LayoutGrid, Plus, Search, TriangleAlert, Waypoints } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Spinner } from "../../../components/ui/Spinner.tsx";
-import {
-  SWIPE_IGNORE_ATTRIBUTE,
-  useHorizontalWheelNavigation,
-} from "../../../hooks/useHorizontalWheelNavigation.ts";
+import { SWIPE_IGNORE_ATTRIBUTE } from "../../../hooks/useHorizontalWheelNavigation.ts";
 import {
   CanvasButton,
   JourneyCanvas,
   type JourneyCameraHandle,
   type JourneyEdgeTone,
 } from "../../onboarding/graph/JourneyCanvas.tsx";
-import {
-  layeredLayout,
-  resolveLayout,
-  type GraphPoint,
-  type LayoutOptions,
-} from "../../onboarding/graph/layout.ts";
-import {
-  EDGE_REFUSAL_MESSAGE,
-  GRAPH_NODE_HEIGHT,
-  GRAPH_NODE_WIDTH,
-  blockersBehind,
-  chainPositions,
-  dependentsAhead,
-  edgeRefusal,
-  entryPointIds,
-  keyboardNeighbour,
-  type GraphDirection,
-  type GraphPositions,
-} from "../../graph-diagram/graphLayout.ts";
+import type { GraphPoint } from "../../onboarding/graph/layout.ts";
+import { useChainFocus, type ChainHalf } from "../hooks/useChainFocus.ts";
+import { useGraphEdits, useGraphSaving } from "../hooks/useGraphEdits.ts";
+import { useGraphKeyboard } from "../hooks/useGraphKeyboard.ts";
+import { useGraphPositions, NODE_SIZE } from "../hooks/useGraphPositions.ts";
+import { useNodeDetail } from "../hooks/useNodeDetail.ts";
+import { useTidyUp } from "../hooks/useTidyUp.ts";
 import { GraphLegend } from "./GraphLegend.tsx";
 import { NodeCover } from "./BlueprintNodeCover.tsx";
 import type { BlueprintGraphCanvasNode, Props } from "./blueprintGraphCanvasTypes.ts";
@@ -41,28 +26,6 @@ export type {
   BlueprintGraphCanvasNodeProps,
   JourneyEdgeTone,
 } from "./blueprintGraphCanvasTypes.ts";
-
-/** The box a Blueprint card is drawn in, and the box the layout reserves for it. */
-const NODE_SIZE = { width: GRAPH_NODE_WIDTH, height: GRAPH_NODE_HEIGHT };
-
-/**
- * How far apart the automatic layout puts them.
- *
- * Wider than the card and half again as tall, for the same reason the journey graph's numbers are:
- * the gap is where the arrows go, and an arrow that has to squeeze between two cards is an arrow
- * that reads as touching both.
- */
-const BLUEPRINT_LAYOUT: LayoutOptions = { columnGap: 300, rowGap: 190, maxPerRow: 4 };
-
-/**
- * Which half of the lit run something is in: what has to happen before the node being pointed at,
- * or what that node opens up.
- *
- * The two are the whole question somebody asks by pointing at a node, and an arrowhead answers it
- * only if you follow the arrow. Two colours answer it at a glance, which is what a graph is for —
- * so the halves are drawn apart rather than lit as one undifferentiated blob.
- */
-type ChainHalf = "focus" | "behind" | "ahead";
 
 /** What each half wears. Orange is what has to come first; the brand colour is what comes after. */
 const HALF_RING: Record<ChainHalf, string> = {
@@ -129,17 +92,6 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
   const camera = useRef<JourneyCameraHandle>(null);
   const paneRef = useRef<HTMLDivElement | null>(null);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  /**
-   * The node under the pointer, which lights its run without committing to it.
-   *
-   * Selection stays for the node somebody is working on; hover is for the far more common act of
-   * sweeping across a graph asking "what is this one tangled up with". Making that cost a click
-   * meant that on a sixteen-phase graph nobody ever asked.
-   */
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   /**
    * Hides everything outside the lit run instead of dimming it.
@@ -148,78 +100,63 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
    * leaves forty ghosts, and the run being looked at is still buried in them.
    */
   const [chainOnly, setChainOnly] = useState(false);
-  /** The node the camera is on its way into. Everything else fades while it travels. */
-  const [flyingInto, setFlyingInto] = useState<string | null>(null);
 
   /**
    * The furniture a canvas carries is furniture for a canvas somebody works in.
    *
-   * In a strip a few hundred pixels tall, a search field and a legend panel cover the thing they
-   * are meant to help with. What is left there is the graph, its zoom bar and its full-screen
-   * button — which is exactly what makes a strip worth having.
+   * In a strip a few hundred pixels tall, a search field and a legend panel cover the thing they are
+   * meant to help with. What is left there is the graph, its zoom bar and its full-screen button --
+   * which is exactly what makes a strip worth having.
    */
   const isEmbedded = height === "fill";
   const [isLegendOpen, setIsLegendOpen] = useState(!isEmbedded);
 
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
-
-  /**
-   * Stored positions when every node has one, and a layered layout otherwise.
-   *
-   * All or nothing, and the same rule the journey graph follows: mixing stored coordinates with
-   * computed ones puts two coordinate systems on one canvas, and a computed row at the origin lands
-   * straight on top of the hand-placed cards. A stored layout whose cards would overlap at this
-   * card size is laid out again as well — the seeded blueprint's coordinates are one.
-   */
-  const layout = useMemo(() => resolveLayout(nodes, BLUEPRINT_LAYOUT, NODE_SIZE), [nodes]);
-
-  /**
-   * Moves shown before the server has them; dropped when fresh coordinates arrive.
-   *
-   * Keyed on what the nodes say, not on the identity of the array. The page hands this a freshly
-   * sorted copy on every render, so an identity check threw away the optimistic position of a card
-   * whose save was still in flight whenever anything else on the page changed -- typing in the
-   * "Add phase" modal did it on every keystroke.
-   */
-  const [overrides, setOverrides] = useState<Record<string, GraphPoint>>({});
-  const positionsKey = nodes
-    .map((node) => `${node.id}:${node.graphX ?? ""}:${node.graphY ?? ""}`)
-    .join("|");
-  const [lastPositionsKey, setLastPositionsKey] = useState(positionsKey);
-  if (lastPositionsKey !== positionsKey) {
-    setLastPositionsKey(positionsKey);
-    setOverrides({});
-  }
-
-  /**
-   * A proposed arrangement, held on the canvas and not yet saved.
-   *
-   * "Tidy up" moves every card at once and is the only thing in this editor with no way back, so
-   * it shows its result and asks. Until it is accepted, this is what the canvas draws and what a
-   * drag edits — so an author can lay the graph out, nudge two cards, and still throw all of it
-   * away.
-   */
-  const [preview, setPreview] = useState<Record<string, GraphPoint> | null>(null);
-  /** Bumped whenever every card has moved, so the view is framed around the new arrangement. */
-  const [arrangement, setArrangement] = useState(0);
-
-  /** What the view is framed around: a different set of nodes is a different picture. */
-  const fitSubject = useMemo(() => nodes.map((node) => node.id).join(","), [nodes]);
-
-  const positions = useMemo(() => {
-    const merged = new Map(layout.positions);
-    Object.entries(preview ?? overrides).forEach(([id, point]) => merged.set(id, point));
-    return merged;
-  }, [layout, overrides, preview]);
-
-  const entryPoints = useMemo(() => entryPointIds(nodes), [nodes]);
-  const chainPositionById = useMemo(() => chainPositions(nodes), [nodes]);
+  const layout = useGraphPositions(nodes);
+  const { positions, entryPoints, chainPositionById } = layout;
+  const chain = useChainFocus(nodes, nodeById);
+  const { focus, chainIds } = chain;
+  const { isSaving, saveError, setSaveError, runMutation } = useGraphSaving();
+  const edits = useGraphEdits({
+    nodes,
+    nodeById,
+    runMutation,
+    setSaveError,
+    preview: layout.preview,
+    setPreview: layout.setPreview,
+    setOverrides: layout.setOverrides,
+    onPositionChange,
+    onAddBlocker,
+    onRemoveBlocker,
+    onCreateNode,
+  });
+  const tidy = useTidyUp({ nodes, positions: layout, runMutation, onPositionChange });
+  const handleKeyDown = useGraphKeyboard({
+    nodes,
+    positions,
+    entryPoints,
+    selectedId: chain.selectedId,
+    setSelectedId: chain.setSelectedId,
+    camera,
+  });
+  const nodeDetail = useNodeDetail({
+    nodes,
+    nodeById,
+    camera,
+    openNodeId,
+    renderNodeDetail,
+    onNodeClick,
+    onCloseNodeDetail,
+    onNavigateNodeDetail,
+  });
+  const { detail, openNode, neighbours, goToNeighbour, swipeRef, flyingInto, openNodeById } =
+    nodeDetail;
 
   /**
    * The nodes whose titles match what was typed, or null when nothing was.
    *
-   * Matching rather than filtering: a node that matches is lit and the rest go quiet, so the
-   * *shape* of the graph stays on screen. Removing the others would answer "where is the one about
+   * Matching rather than filtering: a node that matches is lit and the rest go quiet, so the *shape*
+   * of the graph stays on screen. Removing the others would answer "where is the one about
    * deployment" by throwing away the thing that says where it sits.
    */
   const matchIds = useMemo(() => {
@@ -230,58 +167,6 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
     );
   }, [nodes, query]);
 
-  /**
-   * The run being lit, split into the half in front and the half behind.
-   *
-   * Hover wins over selection: the pointer is the more recent statement of interest, and a
-   * selection that refused to give way while somebody swept the graph would be the graph arguing.
-   */
-  const focusId = hoveredId ?? selectedId;
-  const focus = useMemo(() => {
-    if (!focusId || !nodeById.has(focusId)) return null;
-    return {
-      id: focusId,
-      behind: blockersBehind(nodes, focusId),
-      ahead: dependentsAhead(nodes, focusId),
-    };
-  }, [nodeById, nodes, focusId]);
-
-  const chainIds = useMemo(
-    () => (focus ? new Set([focus.id, ...focus.behind, ...focus.ahead]) : null),
-    [focus],
-  );
-
-  /** Which half of the lit run a node is in, or null when nothing is lit or it is outside it. */
-  const halfOfNode = useCallback(
-    (id: string): ChainHalf | null => {
-      if (!focus) return null;
-      if (id === focus.id) return "focus";
-      if (focus.behind.has(id)) return "behind";
-      if (focus.ahead.has(id)) return "ahead";
-      return null;
-    },
-    [focus],
-  );
-
-  /**
-   * Which half an arrow is in.
-   *
-   * Both ends have to be in the same half. An arrow from something behind the focus to something
-   * unrelated is not one of the reasons the focus is shut, and colouring it as though it were
-   * would make the run look bigger than it is.
-   */
-  const halfOfEdge = useCallback(
-    (blockerId: string, nodeId: string): Exclude<ChainHalf, "focus"> | null => {
-      if (!focus) return null;
-      const behind = (id: string) => id === focus.id || focus.behind.has(id);
-      const ahead = (id: string) => id === focus.id || focus.ahead.has(id);
-      if (behind(blockerId) && behind(nodeId)) return "behind";
-      if (ahead(blockerId) && ahead(nodeId)) return "ahead";
-      return null;
-    },
-    [focus],
-  );
-
   const drawnNodes = useMemo(
     () => (chainOnly && chainIds !== null ? nodes.filter((node) => chainIds.has(node.id)) : nodes),
     [chainIds, chainOnly, nodes],
@@ -290,306 +175,6 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
     if (drawnNodes.length === nodes.length) return positions;
     return new Map(drawnNodes.map((node) => [node.id, positions.get(node.id)!]));
   }, [drawnNodes, nodes.length, positions]);
-
-  /** Runs one graph mutation, holding the canvas still and surfacing the reason if it fails. */
-  const runMutation = useCallback(
-    async (mutation: () => Promise<void>, fallbackMessage: string) => {
-      setIsSaving(true);
-      setSaveError(null);
-      try {
-        await mutation();
-      } catch (reason) {
-        setSaveError(reason instanceof Error ? reason.message : fallbackMessage);
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    [],
-  );
-
-  const handleMove = useCallback(
-    (id: string, point: GraphPoint) => {
-      const node = nodeById.get(id);
-      if (!node) return;
-      const centre = { x: Math.round(point.x), y: Math.round(point.y) };
-
-      // A drag while an arrangement is being reviewed edits that arrangement rather than saving on
-      // its own: saving one card out of a layout the author has not accepted would leave the graph
-      // half in each.
-      if (preview) {
-        setPreview({ ...preview, [id]: centre });
-        return;
-      }
-
-      setOverrides((current) => ({ ...current, [id]: centre }));
-      void runMutation(async () => {
-        try {
-          await onPositionChange(node, centre.x, centre.y);
-        } catch (reason) {
-          // Back to where the server still has it, rather than showing a move that did not happen.
-          setOverrides((current) => {
-            const next = { ...current };
-            delete next[id];
-            return next;
-          });
-          throw reason;
-        }
-      }, "The node position could not be saved.");
-    },
-    [nodeById, onPositionChange, preview, runMutation],
-  );
-
-  const handleConnect = useCallback(
-    (blockerId: string, nodeId: string) => {
-      const refusal = edgeRefusal(nodes, nodeId, blockerId);
-      if (refusal) {
-        setSaveError(EDGE_REFUSAL_MESSAGE[refusal]);
-        return;
-      }
-      const blocked = nodeById.get(nodeId);
-      if (!blocked) return;
-      void runMutation(
-        () => onAddBlocker(blocked, blockerId),
-        "The connection could not be saved.",
-      );
-    },
-    [nodeById, nodes, onAddBlocker, runMutation],
-  );
-
-  const handleDisconnect = useCallback(
-    (blockerId: string, nodeId: string) => {
-      const blocked = nodeById.get(nodeId);
-      if (!blocked) return;
-      void runMutation(
-        () => onRemoveBlocker(blocked, blockerId),
-        "The connection could not be removed.",
-      );
-    },
-    [nodeById, onRemoveBlocker, runMutation],
-  );
-
-  /**
-   * Makes a node at a point on the canvas.
-   *
-   * Both ways in say *where* the node goes: a double-click puts it under the pointer, and the
-   * toolbar button puts it in the middle of what is on screen. A node that appears somewhere the
-   * author has to go looking for it is a node they will think failed to appear.
-   */
-  const createAt = useCallback(
-    (kindId: string, point: GraphPoint) => {
-      if (!onCreateNode) return;
-      void runMutation(
-        () => onCreateNode(kindId, Math.round(point.x), Math.round(point.y)),
-        "The node could not be created.",
-      );
-    },
-    [onCreateNode, runMutation],
-  );
-
-  /** Lays every node out again and shows the result, without saving any of it. */
-  const handleTidyUp = useCallback(() => {
-    setPreview(Object.fromEntries(layeredLayout(nodes, BLUEPRINT_LAYOUT)));
-    setArrangement((count) => count + 1);
-  }, [nodes]);
-
-  /** Writes the proposed arrangement back, one card at a time, and only where it differs. */
-  const handleAcceptPreview = useCallback(() => {
-    if (!preview) return;
-    const accepted = preview;
-
-    void runMutation(async () => {
-      // Every card is tried, so one refusal does not leave the rest of the layout unsaved; the
-      // preview stays open when anything failed, to accept again.
-      let failed = 0;
-      let attempted = 0;
-      for (const node of nodes) {
-        const target = accepted[node.id];
-        if (!target) continue;
-        const x = Math.round(target.x);
-        const y = Math.round(target.y);
-        if (node.graphX === x && node.graphY === y) continue;
-        attempted += 1;
-        try {
-          await onPositionChange(node, x, y);
-        } catch {
-          failed += 1;
-        }
-      }
-      if (failed > 0) {
-        throw new Error(
-          `${failed} of ${attempted} cards could not be moved. Accept again to retry them.`,
-        );
-      }
-      setPreview(null);
-    }, "The layout could not be saved.");
-  }, [nodes, onPositionChange, preview, runMutation]);
-
-  const handleDiscardPreview = useCallback(() => {
-    setPreview(null);
-    setArrangement((count) => count + 1);
-  }, []);
-
-  /**
-   * Arrow keys move between nodes.
-   *
-   * Listened for on the surface rather than on a node: the canvas owns the pointer gestures and the
-   * zoom keys, and which node is "left" of this one is a question about the graph, not about the
-   * DOM order the nodes happen to be in. See {@link keyboardNeighbour} for what "left" means.
-   */
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      const directions: Record<string, GraphDirection> = {
-        ArrowLeft: "left",
-        ArrowRight: "right",
-        ArrowUp: "up",
-        ArrowDown: "down",
-      };
-      const direction = directions[event.key];
-      if (!direction) return;
-      // Inside a field, an arrow key is a cursor.
-      if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select")) {
-        return;
-      }
-
-      const from = selectedId ?? [...entryPoints][0] ?? nodes[0]?.id;
-      if (!from) return;
-
-      const geometry: GraphPositions = Object.fromEntries(positions);
-      const next = selectedId === null ? from : keyboardNeighbour(nodes, geometry, from, direction);
-      if (!next) return;
-
-      event.preventDefault();
-      setSelectedId(next);
-      // Focus follows the ring, and the view follows both.
-      //
-      // Enter is handled on the focused node, so a ring that moved on its own meant the ring sat
-      // on one node and Enter opened another -- whichever had last been focused. And the ring can
-      // walk off the visible canvas, which is the same problem one step later.
-      const surface = event.currentTarget;
-      window.requestAnimationFrame(() => {
-        surface.querySelector<HTMLElement>(`[data-journey-node="${next}"]`)?.focus();
-        void camera.current?.revealNode(next);
-      });
-    },
-    [camera, entryPoints, nodes, positions, selectedId],
-  );
-
-  const openNode = openNodeId ? (nodeById.get(openNodeId) ?? null) : null;
-  const detail = openNode && renderNodeDetail ? renderNodeDetail(openNode) : null;
-
-  /**
-   * Where forward and back go from the opened node.
-   *
-   * The arrows follow the arrows: back is something this node waits for, forward is something it
-   * opens up. That is the order a blueprint actually has, and the one somebody reading it is
-   * walking.
-   *
-   * Where a node has neither — most of them, on a blueprint nobody has connected yet — the step
-   * falls back to the author's own order, which is the order the nodes were handed to this canvas.
-   * A control that does nothing on most of a graph teaches people it is broken; one that says
-   * which of the two it just did is honest about the difference. That is what the labels are for.
-   */
-  const neighbours = useMemo(() => {
-    if (!openNode) return { previous: null, next: null };
-    const index = nodes.findIndex((node) => node.id === openNode.id);
-    const waitsFor = nodes.filter((node) => openNode.blockerIds.includes(node.id));
-    const opens = nodes.filter((node) => node.blockerIds.includes(openNode.id));
-    return {
-      // The last prerequisite the author wrote and the first thing it opens: the nearest neighbour
-      // on each side, by the only order there is to be near in.
-      previous: waitsFor.length
-        ? { node: waitsFor[waitsFor.length - 1], relation: "Waits for" }
-        : index > 0
-          ? { node: nodes[index - 1], relation: "Previous" }
-          : null,
-      next: opens.length
-        ? { node: opens[0], relation: "Opens" }
-        : index >= 0 && index < nodes.length - 1
-          ? { node: nodes[index + 1], relation: "Next" }
-          : null,
-    };
-  }, [nodes, openNode]);
-
-  const goToNeighbour = useCallback(
-    (side: "previous" | "next") => {
-      const target = neighbours[side];
-      if (target) onNavigateNodeDetail?.(target.node.id);
-    },
-    [neighbours, onNavigateNodeDetail],
-  );
-
-  /**
-   * A two-finger swipe across the opened page steps to the neighbour the arrows point at.
-   *
-   * Scoped to the page itself: the graph under it marks the whole pane as somewhere the page's own
-   * swipe must keep its hands off, because a swipe there pans the canvas. A page drawn on top of
-   * it is not the canvas, and this is the one gesture it wants.
-   */
-  const swipeRef = useHorizontalWheelNavigation<HTMLDivElement>({
-    onNext: () => goToNeighbour("next"),
-    onPrevious: () => goToNeighbour("previous"),
-    enabled: !!detail && !!onNavigateNodeDetail,
-    boundary: "self",
-  });
-
-  /**
-   * Flies back out when the opened node is shut.
-   *
-   * Only on the way out. Flying in is done before the caller is told the node was clicked, so that
-   * what opens is already what fills the screen — see the select handler below.
-   */
-  const wasOpenRef = useRef<string | null>(null);
-  useEffect(() => {
-    const previous = wasOpenRef.current;
-    wasOpenRef.current = openNodeId;
-    if (previous && !openNodeId) void camera.current?.flyToFit();
-    // Stepping from one node to the next takes the graph underneath with it, so closing lands on
-    // the node that was actually being read rather than on the one it was entered from.
-    if (previous && openNodeId && previous !== openNodeId) {
-      void camera.current?.zoomIntoNode(openNodeId, 260);
-    }
-  }, [openNodeId]);
-
-  /** Escape is how everything in this app that took the screen gives it back. */
-  useEffect(() => {
-    if (!detail || !onCloseNodeDetail) return;
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      // Inside a field or a dialog, Escape belongs to that. A confirmation about unsaved work is
-      // the worst possible thing to dismiss by closing the thing it is asking about.
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        target.closest('input, textarea, select, [role="dialog"]')
-      ) {
-        return;
-      }
-      onCloseNodeDetail();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [detail, onCloseNodeDetail]);
-
-  const openNodeById = useCallback(
-    (id: string) => {
-      const node = nodeById.get(id);
-      if (!node) return;
-      if (!renderNodeDetail) {
-        onNodeClick?.(node);
-        return;
-      }
-      // The camera lands first and the node opens into what it landed on. Telling the caller first
-      // would open a page over a graph still on its way there, which reads as two things happening
-      // rather than one thing being entered.
-      setFlyingInto(id);
-      void (async () => {
-        await camera.current?.zoomIntoNode(id, 380);
-        setFlyingInto(null);
-        onNodeClick?.(node);
-      })();
-    },
-    [nodeById, onNodeClick, renderNodeDetail],
-  );
 
   const canAuthor = editable && !isSaving;
   const focusTitle = focus ? nodeById.get(focus.id)?.title : undefined;
@@ -654,7 +239,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
             // leaving the count alone, and a count-only key told the canvas nothing had changed —
             // so it kept the view it had framed around the version before, which is how landing on
             // a draft looked like being dropped in zoomed on one card.
-            fitKey={`${fitSubject}|${arrangement}|${chainOnly ? "chain" : "all"}`}
+            fitKey={`${layout.fitSubject}|${layout.arrangement}|${chainOnly ? "chain" : "all"}`}
             // Everything, every time the graph is opened. The canvas can also open on one node at a
             // readable zoom when the whole thing would be too small, and for a hire working through
             // their own path that is the right answer — but an author switching to the graph is
@@ -675,10 +260,10 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
               onNodeClick || renderNodeDetail || editable
                 ? (id) => {
                     if (id === null) {
-                      setSelectedId(null);
+                      chain.setSelectedId(null);
                       return;
                     }
-                    setSelectedId(id);
+                    chain.setSelectedId(id);
                     openNodeById(id);
                   }
                 : undefined
@@ -704,24 +289,24 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
               // While a node is being pointed at, which half of its run an arrow is in outranks
               // where the arrow came from: the first is the question being asked right now, and
               // the second is on the card and in the legend either way.
-              const half = halfOfEdge(blocker.id, node.id);
+              const half = chain.halfOfEdge(blocker.id, node.id);
               if (half) return HALF_EDGE[half];
               return edgeTone?.(node, blocker.id) ?? "rule";
             }}
             // Not while a save is in flight: a second drag of the same card would send the revision
             // the first one is about to replace, and come back as a conflict.
             canMove={editable && !isSaving}
-            onMove={handleMove}
+            onMove={edits.handleMove}
             // Not while a save is in flight, for the same reason moves are not: two quick drags
             // off the same node would send the same revision twice.
             canConnect={canAuthor}
-            onConnect={handleConnect}
-            onDisconnect={editable ? handleDisconnect : undefined}
+            onConnect={edits.handleConnect}
+            onDisconnect={editable ? edits.handleDisconnect : undefined}
             onCanvasDoubleClick={
               canAuthor && createKinds[0]
                 ? // The first kind, on a surface that has more than one: the toolbar names them
                   // all, and a double-click cannot ask which.
-                  (point) => createAt(createKinds[0].id, point)
+                  (point) => edits.createAt(createKinds[0].id, point)
                 : undefined
             }
             nodeLabel={(node) =>
@@ -744,7 +329,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
               const dimmed =
                 (chainIds !== null && !chainIds.has(node.id)) ||
                 (matchIds !== null && !matchIds.has(node.id));
-              const half = halfOfNode(node.id);
+              const half = chain.halfOfNode(node.id);
               return (
                 <div
                   data-testid={`graph-node-${node.id}`}
@@ -752,16 +337,16 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                   // colour: the colour is the answer for a reader, and this is the one thing a
                   // test can hold on to without asserting a class name.
                   data-chain-half={half ?? undefined}
-                  onMouseEnter={() => setHoveredId(node.id)}
+                  onMouseEnter={() => chain.setHoveredId(node.id)}
                   onMouseLeave={() =>
-                    setHoveredId((current) => (current === node.id ? null : current))
+                    chain.setHoveredId((current) => (current === node.id ? null : current))
                   }
                   className={`relative h-full w-full rounded-xl transition-opacity duration-200 ${
                     dimmed ? "opacity-35" : "opacity-100"
                   } ${
                     half
                       ? HALF_RING[half]
-                      : node.id === selectedId
+                      : node.id === chain.selectedId
                         ? "ring-2 ring-app-brand-border-strong"
                         : ""
                   }`}
@@ -769,7 +354,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                   {renderNode(node, {
                     disabled: isSaving,
                     zoom: state.zoom,
-                    highlighted: node.id === focusId,
+                    highlighted: node.id === chain.focusId,
                     chainPosition: chainPositionById.get(node.id),
                   })}
 
@@ -839,7 +424,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
               </div>
             }
             aside={
-              preview ? (
+              layout.preview ? (
                 // The proposal states what it did and what happens next, because "Tidy up" has
                 // already redrawn the canvas by the time this is read: without the sentence, an
                 // author cannot tell an applied change from an offered one.
@@ -847,13 +432,13 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                   <p className="text-sm font-semibold text-app-text">Laid out by prerequisite</p>
                   <p className="text-xs text-app-text-muted">
                     Nothing is saved yet. Drag any card to adjust it first, or put the old
-                    arrangement back.
+                    layout.arrangement back.
                   </p>
                   <div className="flex gap-2">
-                    <Button variant="primary" size="sm" onClick={handleAcceptPreview}>
+                    <Button variant="primary" size="sm" onClick={tidy.handleAcceptPreview}>
                       Keep this
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={handleDiscardPreview}>
+                    <Button variant="secondary" size="sm" onClick={tidy.handleDiscardPreview}>
                       Put it back
                     </Button>
                   </div>
@@ -869,7 +454,9 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                       <CanvasButton
                         key={kind.id}
                         label={kind.label}
-                        onClick={() => createAt(kind.id, camera.current?.viewCenter() ?? zero)}
+                        onClick={() =>
+                          edits.createAt(kind.id, camera.current?.viewCenter() ?? zero)
+                        }
                       >
                         <Plus className="h-4 w-4" />
                       </CanvasButton>
@@ -895,7 +482,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                   </CanvasButton>
                 )}
                 {canAuthor ? (
-                  <CanvasButton label="Tidy up" onClick={handleTidyUp}>
+                  <CanvasButton label="Tidy up" onClick={tidy.handleTidyUp}>
                     <LayoutGrid className="h-4 w-4" />
                   </CanvasButton>
                 ) : null}
