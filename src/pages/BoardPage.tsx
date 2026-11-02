@@ -7,9 +7,11 @@ import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { Spinner } from "../components/ui/Spinner";
-import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardPlanning } from "../features/board/hooks/useBoardPlanning";
+import { useBoardPiles } from "../features/board/hooks/useBoardPiles";
+import { useBoardSections } from "../features/board/hooks/useBoardSections";
+import { FOLD_THRESHOLD } from "../features/board/layout/foldThreshold";
 import { useBoardAreas } from "../features/board/hooks/useBoardAreas";
 import { useCardPreferences } from "../features/board/hooks/useCardPreferences";
 import { usePanelSwitches } from "../features/board/hooks/usePanelSwitches";
@@ -39,13 +41,6 @@ import {
   writeBehindSeen,
 } from "../features/board/layout/behindSeen";
 import {
-  ALL_SECTIONS,
-  markSectionColor,
-  markedIn,
-  sectionTabOrder,
-  summariseSections,
-} from "../features/board/layout/boardSections";
-import {
   BOARD_STAGES,
   currentStage,
   type BoardStage,
@@ -55,9 +50,7 @@ import { readCardOrigins, type CardOrigins } from "../features/board/layout/card
 import { subscribeToBoardStorageReplaced } from "../features/board/layout/boardStorage";
 import { describeCuts, selectShownCards } from "../features/board/layout/boardCuts";
 import { useBoardStructureSync } from "../features/board/sync/useBoardStructureSync";
-import { useCardMarks, useMarkableBoard } from "../features/board/marks/useCardMarks";
-import { buildStacks } from "../features/board/layout/cardStacks";
-import { assignToGroup, groupOf } from "../features/board/layout/boardGroups";
+import { useMarkableBoard } from "../features/board/marks/useCardMarks";
 
 /**
  * The board: the hire's persistent working surface.
@@ -90,16 +83,6 @@ import { assignToGroup, groupOf } from "../features/board/layout/boardGroups";
  * The reason for all three is the same. A board that shows everything at once is fine at eight
  * cards and unusable at forty. See `layout/boardStructure.ts` for the model.
  */
-
-/**
- * The board size at which the stage bands arrive folded.
- *
- * Below it, everything open *is* the right view: a hire with six cards can read all six, and
- * folding four of them under three headings would be ceremony rather than help. Above it the cost
- * flips, and it flips quickly — the complaint the bands answer is not "this is slightly long", it
- * is "forty cards appeared and I do not know where to start".
- */
-const FOLD_THRESHOLD = 8;
 
 /**
  * The hire's board: their own cards and the buddy's, arranged in areas and stages and synced with
@@ -334,56 +317,6 @@ export function BoardPage() {
 
   const { states, stackOnto } = useBoardStructure(boardId, allCards, stageOf);
 
-  /**
-   * The piles on this board, and which of them are spread out.
-   *
-   * A pile is cards the hire put one under another with the "Pile" control (see `restack`). It is
-   * drawn as its top card with the others fanned beneath, and opens on a click. A pile only forms
-   * inside one area, so piling a card under one in another area takes it into that area too — see
-   * {@link handleStackOnto}.
-   *
-   * Which piles are open is kept for the visit rather than stored: opening one is looking into it,
-   * not rearranging the board.
-   */
-  const stacks = useMemo(
-    () => buildStacks(allCards, states, (cardId) => groupOf(groups, cardId)?.id ?? null, pinnedIds),
-    [allCards, groups, pinnedIds, states],
-  );
-  const [expandedStackIds, setExpandedStackIds] = useState<Set<string>>(new Set());
-
-  /** Every pile spread out while the board is being arranged, so each card can be moved. */
-  const openStackIds = useMemo(
-    () => (isArranging ? allRootIds(stacks) : expandedStackIds),
-    [expandedStackIds, isArranging, stacks],
-  );
-
-  function toggleStack(rootId: string) {
-    setExpandedStackIds((current) => {
-      const next = new Set(current);
-      if (next.has(rootId)) next.delete(rootId);
-      else next.add(rootId);
-
-      return next;
-    });
-  }
-
-  /**
-   * Piles a card under another one, and into that card's area so the two can lie together.
-   *
-   * `carry` is a whole closed pile being moved — every card of it goes along, area included.
-   */
-  function handleStackOnto(cardId: string, targetId: string | null, carry?: readonly string[]) {
-    stackOnto(cardId, targetId, carry);
-    if (!targetId) return;
-
-    const area = groupOf(groups, targetId)?.id ?? null;
-    let next = groups;
-    for (const id of carry ?? [cardId]) {
-      if ((groupOf(next, id)?.id ?? null) !== area) next = assignToGroup(next, id, area);
-    }
-    if (next !== groups) saveGroups(next);
-  }
-
   // Lends these cards to the app shell, so the selection toolbar mounted above the router can offer
   // the marker pen on text that turns out to be on one of them. Taken back when this page leaves.
   useMarkableBoard({
@@ -391,124 +324,30 @@ export function BoardPage() {
     onEditCard: (cardId, request) => void editCard(cardId, request),
   });
 
-  // The highlights, for the section bar's colour cuts. Read from the same provider the cards
-  // themselves draw from, so a row's count and the cards behind it cannot disagree.
-  const { marks: cardMarks, labels: markLabels } = useCardMarks();
+  const {
+    sections,
+    markSections,
+    hasSectionTabs,
+    tabSections,
+    shownSectionId,
+    sectionValue,
+    sectionIndex,
+    swipeRef,
+    cardMarks,
+  } = useBoardSections({ allCards, groups, states, pinnedIds, sectionId, setSectionId });
 
-  const sections = useMemo(
-    () =>
-      summariseSections(allCards, groups, states, {
-        // The focus tab is for a board somebody can get lost on. Below the fold threshold every
-        // card is already in front of them, and a tab offering a subset of six is a choice made
-        // for its own sake.
-        focus: allCards.length > FOLD_THRESHOLD,
-        pinnedIds,
-        marks: cardMarks,
-        markLabels,
-      }),
-    [allCards, groups, pinnedIds, states, cardMarks, markLabels],
-  );
-
-  /**
-   * The sections, split by what kind of thing they are.
-   *
-   * A colour is not a part of the board the way an area is — it is something the hire drew on a
-   * card while reading it — so it does not belong in the bar that says which part of the board is
-   * open. The colours are switches, and they live in the rail with the other switches; the bar
-   * keeps the areas, the stages and the rest, which are all places a card *is*.
-   */
-  const markSections = useMemo(() => sections.filter((section) => section.mark), [sections]);
-  const tabSections = useMemo(() => sections.filter((section) => !section.mark), [sections]);
-
-  /**
-   * Whether the board has been divided into anything worth navigating.
-   *
-   * One section called "Everything" is a table of contents for a book with one chapter, so an
-   * undivided board gets no bar at all, rather than a bar with a single tab in it.
-   */
-  const hasSectionTabs = tabSections.length > 1;
-
-  /**
-   * The section actually being shown, which is not always the one that was chosen.
-   *
-   * A colour row exists only while something is marked in that colour, so rubbing out the last
-   * green highlight takes the green dot off the rail — and the board would go on filtering by a
-   * colour with no control left to switch it off, no tab lit, and nothing on the status line
-   * naming the cut, because the cut it names no longer exists to be looked up. An area behaves the
-   * same way when it is dissolved from somewhere other than this page.
-   *
-   * A section id that no longer names a section means everything, which is what the board would be
-   * showing anyway if it agreed with itself.
-   */
-  const shownSectionId = useMemo(
-    () =>
-      sectionId !== null && !sections.some((section) => section.id === sectionId)
-        ? null
-        : sectionId,
-    [sectionId, sections],
-  );
-
-  /**
-   * Piles opened because the colour picked on the right is on a card inside them.
-   *
-   * A closed pile shows only its top card, so filtering by a colour that sits on the second card
-   * showed nothing at all — the filter's count said there was one, and the board said there was
-   * none. Such a pile is spread out for as long as the colour is picked; the filter then leaves
-   * only the cards that carry it.
-   */
-  const heldOpenByMarks = useMemo(() => {
-    const color = markSectionColor(shownSectionId);
-    if (!color) return new Set<string>();
-
-    const hits = new Set(markedIn(allCards, cardMarks, color).map((card) => card.id));
-    const roots = new Set<string>();
-    for (const stack of stacks.values()) {
-      if (stack.memberIds.some((id) => hits.has(id))) roots.add(stack.rootId);
-    }
-    return roots;
-  }, [allCards, cardMarks, shownSectionId, stacks]);
-  const visibleStackIds = useMemo(
-    () =>
-      heldOpenByMarks.size === 0 ? openStackIds : new Set([...openStackIds, ...heldOpenByMarks]),
-    [heldOpenByMarks, openStackIds],
-  );
-
-  /**
-   * The grid's open-and-close, minus the piles the colour filter holds open: folding one of those
-   * from outside it would only hide the highlight the filter is there to show.
-   */
-  function toggleVisibleStack(rootId: string) {
-    if (heldOpenByMarks.has(rootId) && !openStackIds.has(rootId)) return;
-    toggleStack(rootId);
-  }
-
-  /**
-   * The sections as the tab machinery sees them: a fixed left-to-right order, and a string for the
-   * current one.
-   *
-   * Built from the same array the bar renders, so a swipe and a tap walk the same list — a second
-   * order defined anywhere else would drift the first time a card changed area.
-   */
-  const sectionOrder = useMemo(() => sectionTabOrder(tabSections), [tabSections]);
-  const sectionValue = shownSectionId ?? ALL_SECTIONS;
-  const sectionIndex = Math.max(sectionOrder.indexOf(sectionValue), 0);
-
-  /**
-   * Two-finger swipe between the sections, the same gesture every other tabbed page in the app
-   * answers to. Off on an undivided board, where there is nothing to swipe between.
-   *
-   * Off as well while a colour is being shown. The colours are not in this order — they are
-   * switches in the rail, not tabs — so a swipe from one would be asked to step from an index this
-   * list does not contain, and would land on whichever tab happens to be first rather than on the
-   * next one. Pressing the colour again is the way back, which is where a swipe would have to
-   * start anyway.
-   */
-  const swipeRef = useSwipeableTabs<string, HTMLElement>({
-    order: sectionOrder,
-    value: sectionValue,
-    onChange: (value) => setSectionId(value === ALL_SECTIONS ? null : value),
-    enabled: hasSectionTabs && sectionOrder.includes(sectionValue),
-  });
+  const { stacks, visibleStackIds, toggleVisibleStack, handleStackOnto, openAllPiles } =
+    useBoardPiles({
+      allCards,
+      groups,
+      saveGroups,
+      states,
+      pinnedIds,
+      isArranging,
+      shownSectionId,
+      cardMarks,
+      stackOnto,
+    });
 
   /**
    * Which stage bands are open.
@@ -609,7 +448,7 @@ export function BoardPage() {
     setOpenStages(new Set(BOARD_STAGES));
     setSectionId(null);
     setFilter("all");
-    setExpandedStackIds(allRootIds(stacks));
+    openAllPiles();
     if (pathPlace) setSearchParams({}, { replace: true });
   }
 
@@ -960,9 +799,4 @@ export function BoardPage() {
       </div>
     </BoardPathContext.Provider>
   );
-}
-
-/** Every pile's root id — what "open all of them" means. */
-function allRootIds(stacks: Map<string, { rootId: string }>): Set<string> {
-  return new Set([...stacks.values()].map((stack) => stack.rootId));
 }
