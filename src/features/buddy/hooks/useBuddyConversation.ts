@@ -20,26 +20,60 @@ import { buddySessionIdFromPath } from "../buddyPagePath";
 import { actionDraftKey } from "../actionDrafts";
 import { clearDraft } from "../buddyDraftStorage";
 import type { ActionDrafts } from "../actionDrafts";
-import { BUDDY_PATH_ACTIONS } from "../types";
 import { useAuth } from "../../../context/useAuth";
 import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
 import { toWireFilters } from "../utils/filterRange";
-import {
-  BUDDY_ACTION_AMEND_CHECKLIST,
-  BUDDY_ACTION_CLAIM_GOAL,
-  BUDDY_ACTION_DISMISS_CARDS,
-  BUDDY_ACTION_EDIT_CHECKLIST,
-  BUDDY_ACTION_EDIT_LINK,
-  BUDDY_ACTION_EDIT_NOTE,
-  BUDDY_ACTION_PLACE_CHECKLIST,
-  BUDDY_ACTION_PLACE_LINK,
-  BUDDY_ACTION_PLACE_NOTE,
-  BUDDY_ACTION_REORDER_CARDS,
-  BUDDY_ACTION_REWORD_CHECKLIST,
-  BUDDY_ACTION_TICK_CHECKLIST,
-} from "../types";
 import type { ActionPatch, BuddyMessage, BuddyMessageView, ProposedAction } from "../types";
 import type { BuddySessionFilters, QueuedBuddyMessage } from "../types";
+import {
+  BIN_MOVE_FAILED,
+  CONVERSATION_FAILED,
+  GREETING_FAILED,
+  HISTORY_FAILED,
+  PROPOSAL_GONE,
+  REPLY_FAILED,
+  REPLY_TIMED_OUT,
+  STREAM_TIMEOUT_MS,
+  isNotFound,
+} from "../conversation/replyMessages";
+import { placesOnBoard } from "../conversation/boardActions";
+import {
+  readStoredMentorTools,
+  readStoredTeamMode,
+  writeStoredMentorTools,
+  writeStoredTeamMode,
+} from "../conversation/buddyPreferences";
+import {
+  addActions,
+  addCitation,
+  appendChunk,
+  appendToken,
+  clearContent,
+  greetingPlaceholder,
+  markStopped as markMessageStopped,
+  patchAction as patchActionIn,
+  setError,
+  settleGreeting,
+  withHistory,
+  withTurn,
+} from "../conversation/messageReducers";
+import {
+  actionExtras,
+  hireProposal,
+  isStored,
+  mayConfirm,
+  mayDismissStored,
+  movesPath,
+  storedProposal,
+  touchesBoard,
+} from "../conversation/proposals";
+import {
+  blankSession,
+  chooseSession,
+  mergeFetchedSessions,
+  reusableBlankSession,
+} from "../conversation/sessionRules";
+import { createDraftBuffer, createWatchdog } from "../conversation/turnTimers";
 
 /**
  * The slice of the global project context the buddy needs to keep team mode honest: team mode
@@ -54,119 +88,6 @@ export type ProjectSelectionSlice = {
   isLoading: boolean;
   setSelectedProjectId: (projectId: string) => void;
 };
-
-/**
- * What the hire is told when a stream does not finish.
- *
- * Plain, and never the raw failure: a transport message or an HTTP status answers a question
- * nobody asked. What matters is whether trying again is worth it, so each line says so.
- */
-const REPLY_FAILED = "Your buddy could not finish that reply. Ask again in a moment.";
-const REPLY_TIMED_OUT = "Your buddy stopped responding for five minutes. Try again.";
-const GREETING_FAILED = "Your buddy could not be reached just now.";
-const HISTORY_FAILED = "Your conversation could not be loaded.";
-const CONVERSATION_FAILED = "Your buddy could not start a new conversation. Ask again in a moment.";
-/** The bin landed, but the move off the binned conversation did not — the list must not claim a clean success. */
-const BIN_MOVE_FAILED =
-  'Binned, but the next conversation couldn\'t open — use "Try again" to retry.';
-/** The one sentence for a proposal that no longer exists for this caller (HTTP 404). */
-const PROPOSAL_GONE = "This proposal is no longer available.";
-/**
- * How long a turn may go without a single event before it is failed.
- *
- * The read has no timeout of its own — a stream that stops arriving leaves the request open
- * forever — so the turn is failed from here, the same inter-event watchdog the retired chat
- * ran: every event (a tool, a thought, a token, a citation) re-arms it, and five silent
- * minutes mean the stream is wedged. Measured between events, not from the start: a long
- * tool-heavy turn keeps talking, and each event is proof of life.
- */
-const STREAM_TIMEOUT_MS = 300_000;
-
-function isNotFound(e: unknown): boolean {
-  return e instanceof Error && "status" in e && (e as { status: number }).status === 404;
-}
-
-/**
- * The hire-confirmed buddy actions that write to the board, by their wire names: the five
- * `BuddyBoardWriteActions` handles (placing, amending, ticking and rewording a checklist, and
- * the note), the six board edits (a link, editing a note, link or checklist, clearing cards off
- * and rearranging them), plus `claim_goal`, which pins the claimed task as the board's CURRENT_TASK card —
- * its own outcome line says so ("It's on your board too"). Every other confirm changes something
- * else — a task claim, an attestation request, a flag, a username — and needs no board sync.
- */
-const BUDDY_BOARD_ACTIONS = new Set<string>([
-  BUDDY_ACTION_PLACE_CHECKLIST,
-  BUDDY_ACTION_AMEND_CHECKLIST,
-  BUDDY_ACTION_TICK_CHECKLIST,
-  BUDDY_ACTION_REWORD_CHECKLIST,
-  BUDDY_ACTION_PLACE_NOTE,
-  BUDDY_ACTION_CLAIM_GOAL,
-  BUDDY_ACTION_PLACE_LINK,
-  BUDDY_ACTION_EDIT_NOTE,
-  BUDDY_ACTION_EDIT_LINK,
-  BUDDY_ACTION_EDIT_CHECKLIST,
-  BUDDY_ACTION_DISMISS_CARDS,
-  BUDDY_ACTION_REORDER_CARDS,
-]);
-
-/**
- * The mid-answer tool that puts a card on the board. `place_card` is deliberately not a confirmed
- * action — it applies the moment the mentor runs it — so a turn that ran it is the only signal
- * the client ever gets that the board moved. Acted on by `sendMessage` when the turn ends.
- */
-const BUDDY_BOARD_TOOLS = new Set<string>(["place_card"]);
-
-/**
- * Where "is the buddy in team mode" lives between reloads — scoped to the signed-in user, the
- * way the project selection is. A shared browser must not hand one manager's team conversation
- * to the next.
- */
-function teamModeStorageKey(userId: string): string {
-  return `buddyTeamMode:${userId}`;
-}
-
-function readStoredTeamMode(userId: string): boolean {
-  try {
-    return localStorage.getItem(teamModeStorageKey(userId)) === "true";
-  } catch {
-    // Private modes can refuse storage outright. Not a reason to refuse the conversation.
-    return false;
-  }
-}
-
-function writeStoredTeamMode(userId: string, value: boolean): void {
-  try {
-    localStorage.setItem(teamModeStorageKey(userId), value ? "true" : "false");
-  } catch {
-    // Nothing to do: the conversation still switches, it just will not be remembered.
-  }
-}
-
-/**
- * The mentor-tools switch's storage, alongside the team-mode one — same rules, opposite default.
- *
- * Default ON: the full mentor is what the feature is for, and a hire who has never touched the
- * switch must get it. Only an explicit "off" is remembered.
- */
-function mentorToolsStorageKey(userId: string): string {
-  return `buddyMentorTools:${userId}`;
-}
-
-function readStoredMentorTools(userId: string): boolean {
-  try {
-    return localStorage.getItem(mentorToolsStorageKey(userId)) !== "false";
-  } catch {
-    return true;
-  }
-}
-
-function writeStoredMentorTools(userId: string, value: boolean): void {
-  try {
-    localStorage.setItem(mentorToolsStorageKey(userId), value ? "true" : "false");
-  } catch {
-    // Nothing to do: the switch still works, it just will not be remembered.
-  }
-}
 
 /**
  * The conversation core behind every buddy surface: the message list, the optimistic
@@ -558,17 +479,7 @@ export function useBuddyConversation(
     // The greeting claims its place in the thread before the stream is awaited: the composer is
     // live while it is written, and a question typed straight away must not land above it. An empty
     // assistant turn renders nothing (see `BuddyThread`).
-    setMessages((prev) => [
-      ...prev,
-      {
-        id,
-        role: "ASSISTANT",
-        content: "",
-        createdAt: new Date().toISOString(),
-        citations: [],
-        isGreeting: true,
-      },
-    ]);
+    setMessages((prev) => [...prev, greetingPlaceholder(id, new Date().toISOString())]);
 
     // A bag rather than two `let`s: a local written only inside callbacks narrows to its initial
     // value at the read below, a property does not.
@@ -582,11 +493,7 @@ export function useBuddyConversation(
         {
           onToken: (token) => {
             stream.wroteSomething = true;
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === id ? { ...message, content: message.content + token } : message,
-              ),
-            );
+            setMessages((prev) => appendToken(prev, id, token));
             // The surface stops waiting at the first word, not the last: everything after this
             // is the hire reading along, and the composer is theirs from here.
             setIsOpening(false);
@@ -605,23 +512,7 @@ export function useBuddyConversation(
       console.error(e);
       stream.failure = GREETING_FAILED;
     } finally {
-      const reason = stream.failure;
-
-      setMessages((prev) => {
-        const withoutPlaceholder = prev.filter((message) => message.id !== id);
-
-        // Nothing came and nothing went wrong: the placeholder only held the greeting's place, and
-        // an empty assistant turn must not stay in `messages`.
-        if (!reason) return stream.wroteSomething ? prev : withoutPlaceholder;
-
-        // A greeting that failed under a thread the hire can already read is not worth reporting;
-        // if their own question then fails, the reply says so.
-        if (!stream.wroteSomething && withoutPlaceholder.length > 0) return withoutPlaceholder;
-
-        // Otherwise it is worth saying: an empty thread would read as "no buddy here", and a
-        // greeting cut off mid-sentence needs the explanation.
-        return prev.map((message) => (message.id === id ? { ...message, error: reason } : message));
-      });
+      setMessages((prev) => settleGreeting(prev, id, stream));
 
       setIsOpening(false);
       setIsGreeting(false);
@@ -635,17 +526,7 @@ export function useBuddyConversation(
    * own message out from under them. History is older, so it belongs in front.
    */
   const mergeHistory = useCallback((history: BuddyMessage[]) => {
-    setMessages((prev) => [
-      ...history.map((message) => ({
-        ...message,
-        // The backend ids persisted messages; a turn this client streamed has none and gets a
-        // local one. The fallback keeps a backend without the field working too.
-        id: message.id ?? crypto.randomUUID(),
-        // The one-message window: a greeting nobody answered, replayed as it was.
-        isGreeting: history.length === 1 && message.role === "ASSISTANT",
-      })),
-      ...prev,
-    ]);
+    setMessages((prev) => withHistory(prev, history));
   }, []);
 
   /**
@@ -670,24 +551,15 @@ export function useBuddyConversation(
       const list = await getSessions();
 
       if (list.length > 0) {
-        const holds = (id: string | null): id is string =>
-          id !== null && list.some((session) => session.id === id);
         const addressed = buddySessionIdFromPath(window.location.pathname);
-        const previous = currentSessionIdRef.current;
-        const chosen = holds(addressed) ? addressed : holds(previous) ? previous : list[0].id;
+        const chosen = chooseSession(list, addressed, currentSessionIdRef.current);
         applySessions(list);
         applyCurrentSession(chosen);
         return chosen;
       }
 
       const createdId = await createSession();
-      const created: BuddySessionSummary = {
-        id: createdId,
-        title: "",
-        projectId: null,
-        createdAt: new Date().toISOString(),
-      };
-      applySessions([created]);
+      applySessions([blankSession(createdId, new Date().toISOString())]);
       applyCurrentSession(createdId);
       return createdId;
     })();
@@ -718,15 +590,9 @@ export function useBuddyConversation(
       const read = await getSessions();
 
       // A conversation binned while this read was in flight is still in it — the read is a
-      // moment — so the tombstone wins over the row (see `binnedSessionIdsRef`).
-      const fetched = read.filter((session) => !binnedSessionIdsRef.current.has(session.id));
-
-      // ...and a conversation created while it was in flight is newer than that moment, so it stays
-      // in front rather than being replaced away.
-      const fetchedIds = new Set(fetched.map((session) => session.id));
-      const createdMeanwhile = sessionsRef.current.filter((session) => !fetchedIds.has(session.id));
-
-      const next = [...createdMeanwhile, ...fetched];
+      // moment — so the tombstone wins over the row (see `binnedSessionIdsRef`); and one created
+      // while it was in flight is newer than that moment, so it stays in front.
+      const next = mergeFetchedSessions(read, binnedSessionIdsRef.current, sessionsRef.current);
       applySessions(next);
       return next;
     } catch (e) {
@@ -982,8 +848,8 @@ export function useBuddyConversation(
 
     // An untitled newest conversation is one nobody has written into (the backend titles from the
     // first message), so it is brought back instead of stacking a second empty one.
-    const newest = sessionsRef.current[0];
-    if (newest && newest.id !== currentSessionIdRef.current && newest.title.trim() === "") {
+    const newest = reusableBlankSession(sessionsRef.current, currentSessionIdRef.current);
+    if (newest) {
       await selectSession(newest.id);
       return;
     }
@@ -1009,14 +875,8 @@ export function useBuddyConversation(
         return;
       }
 
-      const created: BuddySessionSummary = {
-        id: createdId,
-        title: "",
-        projectId: null,
-        createdAt: new Date().toISOString(),
-      };
       // Newest first, like the backend's own ordering.
-      applySessions([created, ...sessionsRef.current]);
+      applySessions([blankSession(createdId, new Date().toISOString()), ...sessionsRef.current]);
       applyCurrentSession(createdId);
 
       setMessages([]);
@@ -1162,9 +1022,7 @@ export function useBuddyConversation(
    * generic line.
    */
   const failReply = useCallback((messageId: string, reason: string = REPLY_FAILED) => {
-    setMessages((prev) =>
-      prev.map((message) => (message.id === messageId ? { ...message, error: reason } : message)),
-    );
+    setMessages((prev) => setError(prev, messageId, reason));
   }, []);
 
   /**
@@ -1208,21 +1066,13 @@ export function useBuddyConversation(
        * it stopped.
        */
       let timedOut = false;
-      let watchdogId: ReturnType<typeof setTimeout> | null = null;
-      const clearWatchdog = () => {
-        if (watchdogId !== null) {
-          clearTimeout(watchdogId);
-          watchdogId = null;
-        }
-      };
-      const armWatchdog = () => {
-        clearWatchdog();
-        watchdogId = setTimeout(() => {
-          timedOut = true;
-          console.error(`Buddy stream timed out (no events for ${STREAM_TIMEOUT_MS}ms)`);
-          controller.abort();
-        }, STREAM_TIMEOUT_MS);
-      };
+      const watchdog = createWatchdog(STREAM_TIMEOUT_MS, () => {
+        timedOut = true;
+        console.error(`Buddy stream timed out (no events for ${STREAM_TIMEOUT_MS}ms)`);
+        controller.abort();
+      });
+      const armWatchdog = watchdog.arm;
+      const clearWatchdog = watchdog.clear;
 
       /**
        * Words and thoughts held back until the next frame.
@@ -1233,38 +1083,14 @@ export function useBuddyConversation(
        * turn that ends flushes synchronously, so nothing it received is lost to a frame that
        * never came.
        */
-      const draft: { content: string; reasoning: string; rafId: number | null } = {
-        content: "",
-        reasoning: "",
-        rafId: null,
-      };
+      const draft = createDraftBuffer((chunk) =>
+        setMessages((prev) => appendChunk(prev, assistantId, chunk)),
+      );
       // Whether any of the answer's words have reached state yet. The first one is written at
       // once, so the typing row never gives way to an empty bubble for a frame.
       let contentShown = false;
-      const flushDraft = () => {
-        if (draft.rafId !== null) {
-          cancelAnimationFrame(draft.rafId);
-          draft.rafId = null;
-        }
-        if (!draft.content && !draft.reasoning) return;
-        const { content, reasoning } = draft;
-        draft.content = "";
-        draft.reasoning = "";
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? {
-                  ...m,
-                  content: m.content + content,
-                  ...(reasoning ? { reasoning: (m.reasoning ?? "") + reasoning } : {}),
-                }
-              : m,
-          ),
-        );
-      };
-      const scheduleFlush = () => {
-        if (draft.rafId === null) draft.rafId = requestAnimationFrame(flushDraft);
-      };
+      const flushDraft = draft.flush;
+      const scheduleFlush = draft.schedule;
 
       // The hire's surface must name the conversation it speaks into. The composer is live
       // from the first paint, so a send can beat the opening read; resolution is shared and
@@ -1304,7 +1130,7 @@ export function useBuddyConversation(
         citations: [],
       };
 
-      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      setMessages((prev) => withTurn(prev, userMessage, assistantMessage));
       setIsThinking(true);
 
       /**
@@ -1363,9 +1189,7 @@ export function useBuddyConversation(
         setIsStreaming(false);
         setIsThinking(false);
         setActiveTool(null);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, stopped: true } : m)),
-        );
+        setMessages((prev) => markMessageStopped(prev, assistantId));
         refreshTitleIfUntitled();
       };
 
@@ -1393,7 +1217,7 @@ export function useBuddyConversation(
               armWatchdog();
               setActiveTool(name);
               touched.any = true;
-              if (BUDDY_BOARD_TOOLS.has(name)) touched.board = true;
+              if (placesOnBoard(name)) touched.board = true;
             },
 
             onReasoning: (reasoningText) => {
@@ -1403,7 +1227,7 @@ export function useBuddyConversation(
               // the turn counts as streaming, so the panel follows it from the first thought (see
               // `BuddyThread`).
               setIsStreaming(true);
-              draft.reasoning += reasoningText;
+              draft.addReasoning(reasoningText);
               scheduleFlush();
             },
 
@@ -1413,7 +1237,7 @@ export function useBuddyConversation(
               setIsThinking(false);
               setActiveTool(null);
 
-              draft.content += token;
+              draft.addContent(token);
               if (contentShown) {
                 scheduleFlush();
               } else {
@@ -1426,24 +1250,16 @@ export function useBuddyConversation(
               armWatchdog();
               // The backend is asking again and the streamed words will not be part of the answer;
               // thoughts and citations stay, and the typing row takes the reply's place.
-              draft.content = "";
+              draft.discardContent();
               flushDraft();
               contentShown = false;
               setIsThinking(true);
-              setMessages((prev) =>
-                prev.map((m) => (m.id === assistantId ? { ...m, content: "" } : m)),
-              );
+              setMessages((prev) => clearContent(prev, assistantId));
             },
 
             onCitation: (citation) => {
               armWatchdog();
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId
-                    ? { ...m, citations: [...(m.citations ?? []), citation] }
-                    : m,
-                ),
-              );
+              setMessages((prev) => addCitation(prev, assistantId, citation));
             },
 
             onActionProposal: (proposal) => {
@@ -1452,40 +1268,7 @@ export function useBuddyConversation(
               // recorded and attached to the reply once that exists, with the confirm payloads the
               // buddy proposed.
               setActiveTool(null);
-              proposed.push({
-                id: crypto.randomUUID(),
-                action: proposal.action,
-                label: proposal.label,
-                question: proposal.question,
-                taskId: proposal.taskId,
-                title: proposal.title,
-                attesterId: proposal.attesterId,
-                githubLogin: proposal.githubLogin,
-                competencyKey: proposal.competencyKey,
-                level: proposal.level,
-                checklistTitle: proposal.checklistTitle,
-                checklistItems: proposal.checklistItems,
-                cardId: proposal.cardId,
-                noteText: proposal.noteText,
-                lineBefore: proposal.lineBefore,
-                lineAfter: proposal.lineAfter,
-                stepId: proposal.stepId,
-                questionId: proposal.questionId,
-                phaseId: proposal.phaseId,
-                onboardingTaskId: proposal.onboardingTaskId,
-                answer: proposal.answer,
-                optionIds: proposal.optionIds,
-                description: proposal.description,
-                reason: proposal.reason,
-                waitsOnIds: proposal.waitsOnIds,
-                unlocksIds: proposal.unlocksIds,
-                linkUrl: proposal.linkUrl,
-                linkLabel: proposal.linkLabel,
-                cardIds: proposal.cardIds,
-                cardNames: proposal.cardNames,
-                preview: proposal.preview,
-                status: "idle",
-              });
+              proposed.push(hireProposal(crypto.randomUUID(), proposal));
             },
 
             onStoredProposal: (proposal) => {
@@ -1493,14 +1276,7 @@ export function useBuddyConversation(
               // A team-mode offer: stored server-side, confirmed by id. Recorded the same way —
               // held back until the reply exists, so the card never lands above an empty bubble.
               setActiveTool(null);
-              proposed.push({
-                id: crypto.randomUUID(),
-                proposalId: proposal.proposalId,
-                label: proposal.label,
-                preview: proposal.preview,
-                risk: proposal.risk,
-                status: "idle",
-              });
+              proposed.push(storedProposal(crypto.randomUUID(), proposal));
             },
 
             onDone: () => {
@@ -1513,13 +1289,7 @@ export function useBuddyConversation(
               setActiveTool(null);
 
               if (proposed.length > 0) {
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId
-                      ? { ...m, actions: [...(m.actions ?? []), ...proposed] }
-                      : m,
-                  ),
-                );
+                setMessages((prev) => addActions(prev, assistantId, proposed));
               }
 
               refreshTitleIfUntitled();
@@ -1723,13 +1493,7 @@ export function useBuddyConversation(
 
   /** Patches one proposed action in place, keyed by its message and action id. */
   const patchAction = useCallback((messageId: string, actionId: string, patch: ActionPatch) => {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId
-          ? { ...m, actions: m.actions?.map((a) => (a.id === actionId ? { ...a, ...patch } : a)) }
-          : m,
-      ),
-    );
+    setMessages((prev) => patchActionIn(prev, messageId, actionId, patch));
   }, []);
 
   // The proposal currently on its way to the backend, per message and action id: two clicks inside
@@ -1786,9 +1550,7 @@ export function useBuddyConversation(
       // Retryable after a transport error or a hire offer's legible "couldn't"; a stored team
       // proposal that resolved is spent, because confirming a success twice claims the same task
       // twice.
-      const isRetryableRefusal =
-        action.status === "resolved" && action.ok === false && !("proposalId" in action);
-      if (action.status !== "idle" && action.status !== "error" && !isRetryableRefusal) return;
+      if (!mayConfirm(action)) return;
 
       // One lock per proposal card, shared by confirm and dismiss, so the slower response cannot
       // overwrite the faster one.
@@ -1802,37 +1564,9 @@ export function useBuddyConversation(
       // void callback (no Promise handed to a JSX prop).
       void (async () => {
         try {
-          const result =
-            "proposalId" in action
-              ? await confirmStoredProposal(action.proposalId)
-              : await performAction(action.action, {
-                  question: action.question,
-                  taskId: action.taskId,
-                  title: action.title,
-                  attesterId: action.attesterId,
-                  githubLogin: action.githubLogin,
-                  competencyKey: action.competencyKey,
-                  level: action.level,
-                  checklistTitle: action.checklistTitle,
-                  checklistItems: action.checklistItems,
-                  cardId: action.cardId,
-                  noteText: action.noteText,
-                  lineBefore: action.lineBefore,
-                  lineAfter: action.lineAfter,
-                  stepId: action.stepId,
-                  questionId: action.questionId,
-                  phaseId: action.phaseId,
-                  onboardingTaskId: action.onboardingTaskId,
-                  answer: action.answer,
-                  optionIds: action.optionIds,
-                  description: action.description,
-                  reason: action.reason,
-                  waitsOnIds: action.waitsOnIds,
-                  unlocksIds: action.unlocksIds,
-                  linkUrl: action.linkUrl,
-                  linkLabel: action.linkLabel,
-                  cardIds: action.cardIds,
-                });
+          const result = isStored(action)
+            ? await confirmStoredProposal(action.proposalId)
+            : await performAction(action.action, actionExtras(action));
           patchAction(messageId, action.id, {
             status: "resolved",
             ok: result.ok,
@@ -1843,14 +1577,14 @@ export function useBuddyConversation(
           if (result.ok) clearActionDraft(actionDraftKey(messageId, action.id));
           // A path action just moved something on a page that may be open behind this dock. Told
           // rather than polled, and only on success: a refused confirm changed nothing to refresh.
-          if (result.ok && "action" in action && BUDDY_PATH_ACTIONS.includes(action.action)) {
+          if (result.ok && movesPath(action)) {
             announceBuddyPathChanged();
           }
 
           // `board.all()`, not a project key: the backend re-resolves the project server-side
           // (the caller's single onboarding project) and never tells the client which board —
           // see `useInvalidateBoard`.
-          if (result.ok && "action" in action && BUDDY_BOARD_ACTIONS.has(action.action)) {
+          if (result.ok && touchesBoard(action)) {
             invalidateBoard();
           }
         } catch (e) {
@@ -1896,7 +1630,7 @@ export function useBuddyConversation(
 
       // A hire offer, or one that arrived without its details: nothing to decline at the backend,
       // but still worth putting away here.
-      if (!("proposalId" in action)) {
+      if (!isStored(action)) {
         patchAction(messageId, actionId, { status: "dismissed" });
         // A hire offer is the only kind that carries a draft, and this is the one place one is
         // declined — the wording goes with the offer it belonged to.
@@ -1904,7 +1638,7 @@ export function useBuddyConversation(
         return;
       }
 
-      if (action.status !== "idle" && action.status !== "error") return;
+      if (!mayDismissStored(action)) return;
 
       // The confirm's lock, shared: one question, one in-flight decision.
       const flightKey = `${messageId}:${actionId}`;

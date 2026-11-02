@@ -897,7 +897,7 @@
   },
   "src/features/buddy/hooks/useBuddyConversation.ts": {
     "complexity": {
-      "count": 4
+      "count": 3
     },
     "max-depth": {
       "count": 1
@@ -906,7 +906,7 @@
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 3
+      "count": 2
     }
   },
   "src/features/buddy/hooks/useGreetingReveal.ts": {
