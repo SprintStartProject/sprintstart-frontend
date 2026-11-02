@@ -30,11 +30,10 @@ import { PhaseItemList } from "../features/onboarding/components/journey/PhaseIt
 import { PhaseNavigator } from "../features/onboarding/components/journey/PhaseNavigator";
 import { QuestionWorkspace } from "../features/onboarding/components/journey/QuestionWorkspace";
 import { StepWorkspace } from "../features/onboarding/components/journey/StepWorkspace";
-import {
-  useOnboardingJourney,
-  type GenerationPhaseProgress,
-} from "../features/onboarding/generation/OnboardingJourneyContext";
+import { useOnboardingJourney } from "../features/onboarding/generation/OnboardingJourneyContext";
 import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
+import { useGenerationScreen } from "../features/onboarding/hooks/useGenerationScreen";
+import { useJourneyView, type ViewMode } from "../features/onboarding/hooks/useJourneyView";
 import { usePathLoading } from "../features/onboarding/hooks/usePathLoading";
 import { useGenerationFollowUp } from "../features/onboarding/hooks/useGenerationFollowUp";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
@@ -73,13 +72,7 @@ import {
   withSkipAnswerSeen,
   withSkipAnswerUnseen,
 } from "../features/onboarding/skipAnswers";
-import {
-  hireJourneyViewKey,
-  readJourneyView,
-  writeJourneyView,
-} from "../features/onboarding/journeyViewMemory";
-
-type ViewMode = "list" | "graph";
+import { hireJourneyViewKey } from "../features/onboarding/journeyViewMemory";
 
 /** How a step came to be opened: by its address, or by the member on the page. */
 type StartOptions = { byAddress?: boolean };
@@ -170,40 +163,9 @@ export function OnBoardingPage() {
   // A phase picked from the chooser before anything in it was started -- until then nothing else
   // says that this is where the hire wants to be.
   const [chosenPhaseId, setChosenPhaseId] = useState<string | null>(null);
-  // Where the member left the page last time: list or graph, and the phase the graph was zoomed into.
-  // A link to a step always opens the list, since that is where the step unfolds.
-  // Arriving for a particular step, question or phase choice opens the list: that is where each of
-  // them unfolds, whichever view was used last.
-  const [viewMode, setViewMode] = useState<ViewMode>(() =>
-    routeStepId || navigationState?.focusQuestionId || navigationState?.choosePhase
-      ? "list"
-      : viewKey
-        ? readJourneyView(viewKey).mode
-        : "graph",
-  );
-  const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
-    // A phase arrived at by name opens *inside* itself on the graph, the same way it opens selected
-    // in the list — the two views' idea of "here" has to be the one place the member was sent.
-    () => openPhaseId ?? (viewKey ? readJourneyView(viewKey).graphPhaseId : null),
-  );
   // The item unfolded in the list, and the one zoomed into on the graph.
   const [expandedItemId, setExpandedItemId] = useState<string | null>(focusItemId ?? null);
   const [graphItemId, setGraphItemId] = useState<string | null>(null);
-  /**
-   * Whether the list is on screen because this visit arrived for a step, a question or the phase
-   * chooser, rather than because the member wanted it.
-   *
-   * Without the distinction, one click on the dashboard's next-step card wrote "list" over a
-   * member's remembered graph -- for good, and again every time they used that card. Choosing a
-   * view clears it, and only then is the choice remembered.
-   */
-  const arrivedInForcedList = useRef(
-    Boolean(routeStepId || navigationState?.focusQuestionId || navigationState?.choosePhase),
-  );
-  const chooseViewMode = useCallback((mode: ViewMode) => {
-    arrivedInForcedList.current = false;
-    setViewMode(mode);
-  }, []);
   const chooserScrollTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(chooserScrollTimer.current), []);
   /** Brings the phase chooser into view, once the panel holding it has slid in. */
@@ -217,46 +179,11 @@ export function OnBoardingPage() {
       SLIDING_PANEL_EXIT_MS,
     );
   }, []);
-  const [isDinoActiveInGeneration, setIsDinoActiveInGeneration] = useState(false);
-  /**
-   * The last running generation, kept so the generation screen can stay up while the dino game
-   * is still being played after the run has ended (see `isDinoActiveInGeneration`).
-   *
-   * `completed` outlives the `done` status on purpose: the page clears a finished generation as
-   * soon as the new path is fetched, so the status drops to `idle` while the game may still be
-   * open. Without the flag the screen would fall back to the frozen "working" snapshot and stop
-   * saying "Path ready".
-   */
-  const [lastGeneration, setLastGeneration] = useState<{
-    phases: GenerationPhaseProgress[];
-    startedAt: number;
-    completed: boolean;
-  }>(() =>
-    generation.status === "running"
-      ? { phases: generation.phases, startedAt: generation.startedAt, completed: false }
-      : { phases: [], startedAt: 0, completed: false },
-  );
-
-  // Follows the generation during render (React's "adjust state when a value changes" pattern)
-  // rather than in an effect, so the screen never paints one frame with a stale outcome.
-  const [seenGeneration, setSeenGeneration] = useState(generation);
-  if (seenGeneration !== generation) {
-    setSeenGeneration(generation);
-    if (generation.status === "running") {
-      setLastGeneration({
-        phases: generation.phases,
-        startedAt: generation.startedAt,
-        completed: false,
-      });
-    } else if (generation.status === "done") {
-      setLastGeneration((previous) => ({ ...previous, completed: true }));
-    } else if (generation.status === "error") {
-      // Failure wins over the game: the snapshot's phases are still "working", so keeping the
-      // generation screen up for the game would hide the failure behind a wait that is over.
-      // Dropping the flag unmounts the screen, which releases the game's shared slot with it.
-      setIsDinoActiveInGeneration(false);
-    }
-  }
+  const {
+    lastGeneration,
+    isDinoActive: isDinoActiveInGeneration,
+    setIsDinoActive: setIsDinoActiveInGeneration,
+  } = useGenerationScreen(generation);
   // Set when the page itself moves the member on, so the item they land on is scrolled to.
   const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
   // The item a buddy link landed on, for as long as its light plays. `key` changes per arrival, so
@@ -268,6 +195,16 @@ export function OnBoardingPage() {
   usePathRevealMoment(loadingState === "success" ? path : null);
 
   const phases = useMemo(() => (path ? sortedPhases(path) : []), [path]);
+  const { viewMode, chooseViewMode, showListByArrival, setGraphPhaseId, openGraphPhaseId } =
+    useJourneyView({
+      viewKey,
+      arrivedForList: Boolean(
+        routeStepId || navigationState?.focusQuestionId || navigationState?.choosePhase,
+      ),
+      openPhaseId,
+      phases,
+      loadingState,
+    });
 
   /**
    * Everything this visit was sent here for, in one place: a step in the address, a question or
@@ -327,8 +264,7 @@ export function OnBoardingPage() {
     queueMicrotask(() => {
       // The list, whichever view was last used: a step, a question and the chooser all unfold
       // there. Marked as forced, so it is not written back as a preference the member chose.
-      arrivedInForcedList.current = true;
-      setViewMode("list");
+      showListByArrival();
 
       if (arrival.kind === "choose") {
         setExpandedItemId(null);
@@ -397,7 +333,17 @@ export function OnBoardingPage() {
       const item = phaseItems(owningPhase).find((candidate) => candidate.id === arrival.id);
       if (item) startStepRef.current(item, { byAddress: true });
     });
-  }, [arrival, arrivalKey, linkOpensStep, loadingState, navigate, path, setSelectedPhaseId, toast]);
+  }, [
+    arrival,
+    arrivalKey,
+    linkOpensStep,
+    loadingState,
+    navigate,
+    path,
+    setSelectedPhaseId,
+    showListByArrival,
+    toast,
+  ]);
 
   useEffect(() => {
     clearLinkRef.current = () =>
@@ -441,13 +387,6 @@ export function OnBoardingPage() {
       .querySelector(`[data-item-id="${target}"]`)
       ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }, [expandedItemId, loadingState, selectedPhaseId]);
-
-  // A remembered phase that is not in this path (a rebuilt path, another project) opens the map.
-  const openGraphPhaseId = phases.some((phase) => phase.id === graphPhaseId) ? graphPhaseId : null;
-  useEffect(() => {
-    if (loadingState !== "success" || arrivedInForcedList.current || !viewKey) return;
-    writeJourneyView(viewKey, { mode: viewMode, graphPhaseId: openGraphPhaseId });
-  }, [loadingState, openGraphPhaseId, viewKey, viewMode]);
 
   const swipeRef = useSwipeableTabs<ViewMode, HTMLDivElement>({
     order: VIEW_ORDER,
