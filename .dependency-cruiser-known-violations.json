@@ -4942,39 +4942,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/useProjectInsights.ts",
-    "to": "src/features/data-ingestion/types.ts",
-    "unresolvedTo": "../data-ingestion/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/services/arrivalService.ts",
     "to": "src/features/arrival/types.ts",
     "unresolvedTo": "../features/arrival/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-stay-below-the-ui"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/services/attestationService.ts",
-    "to": "src/features/attestation/types.ts",
-    "unresolvedTo": "../features/attestation/types",
     "dependencyTypes": [
       "local",
       "type-only",

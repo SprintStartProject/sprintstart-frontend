@@ -2,8 +2,9 @@ import type { Dispatch, SetStateAction } from "react";
 import { binSession as binSessionApi, createSession } from "../../../services/buddyService";
 import type { BuddySessionSummary } from "../../../services/buddyService";
 import { clearDraft } from "../buddyDraftStorage";
+import { reportOpenFailure } from "./openFailure";
 import type { OpeningLatches } from "./openingLatches";
-import { BIN_MOVE_FAILED, CONVERSATION_FAILED, HISTORY_FAILED, isNotFound } from "./replyMessages";
+import { BIN_MOVE_FAILED, CONVERSATION_FAILED, isNotFound } from "./replyMessages";
 import { blankSession, reusableBlankSession } from "./sessionRules";
 import type { TurnTracker } from "./turnTracker";
 
@@ -57,9 +58,7 @@ async function switchTo(env: MoveEnv, sessionId: string): Promise<void> {
     console.error(e);
     // Release the latch so the banner's "Try again" can re-run the read for this conversation.
     env.latches.releaseLoad();
-    // This failure owns the banner: a retry must redo this read, not a stale move.
-    env.latches.setRetryMove(null);
-    env.setOpenError(HISTORY_FAILED);
+    reportOpenFailure(env.latches, env.setOpenError);
   } finally {
     env.latches.setBusy(false);
   }
