@@ -23,7 +23,7 @@ export function useBuddyRail(): BuddyRail {
   const [rail, setRail] = useState(() => ({ open: (readRailOpen() ?? false) && isDesktop }));
 
   // The same rule the initial state applies, for the window narrowing after load. Not through
-  // `setOpen`: this is the column no longer fitting, not the hire choosing, so it neither writes the
+  // `setOpen`: this is the column failing to fit, not the hire choosing, so it neither writes the
   // preference through nor counts as having decided.
   useRailOverlayGuard(!isDesktop, () =>
     setRail((current) => (current.open ? { ...current, open: false } : current)),
