@@ -18,10 +18,7 @@ import type {
   BlueprintQuestion,
   BlueprintStep,
 } from "./types.ts";
-import type {
-  BlueprintQuestionMetadata,
-  BlueprintStepMetadata,
-} from "./components/BlueprintSubGraphEditor.tsx";
+import type { BlueprintQuestionMetadata, BlueprintStepMetadata } from "./subgraph/metadata.ts";
 
 /** The fixed phase whose own graph is open, and the thin nodes it is drawn from. */
 export function useSubGraphState(context: PathPageContext) {
