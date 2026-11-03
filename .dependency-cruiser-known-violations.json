@@ -4914,9 +4914,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/RoleManagementTab.tsx",
+    "from": "src/features/team-management/pmKit.ts",
     "to": "src/features/pm-area/components/PmListToolbar.tsx",
-    "unresolvedTo": "../../pm-area/components/PmListToolbar",
+    "unresolvedTo": "../pm-area/components/PmListToolbar.tsx",
     "dependencyTypes": [
       "local",
       "import"
@@ -4928,9 +4928,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/RoleManagementTab.tsx",
+    "from": "src/features/team-management/pmKit.ts",
     "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
+    "unresolvedTo": "../projects/useProjectContext.ts",
     "dependencyTypes": [
       "local",
       "import"

@@ -2037,13 +2037,10 @@
   },
   "src/features/team-management/components/RoleManagementTab.tsx": {
     "complexity": {
-      "count": 4
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/features/team-management/components/RoleRow.tsx": {
