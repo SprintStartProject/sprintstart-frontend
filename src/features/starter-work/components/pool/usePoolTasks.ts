@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "../../../../services/queryKeys";
 import { starterWorkService } from "../../../../services/starterWorkService";
-import { useProjectContext } from "../../../projects/useProjectContext";
 import type { StarterWorkTask } from "../../types";
 import {
   applyStatusFilter,
@@ -19,8 +18,7 @@ import {
  * Which repos/Jira projects belong to the selected project's corpus — the same project-scoped query
  * `CorpusIssueBrowser` fetches, so an already-open browser costs this nothing extra.
  */
-export function useProjectGroupKeys(): ReadonlySet<string> {
-  const { selectedProjectId } = useProjectContext();
+export function useProjectGroupKeys(selectedProjectId: string): ReadonlySet<string> {
   const { data: candidates } = useQuery({
     queryKey: queryKeys.starterWork.corpusIssues(selectedProjectId),
     queryFn: () => starterWorkService.fetchCandidates(selectedProjectId),

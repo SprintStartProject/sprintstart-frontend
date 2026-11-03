@@ -3,7 +3,7 @@
 export const CLOUD_PAGE_SIZE = 12;
 export const LIST_PAGE_SIZE = 10;
 
-/** The cloud is always four columns of three — used to know which slots sit in the same column. */
+/** The cloud is always four columns of three, which tells which slots sit in the same column. */
 const CLOUD_GRID_COLUMNS = 4;
 export const CLOUD_GRID_ROWS = CLOUD_PAGE_SIZE / CLOUD_GRID_COLUMNS;
 

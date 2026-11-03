@@ -51,12 +51,12 @@ export function StarterWorkPoolCloud({
   closedTasks = [],
   isClosedLoading = false,
 }: StarterWorkPoolCloudProps) {
-  const { selectedProject } = useProjectContext();
+  const { selectedProjectId, selectedProject } = useProjectContext();
   const { error: showErrorToast } = useToast();
   const showLoadingSkeleton = useDelayedFlag(isLoading);
   const showClosedLoadingSkeleton = useDelayedFlag(isClosedLoading);
   const controls = usePoolControls();
-  const projectGroupKeys = useProjectGroupKeys();
+  const projectGroupKeys = useProjectGroupKeys(selectedProjectId);
   const { lastCheckedAt, statusCounts, filteredTasks } = usePoolTasks({
     tasks,
     closedTasks,
