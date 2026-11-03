@@ -2139,17 +2139,6 @@
       "count": 2
     }
   },
-  "src/pages/AdminPage.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/pages/BlueprintPathDetailPage.tsx": {
     "complexity": {
       "count": 1
