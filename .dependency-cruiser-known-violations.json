@@ -4856,9 +4856,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/StepDetailsPanel.tsx",
+    "from": "src/features/team-management/components/detail/stepPanel/stepPanelKit.ts",
     "to": "src/features/onboarding/journey.ts",
-    "unresolvedTo": "../../../onboarding/journey",
+    "unresolvedTo": "../../../../onboarding/journey",
     "dependencyTypes": [
       "local",
       "import"
@@ -4870,9 +4870,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/StepDetailsPanel.tsx",
+    "from": "src/features/team-management/components/detail/stepPanel/stepPanelKit.ts",
     "to": "src/features/onboarding/types.ts",
-    "unresolvedTo": "../../../onboarding/types",
+    "unresolvedTo": "../../../../onboarding/types",
     "dependencyTypes": [
       "local",
       "type-only",
