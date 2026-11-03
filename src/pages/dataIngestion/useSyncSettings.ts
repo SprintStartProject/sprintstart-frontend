@@ -80,5 +80,3 @@ export function useSyncSettings({ sources, projectId, refresh }: Args) {
     },
   };
 }
-
-export type SyncSettings = ReturnType<typeof useSyncSettings>;

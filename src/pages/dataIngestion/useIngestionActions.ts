@@ -73,5 +73,3 @@ export function useIngestionActions({ feed, selection, showSection, reloadProjec
     },
   };
 }
-
-export type IngestionActions = ReturnType<typeof useIngestionActions>;

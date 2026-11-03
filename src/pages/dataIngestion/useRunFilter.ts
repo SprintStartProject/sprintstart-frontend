@@ -46,8 +46,6 @@ export function useRunFilter(selectedProjectId: string) {
   };
 }
 
-export type RunFilter = ReturnType<typeof useRunFilter>;
-
 /**
  * The viewed page can fall out of range while the view is open (a filter narrowing the result
  * set, runs being removed). Steps back to the last page instead of showing an empty table; this
