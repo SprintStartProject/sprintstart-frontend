@@ -1627,20 +1627,6 @@
       "count": 2
     }
   },
-  "src/features/onboarding/graph/JourneyCanvas.tsx": {
-    "complexity": {
-      "count": 9
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "max-params": {
-      "count": 1
-    }
-  },
   "src/features/onboarding/graph/JourneyNodeCards.tsx": {
     "complexity": {
       "count": 4
