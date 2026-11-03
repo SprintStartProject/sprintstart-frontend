@@ -2357,10 +2357,5 @@
     "max-depth": {
       "count": 3
     }
-  },
-  "src/services/teamManagementService.ts": {
-    "max-lines": {
-      "count": 1
-    }
   }
 }

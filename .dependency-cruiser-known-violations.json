@@ -5423,9 +5423,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/teamManagementService.ts",
+    "from": "src/services/team/featureTypes.ts",
     "to": "src/features/onboarding/types.ts",
-    "unresolvedTo": "../features/onboarding/types",
+    "unresolvedTo": "../../features/onboarding/types.ts",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -5438,9 +5438,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/teamManagementService.ts",
+    "from": "src/services/team/featureTypes.ts",
     "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../features/team-management/types",
+    "unresolvedTo": "../../features/team-management/types.ts",
     "dependencyTypes": [
       "local",
       "type-only",
