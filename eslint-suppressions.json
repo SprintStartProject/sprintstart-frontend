@@ -459,14 +459,8 @@
     }
   },
   "src/features/blueprints/components/BlueprintSubGraphEditor.tsx": {
-    "complexity": {
-      "count": 3
-    },
-    "max-lines": {
-      "count": 1
-    },
     "max-lines-per-function": {
-      "count": 5
+      "count": 1
     }
   },
   "src/features/blueprints/components/PhasePrerequisites.tsx": {
