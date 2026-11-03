@@ -2215,20 +2215,6 @@
       "count": 1
     }
   },
-  "src/pages/TeamMemberDetailPage.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    },
-    "max-params": {
-      "count": 1
-    }
-  },
   "src/router/AppRouter.tsx": {
     "max-lines-per-function": {
       "count": 1
