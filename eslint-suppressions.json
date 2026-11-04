@@ -1121,9 +1121,6 @@
   },
   "src/features/data-ingestion/components/SyncScheduleSettings.tsx": {
     "complexity": {
-      "count": 2
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
