@@ -11,6 +11,7 @@ import type { KnowledgeTab } from "../tabs.ts";
 import type { ArtifactSort, SourceSystem, UploadFormat } from "../../../services/knowledgeTypes.ts";
 import { hasRepositoryFacet } from "../../data-ingestion/connectors/registry.ts";
 import { normalizeDateRange, type DateRange } from "../dateRange.ts";
+import { KB_URL_PARAM, toKnowledgeBaseSearchString } from "../../../router/knowledgeBaseUrl.ts";
 
 /** Page size used when the URL names none. Mirrors the backend's list default. */
 export const DEFAULT_PAGE_SIZE = 20;
@@ -28,25 +29,6 @@ export const MAX_PAGE_SIZE = 100;
  * is shown as an extra option, so the control never lies about the current size.
  */
 export const PAGE_SIZE_OPTIONS: readonly number[] = [DEFAULT_PAGE_SIZE, 50, MAX_PAGE_SIZE];
-
-/**
- * Query-string keys the Knowledge Base page owns. Short, human-readable names, because these
- * URLs are meant to be pasted into chats and tickets.
- */
-export const KB_URL_PARAM = {
-  tab: "tab",
-  search: "q",
-  sources: "sources",
-  repositories: "repos",
-  format: "format",
-  languages: "languages",
-  page: "page",
-  size: "size",
-  sort: "sort",
-  from: "from",
-  to: "to",
-  artifact: "artifact",
-} as const;
 
 /**
  * The params that describe *one project's* corpus. A project switch drops them: a repository or
@@ -219,16 +201,6 @@ export function parseKnowledgeBaseSearch(params: URLSearchParams): KnowledgeBase
     dateRange,
     artifactId: params.get(KB_URL_PARAM.artifact) || null,
   };
-}
-
-/**
- * Serialises params back into a `location.search` string (`""` when empty). Commas and slashes
- * are left readable — `?sources=GITHUB,JIRA&repos=acme/api` rather than `%2C`/`%2F` — both are
- * legal in a query string and `URLSearchParams` reads them back unchanged.
- */
-export function toKnowledgeBaseSearchString(params: URLSearchParams): string {
-  const query = params.toString().replace(/%2C/gi, ",").replace(/%2F/gi, "/");
-  return query ? `?${query}` : "";
 }
 
 /** Writes a set-valued param as one comma-separated value, or removes it when empty. */
