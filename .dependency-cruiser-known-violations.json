@@ -475,9 +475,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/ProjectDetailsDrawer.tsx",
+    "from": "src/features/admin/components/projectDrawer/projectsKit.ts",
     "to": "src/features/projects/components/ProjectMonogram.tsx",
-    "unresolvedTo": "../../projects/components/ProjectMonogram",
+    "unresolvedTo": "../../../projects/components/ProjectMonogram",
     "dependencyTypes": [
       "local",
       "import"
@@ -489,9 +489,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/ProjectDetailsDrawer.tsx",
+    "from": "src/features/admin/components/projectDrawer/projectsKit.ts",
     "to": "src/features/projects/industry/ProjectIndustryPanel.tsx",
-    "unresolvedTo": "../../projects/industry/ProjectIndustryPanel",
+    "unresolvedTo": "../../../projects/industry/ProjectIndustryPanel",
     "dependencyTypes": [
       "local",
       "import"
