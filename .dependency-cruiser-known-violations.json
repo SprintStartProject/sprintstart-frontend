@@ -405,9 +405,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/CreateProjectWizard.tsx",
+    "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/AddSourceFlow.tsx",
-    "unresolvedTo": "../../data-ingestion/add-source/AddSourceFlow",
+    "unresolvedTo": "../../../data-ingestion/add-source/AddSourceFlow",
     "dependencyTypes": [
       "local",
       "import"
@@ -419,9 +419,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/CreateProjectWizard.tsx",
+    "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/CredentialSlot.tsx",
-    "unresolvedTo": "../../data-ingestion/add-source/CredentialSlot",
+    "unresolvedTo": "../../../data-ingestion/add-source/CredentialSlot",
     "dependencyTypes": [
       "local",
       "import"
@@ -433,9 +433,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/CreateProjectWizard.tsx",
+    "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/projectSourcesDraft.ts",
-    "unresolvedTo": "../../data-ingestion/add-source/projectSourcesDraft",
+    "unresolvedTo": "../../../data-ingestion/add-source/projectSourcesDraft",
     "dependencyTypes": [
       "local",
       "import"
@@ -447,9 +447,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/CreateProjectWizard.tsx",
+    "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/sourceOwners.ts",
-    "unresolvedTo": "../../data-ingestion/add-source/sourceOwners",
+    "unresolvedTo": "../../../data-ingestion/add-source/sourceOwners",
     "dependencyTypes": [
       "local",
       "import"
@@ -461,9 +461,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/CreateProjectWizard.tsx",
+    "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/useSourceDraftForm.ts",
-    "unresolvedTo": "../../data-ingestion/add-source/useSourceDraftForm",
+    "unresolvedTo": "../../../data-ingestion/add-source/useSourceDraftForm",
     "dependencyTypes": [
       "local",
       "import"
