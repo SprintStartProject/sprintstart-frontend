@@ -36,7 +36,7 @@
  * which page (`pageTitleFor` in `selectionCapture.ts`), and either on its own can send the search after the wrong thing. `origin` stays out.
  */
 
-import type { CapturedSelection } from "../board/selection/selectionCapture";
+import type { CapturedSelection } from "../board";
 
 /**
  * How much of a selection is carried into the composer.

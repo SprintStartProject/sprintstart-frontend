@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { GitBranch, NotebookText, Ticket } from "lucide-react";
-import { useGithubTokens } from "../settings/hooks/useGithubTokens";
-import { useAtlassianCredentials } from "../settings/hooks/useAtlassianCredentials";
-import { useNotionCredentials } from "../settings/hooks/useNotionCredentials";
-import { TokenAddForm } from "../settings/components/TokenAddForm";
+import { useGithubTokens } from "../settings";
+import { useAtlassianCredentials } from "../settings";
+import { useNotionCredentials } from "../settings";
+import { TokenAddForm } from "../settings";
 import {
   GithubTokenRow,
   AtlassianAccessAddForm,

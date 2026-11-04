@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { matchEggPhrase } from "../easter-eggs/lib/eggPhrases";
-import { playEggEffect } from "../easter-eggs/eggEffectBus";
+import { matchEggPhrase } from "../easter-eggs";
+import { playEggEffect } from "../easter-eggs";
 import { BuddyDraftActionsContext, BuddyDraftContext } from "./buddyDraftContext";
 import type { BuddyDraft, BuddyDraftActions } from "./buddyDraftContext";
 import { useBuddySession } from "./buddySessionContext";

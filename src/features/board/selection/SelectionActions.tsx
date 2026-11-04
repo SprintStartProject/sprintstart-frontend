@@ -11,9 +11,9 @@ import { rememberOrigin } from "../layout/cardOrigins";
 import { withOnboardingPlace } from "../layout/onboardingOrigin";
 import { useCardMarks } from "../marks/useCardMarks";
 import { DEFAULT_HIGHLIGHT } from "../marks/highlightColors";
-import { openAiBuddy } from "../../buddy/aiBuddyBus";
-import { quoteFromSelection } from "../../buddy/quoteFromSelection";
-import { formatMarkdownQuote } from "../../buddy/utils/quoteFormat";
+import { openAiBuddy } from "../../buddy";
+import { quoteFromSelection } from "../../buddy";
+import { formatMarkdownQuote } from "../../buddy";
 import { cardFor } from "./selectionCapture";
 import { useTextSelection } from "./useTextSelection";
 

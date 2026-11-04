@@ -1,7 +1,7 @@
 import { Check, ExternalLink } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
-import { Marked } from "../../board/components/Marked";
-import type { CardMark } from "../../board/marks/cardMarks";
+import { Marked } from "../../board";
+import type { CardMark } from "../../board";
 import { groupByScope } from "../scopeGroups";
 import { safeStepHref } from "../stepHref";
 import type { ArrivalStep } from "../types";

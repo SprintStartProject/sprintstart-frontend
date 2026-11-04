@@ -27,9 +27,9 @@ import { KnowledgeBaseLinkCard } from "./KnowledgeBaseLinkCard.tsx";
 import { SyncScheduleSettings } from "./SyncScheduleSettings.tsx";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
-import { DinoGameLazy } from "../../easter-eggs/components/DinoGameLazy.tsx";
-import { DinoPlayHint } from "../../easter-eggs/components/DinoPlayHint.tsx";
-import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame.ts";
+import { DinoGameLazy } from "../../easter-eggs";
+import { DinoPlayHint } from "../../easter-eggs";
+import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs";
 
 type SourceDetailsPanelProps = {
   source: DataSource;

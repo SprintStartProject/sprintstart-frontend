@@ -1,5 +1,5 @@
-import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
-import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
+import { useInvalidateBoard } from "../../board";
+import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs";
 import type { ProjectSelectionSlice } from "../conversation/projectSelection";
 import { buddySessionApi } from "./buddySessionApi";
 import { useComposerFlow } from "./useComposerFlow";

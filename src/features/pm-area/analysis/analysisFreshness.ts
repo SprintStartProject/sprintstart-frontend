@@ -1,4 +1,4 @@
-import type { KnowledgeGapOverview } from "../../knowledge-gaps/types";
+import type { KnowledgeGapOverview } from "../../knowledge-gaps";
 
 /**
  * Whether the knowledge gaps already reflect the newest import.

@@ -1,8 +1,8 @@
 import { ExternalLink, GitPullRequest } from "lucide-react";
-import { formatDuration } from "../../onboarding-metrics/format";
+import { formatDuration } from "../../onboarding-metrics";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../buddy";
 import type { BoardCard, OpenPullRequestsContent } from "../types";
 
 type OpenPullRequestsCardProps = {

@@ -4,7 +4,7 @@ import { arrivalService } from "../../../services/arrivalService";
 import { Spinner } from "../../../components/ui/Spinner";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { useCardMarks } from "../marks/useCardMarks";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../buddy";
 import { ArrivalStepList } from "../../arrival/components/ArrivalStepList";
 import { summarise } from "../../arrival/summarise";
 import type { ArrivalStep } from "../../arrival/types";

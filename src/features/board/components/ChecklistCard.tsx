@@ -9,7 +9,7 @@ import { useBoardCardControls } from "./boardCardControls";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { CardOriginLink } from "./CardOriginLink";
 import { Marked } from "./Marked";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../buddy";
 import { questionAboutChecklist } from "../generation/cardQuestion";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { CardOrigin } from "../layout/cardOrigins";

@@ -1,7 +1,7 @@
 import { Spinner } from "../../../components/ui/Spinner";
-import { useProfile } from "../../../features/profile/useProfile";
-import { AccountForm } from "../../../features/profile/components/AccountForm";
-import { PasswordForm } from "../../../features/profile/components/PasswordForm";
+import { useProfile } from "../../profile";
+import { AccountForm } from "../../profile";
+import { PasswordForm } from "../../profile";
 
 /**
  * Profile section of the settings page. Reuses the existing account and

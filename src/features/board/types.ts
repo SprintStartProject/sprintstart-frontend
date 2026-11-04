@@ -1,6 +1,6 @@
 import type { ArrivalStep } from "../arrival/types";
 import type { StepStatus } from "../onboarding/types";
-import type { TaskType } from "../starter-work/types";
+import type { TaskType } from "../starter-work";
 
 /**
  * The board: a hire's persistent working surface on one project.

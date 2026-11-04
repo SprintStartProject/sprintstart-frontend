@@ -1,7 +1,7 @@
 import { CircleAlert, Loader2, ScanSearch } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { formatRelativeDate } from "../../knowledge-gaps/format";
+import { formatRelativeDate } from "../../knowledge-gaps";
 import { useProjectContext } from "../../projects";
 import { RingGauge } from "../components/charts/RingGauge";
 import { scoreVerdict } from "./findings";
