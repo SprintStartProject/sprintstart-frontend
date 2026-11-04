@@ -25,17 +25,6 @@
       "count": 1
     }
   },
-  "src/components/layout/SideBar.tsx": {
-    "complexity": {
-      "count": 3
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "src/components/layout/SidebarAccountFlyout.tsx": {
     "max-lines-per-function": {
       "count": 1
