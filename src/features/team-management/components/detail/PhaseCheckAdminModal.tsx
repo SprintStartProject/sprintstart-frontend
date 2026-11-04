@@ -7,7 +7,7 @@ import type {
   QuestionAttemptsReviewEndpoint,
   UpsertQuestion,
   CheckQuestionType,
-} from "../../../onboarding/types";
+} from "../../../onboarding";
 import {
   Loader2,
   AlertCircle,

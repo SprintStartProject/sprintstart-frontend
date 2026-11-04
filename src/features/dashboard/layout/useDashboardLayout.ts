@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useAuth } from "../../../context/useAuth";
 import { useMyKnowledgeGaps } from "../../knowledge-gaps";
-import { useMyOnboardingStatus } from "../../onboarding/hooks/useMyOnboardingStatus";
+import { useMyOnboardingStatus } from "../../onboarding";
 import { useProjectContext } from "../../projects";
 import { DASHBOARD_WIDGET_IDS, getAvailableWidgets } from "./catalog";
 import * as operations from "./layoutOperations";

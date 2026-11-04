@@ -1,5 +1,5 @@
 import { SidePanel } from "../../../../components/ui/SidePanel";
-import { StepOriginBadge } from "../../../onboarding/components/StepOriginBadge";
+import { StepOriginBadge } from "../../../onboarding";
 import type { OnboardingTaskEndpoint } from "./stepPanel/stepPanelKit";
 import type { OnboardingFeedback } from "../../../../services/teamManagementService";
 import type { SkipReviewAction } from "./SkipReview";

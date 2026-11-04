@@ -3,8 +3,8 @@ import { MessageCircle, PartyPopper, X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { useFocusMode } from "../../../context/useFocusMode";
 import { openAiBuddy } from "../../buddy";
-import { isPhaseOpen } from "../../onboarding/activePhase";
-import type { OnboardingPathEndpoint } from "../../onboarding/types";
+import { isPhaseOpen } from "../../onboarding";
+import type { OnboardingPathEndpoint } from "../../onboarding";
 import { readOfferedRecaps, writeOfferedRecaps } from "../layout/phaseRecaps";
 
 type BoardPhaseRecapProps = {
