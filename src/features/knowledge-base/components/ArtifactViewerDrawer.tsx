@@ -5,7 +5,7 @@ import { useArtifactDeletion } from "../hooks/useArtifactDeletion";
 import { useArtifactDrawerData } from "../hooks/useArtifactDrawerData";
 import { useScrollToCitedChunk } from "../hooks/useScrollToCitedChunk";
 import { contentKind, shouldRenderAsMarkdown } from "../artifactPresentation";
-import { findConnector } from "../../data-ingestion/connectors/registry";
+import { findConnector } from "../../data-ingestion";
 import { createMarkdownComponents } from "./markdownComponents";
 import { questionForArtifact, quoteForChat } from "../../../hooks/askAiQuote";
 import { useArtifactSelection } from "../hooks/useArtifactSelection";

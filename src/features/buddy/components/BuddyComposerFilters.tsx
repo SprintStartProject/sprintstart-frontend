@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, Check, Filter, RotateCcw, TriangleAlert, X } from "lucide-react";
 import { centralSpringToken } from "../../../styles/tokens";
-import { SOURCE_META } from "../../data-ingestion/data";
+import { SOURCE_META } from "../../data-ingestion";
 import type { SourceSystem } from "../../../services/sourceSystems";
 import { useProjectContext } from "../../projects";
 import { useAvailableSources } from "../hooks/useAvailableSources";

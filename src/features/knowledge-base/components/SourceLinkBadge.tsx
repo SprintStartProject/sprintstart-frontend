@@ -1,5 +1,5 @@
 import { ExternalLink } from "lucide-react";
-import { getConnector } from "../../data-ingestion/connectors/registry.ts";
+import { getConnector } from "../../data-ingestion";
 import { toSourceSystem } from "../../../services/sourceSystems.ts";
 import type { SourceSystem } from "../../../services/knowledgeTypes";
 

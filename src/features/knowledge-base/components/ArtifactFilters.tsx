@@ -12,7 +12,7 @@ import {
   Search,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
-import { CONNECTOR_LIST } from "../../data-ingestion/connectors/registry.ts";
+import { CONNECTOR_LIST } from "../../data-ingestion";
 import { Input } from "../../../components/ui/Input";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect.tsx";
 import {

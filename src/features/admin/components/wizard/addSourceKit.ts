@@ -1,5 +1,5 @@
-export { AddSourceFlow } from "../../../data-ingestion/add-source/AddSourceFlow";
-export { COMPANION_GAP, COMPANION_WIDTH } from "../../../data-ingestion/add-source/CredentialSlot";
+export { AddSourceFlow } from "../../../data-ingestion";
+export { COMPANION_GAP, COMPANION_WIDTH } from "../../../data-ingestion";
 export {
   addDraftSources,
   connectDraftSources,
@@ -8,6 +8,6 @@ export {
   removeDraftSource,
   setDraftSourceOwner,
   type DraftSource,
-} from "../../../data-ingestion/add-source/projectSourcesDraft";
-export { sortOwnerOptions } from "../../../data-ingestion/add-source/sourceOwners";
-export { useSourceDraftForm } from "../../../data-ingestion/add-source/useSourceDraftForm";
+} from "../../../data-ingestion";
+export { sortOwnerOptions } from "../../../data-ingestion";
+export { useSourceDraftForm } from "../../../data-ingestion";

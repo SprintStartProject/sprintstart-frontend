@@ -1,4 +1,4 @@
-import { sourceSystemOfCitation } from "../../data-ingestion/connectors/registry.ts";
+import { sourceSystemOfCitation } from "../../data-ingestion";
 import type { Artifact, ArtifactType } from "../../../services/knowledgeTypes.ts";
 
 /** What a clicked citation hands the surface so it can open the artifact drawer. */

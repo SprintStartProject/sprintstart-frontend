@@ -1,4 +1,4 @@
-import { CONNECTORS, KNOWLEDGE_BASE_SOURCE_ORDER } from "../data-ingestion/connectors/registry.ts";
+import { CONNECTORS, KNOWLEDGE_BASE_SOURCE_ORDER } from "../data-ingestion";
 import type {
   Artifact,
   ArtifactSort,

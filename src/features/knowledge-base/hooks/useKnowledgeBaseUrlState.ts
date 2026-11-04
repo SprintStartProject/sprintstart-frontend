@@ -9,7 +9,7 @@ import {
 } from "../tabs.ts";
 import type { KnowledgeTab } from "../tabs.ts";
 import type { ArtifactSort, SourceSystem, UploadFormat } from "../../../services/knowledgeTypes.ts";
-import { hasRepositoryFacet } from "../../data-ingestion/connectors/registry.ts";
+import { hasRepositoryFacet } from "../../data-ingestion";
 import { normalizeDateRange, type DateRange } from "../dateRange.ts";
 import { KB_URL_PARAM, toKnowledgeBaseSearchString } from "../../../router/knowledgeBaseUrl.ts";
 

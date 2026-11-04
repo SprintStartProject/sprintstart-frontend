@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { toSourceSystem } from "../../../services/sourceSystems";
-import { CHAT_SOURCE_SYSTEMS } from "../../data-ingestion/connectors/registry";
+import { CHAT_SOURCE_SYSTEMS } from "../../data-ingestion";
 import type { SourceSystem } from "../../../services/sourceSystems";
 
 /**
