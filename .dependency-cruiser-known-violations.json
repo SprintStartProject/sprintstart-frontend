@@ -504,20 +504,6 @@
   {
     "type": "dependency",
     "from": "src/features/admin/data.ts",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../data-ingestion/connectors/sourceSystems",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/data.ts",
     "to": "src/features/data-ingestion/data.ts",
     "unresolvedTo": "../data-ingestion/data",
     "dependencyTypes": [
@@ -632,36 +618,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/buddy/citations/citationArtifact.ts",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../../knowledge-base/types.ts",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/buddy/components/BuddyComposerFilters.tsx",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/sourceSystems",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/buddy/components/BuddyComposerFilters.tsx",
     "to": "src/features/data-ingestion/data.ts",
     "unresolvedTo": "../../data-ingestion/data",
@@ -704,40 +660,11 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/buddy/hooks/useAvailableSources.ts",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/sourceSystems",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/buddy/hooks/usePointerGaze.ts",
     "to": "src/features/moments/rocketWatch.ts",
     "unresolvedTo": "../../moments/rocketWatch.ts",
     "dependencyTypes": [
       "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/buddy/types.ts",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../data-ingestion/connectors/sourceSystems",
-    "dependencyTypes": [
-      "local",
-      "type-only",
       "import"
     ],
     "rule": {
@@ -792,21 +719,6 @@
     "from": "src/features/dashboard/components/IngestionWidget.tsx",
     "to": "src/features/data-ingestion/types.ts",
     "unresolvedTo": "../../data-ingestion/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/dashboard/components/KnowledgeBaseWidget.tsx",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../../knowledge-base/types",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -918,107 +830,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/bitbucket/WorkspaceMetadataView.tsx",
-    "to": "src/features/knowledge-base/bitbucketWorkspaceMetadata.ts",
-    "unresolvedTo": "../../../knowledge-base/bitbucketWorkspaceMetadata.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/bitbucket/WorkspaceMetadataView.tsx",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../../../knowledge-base/types.ts",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/github/OrgMetadataView.tsx",
-    "to": "src/features/knowledge-base/orgMetadata.ts",
-    "unresolvedTo": "../../../knowledge-base/orgMetadata.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/github/OrgMetadataView.tsx",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../../../knowledge-base/types.ts",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/knowledgeBaseLink.ts",
-    "to": "src/features/knowledge-base/hooks/useKnowledgeBaseUrlState.ts",
-    "unresolvedTo": "../../knowledge-base/hooks/useKnowledgeBaseUrlState.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/types.ts",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../../knowledge-base/types.ts",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/upload/DraftForm.tsx",
-    "to": "src/features/knowledge-base/components/FileUploadZone.tsx",
-    "unresolvedTo": "../../../knowledge-base/components/FileUploadZone.tsx",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/knowledge-base/components/ArtifactFilters.tsx",
     "to": "src/features/data-ingestion/connectors/registry.ts",
     "unresolvedTo": "../../data-ingestion/connectors/registry.ts",
@@ -1050,20 +861,6 @@
     "from": "src/features/knowledge-base/components/SourceLinkBadge.tsx",
     "to": "src/features/data-ingestion/connectors/registry.ts",
     "unresolvedTo": "../../data-ingestion/connectors/registry.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-base/components/SourceLinkBadge.tsx",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/sourceSystems.ts",
     "dependencyTypes": [
       "local",
       "import"
@@ -1108,21 +905,6 @@
     "unresolvedTo": "../data-ingestion/connectors/registry.ts",
     "dependencyTypes": [
       "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-base/types.ts",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../data-ingestion/connectors/sourceSystems.ts",
-    "dependencyTypes": [
-      "local",
-      "type-only",
       "import"
     ],
     "rule": {
@@ -1323,21 +1105,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/knowledgeService.ts",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../features/knowledge-base/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-stay-below-the-ui"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/services/myStarterWorkService.ts",
     "to": "src/features/starter-work/types.ts",
     "unresolvedTo": "../features/starter-work/types",
@@ -1431,21 +1198,6 @@
     "from": "src/services/queryKeys.ts",
     "to": "src/features/data-ingestion/types.ts",
     "unresolvedTo": "../features/data-ingestion/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-stay-below-the-ui"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/services/queryKeys.ts",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../features/knowledge-base/types",
     "dependencyTypes": [
       "local",
       "type-only",
