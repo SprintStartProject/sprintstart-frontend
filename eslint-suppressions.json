@@ -395,17 +395,6 @@
       "count": 1
     }
   },
-  "src/features/arrival/components/ArrivalStepThread.tsx": {
-    "complexity": {
-      "count": 2
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 4
-    }
-  },
   "src/features/arrival/hooks/useArrivalAuthoring.ts": {
     "max-lines-per-function": {
       "count": 1
