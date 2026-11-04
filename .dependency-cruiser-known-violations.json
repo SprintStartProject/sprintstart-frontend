@@ -5002,9 +5002,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/buddyService.ts",
+    "from": "src/services/buddy/featureTypes.ts",
     "to": "src/features/buddy/types.ts",
-    "unresolvedTo": "../features/buddy/types",
+    "unresolvedTo": "../../features/buddy/types",
     "dependencyTypes": [
       "local",
       "type-only",
