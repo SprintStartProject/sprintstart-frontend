@@ -1058,13 +1058,10 @@
   },
   "src/features/data-ingestion/components/RepositoryDiscovery.tsx": {
     "complexity": {
-      "count": 3
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/features/data-ingestion/components/RunDetailsPanel.tsx": {
