@@ -262,17 +262,6 @@
       "count": 1
     }
   },
-  "src/features/admin/components/ProjectDetailsDrawer.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/features/admin/components/ProjectPeopleSection.tsx": {
     "complexity": {
       "count": 2
