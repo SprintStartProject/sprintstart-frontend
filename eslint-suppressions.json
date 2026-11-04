@@ -2246,21 +2246,14 @@
       "count": 1
     }
   },
-  "src/services/buddyService.ts": {
-    "complexity": {
-      "count": 3
-    },
-    "max-depth": {
-      "count": 3
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 4
-    },
+  "src/services/buddy/messageStream.ts": {
     "max-params": {
-      "count": 2
+      "count": 1
+    }
+  },
+  "src/services/buddy/readBuddyStream.ts": {
+    "max-params": {
+      "count": 1
     }
   },
   "src/services/ingestionService.ts": {
