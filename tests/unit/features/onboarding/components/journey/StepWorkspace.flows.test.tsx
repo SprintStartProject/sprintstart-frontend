@@ -42,7 +42,7 @@ const baseStep = {
   expectedOutcomes: [] as string[],
   tasks: [],
   resources: [],
-  status: "IN_PROGRESS" as const,
+  status: "IN_PROGRESS" as "WAITING" | "IN_PROGRESS" | "FINISHED" | "SKIPPED",
   startedAt: null as string | null,
   completedAt: null as string | null,
   feedback: null as { helpful: boolean; comment: string } | null,
