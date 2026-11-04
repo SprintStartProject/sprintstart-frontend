@@ -3,7 +3,7 @@ import { useToast } from "../../context/useToast";
 import { BuddyDraftProvider } from "./BuddyDraftProvider";
 import { BuddySessionContext } from "./buddySessionContext";
 import { useBuddyConversation } from "./hooks/useBuddyConversation";
-import { useProjectContext } from "../projects/useProjectContext";
+import { useProjectContext } from "../projects";
 
 /**
  * Holds the hire's one buddy conversation for the lifetime of the session.

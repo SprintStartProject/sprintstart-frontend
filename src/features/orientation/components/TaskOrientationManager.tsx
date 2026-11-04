@@ -4,7 +4,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Pagination } from "../../../components/ui/Pagination";
 import { useToast } from "../../../context/useToast";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { OrientationEditor } from "./OrientationEditor";
 import { parseCandidateSource, trackerLabel } from "../../starter-work/sourceId";
 import { orientationService } from "../../../services/orientationService";

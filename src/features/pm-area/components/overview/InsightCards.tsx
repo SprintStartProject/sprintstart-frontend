@@ -29,7 +29,7 @@ import { SEVERITY_ORDER, SEVERITY_STYLES } from "../../../knowledge-gaps/severit
 import { formatWaiting, hasWaitedADay } from "../../../knowledge-request/format";
 import { formatDuration } from "../../../onboarding-metrics/format";
 import { hireMoments } from "../../../onboarding-metrics/moments";
-import { useProjectContext } from "../../../projects/useProjectContext";
+import { useProjectContext } from "../../../projects";
 import { FunnelChart, type FunnelStage } from "../charts/FunnelChart";
 import { PmCard, PmCardHeader, PmCardLink } from "../PmCard";
 

@@ -23,7 +23,7 @@ import { onBuddyPageReady } from "../aiBuddyBus";
 import { BUDDY_PAGE_PATH as BUDDY_PAGE, isBuddyPagePath } from "../buddyPagePath";
 import { useBuddy } from "../hooks/useBuddy";
 import { useGreetingReveal } from "../hooks/useGreetingReveal";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { CitationPopover } from "../citations/CitationPopover";
 import { citationDrawerProjectId } from "../citations/citationArtifact";
 import { useCitationViewer } from "../citations/useCitationViewer";

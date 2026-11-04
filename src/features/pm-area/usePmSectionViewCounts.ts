@@ -2,7 +2,7 @@ import { useQueryFetch } from "../../hooks/useQueryFetch";
 import { knowledgeRequestService } from "../../services/knowledgeRequestService";
 import { queryKeys } from "../../services/queryKeys";
 import { getProjectRoles } from "../../services/teamManagementService";
-import { useProjectContext } from "../projects/useProjectContext";
+import { useProjectContext } from "../projects";
 import { useTeamRoster } from "./useTeamRoster";
 
 export type PmSectionViewCounts = {

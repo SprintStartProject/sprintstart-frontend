@@ -10,7 +10,7 @@ import { queryKeys } from "../../../services/queryKeys";
 import type { FAQGroup } from "../../faq/types";
 import type { KnowledgeGap, KnowledgeGapSeverity } from "../../knowledge-gaps/types";
 import { SEVERITIES, SEVERITY_ORDER, SEVERITY_STYLES } from "../../knowledge-gaps/severity";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { summarizeGaps, topQuestions, type GapSummary } from "../teamInsights";
 import type { DashboardWidgetSize } from "../layout/types";
 

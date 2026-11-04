@@ -25,7 +25,7 @@ import { queryKeys } from "../../../services/queryKeys";
 import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { PmSectionHeader, PmStat } from "../../pm-area/components/PmCard";
 import { useMemberPeek } from "../../pm-area/useMemberPeek";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { HireTimelineCard } from "./HireTimelineCard";
 import { formatDuration } from "../format";
 import { isAwaitingFirstResponse } from "../hireStatus";

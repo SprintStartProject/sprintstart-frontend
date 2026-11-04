@@ -3,7 +3,7 @@ import { Check, CheckSquare, Plus, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
-import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
+import { SelectionCheckbox } from "../../admin";
 import { readableTitle } from "../layout/cardNames";
 import { useBoardCardControls } from "./boardCardControls";
 import { BoardCardFrame } from "./BoardCardFrame";

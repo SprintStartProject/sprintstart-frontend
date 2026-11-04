@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { Button } from "../../../components/ui/Button";
 import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import type { OnboardingFeedback } from "../../../services/teamManagementService";
-import type { TeamOverviewUser } from "../../team-management/types";
+import type { TeamOverviewUser } from "../../team-management";
 import { isUnread, type SkipDecision } from "../useMemberOpenItems";
 
 type MemberOpenItemsProps = {

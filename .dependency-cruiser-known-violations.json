@@ -391,20 +391,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/AssignedProjectCard.tsx",
-    "to": "src/features/projects/components/ProjectMonogram.tsx",
-    "unresolvedTo": "../../projects/components/ProjectMonogram",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/AddSourceFlow.tsx",
     "unresolvedTo": "../../../data-ingestion/add-source/AddSourceFlow",
@@ -503,48 +489,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/ProjectList.tsx",
-    "to": "src/features/projects/components/ProjectMonogram.tsx",
-    "unresolvedTo": "../../projects/components/ProjectMonogram",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/ProjectPicker.tsx",
-    "to": "src/features/projects/components/ProjectMonogram.tsx",
-    "unresolvedTo": "../../projects/components/ProjectMonogram",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/ProjectsTab.tsx",
-    "to": "src/features/projects/components/ProjectMonogram.tsx",
-    "unresolvedTo": "../../projects/components/ProjectMonogram",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/admin/components/SourceList.tsx",
     "to": "src/features/data-ingestion/components/SourceStatusChip.tsx",
     "unresolvedTo": "../../data-ingestion/components/SourceStatusChip",
@@ -590,20 +534,6 @@
     "from": "src/features/admin/components/SourceList.tsx",
     "to": "src/features/data-ingestion/data.ts",
     "unresolvedTo": "../../data-ingestion/data",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/TokensTab.tsx",
-    "to": "src/features/access/components/AccessManagementView.tsx",
-    "unresolvedTo": "../../access/components/AccessManagementView",
     "dependencyTypes": [
       "local",
       "import"
@@ -774,68 +704,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/data.ts",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/admin/hooks/useAdminData.ts",
     "to": "src/features/settings/hooks/useGithubTokens.ts",
     "unresolvedTo": "../../settings/hooks/useGithubTokens",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/hooks/useSkillPool.ts",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/types.ts",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/arrival/components/ArrivalSection.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
     "dependencyTypes": [
       "local",
       "import"
@@ -1217,20 +1088,6 @@
   {
     "type": "dependency",
     "from": "src/features/board/components/ChecklistCard.tsx",
-    "to": "src/features/admin/components/SelectionCheckbox.tsx",
-    "unresolvedTo": "../../admin/components/SelectionCheckbox",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/components/ChecklistCard.tsx",
     "to": "src/features/buddy/components/AskTheBuddy.tsx",
     "unresolvedTo": "../../buddy/components/AskTheBuddy",
     "dependencyTypes": [
@@ -1400,20 +1257,6 @@
   {
     "type": "dependency",
     "from": "src/features/board/components/PathStepCard.tsx",
-    "to": "src/features/admin/components/SelectionCheckbox.tsx",
-    "unresolvedTo": "../../admin/components/SelectionCheckbox",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/components/PathStepCard.tsx",
     "to": "src/features/buddy/components/AskTheBuddy.tsx",
     "unresolvedTo": "../../buddy/components/AskTheBuddy",
     "dependencyTypes": [
@@ -1470,20 +1313,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/board/components/SuggestedTasksCard.tsx",
-    "to": "src/features/task-pool/components/GrabTaskButton.tsx",
-    "unresolvedTo": "../../task-pool/components/GrabTaskButton",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/board/components/TaskPoolCard.tsx",
     "to": "src/features/buddy/components/AskTheBuddy.tsx",
     "unresolvedTo": "../../buddy/components/AskTheBuddy",
@@ -1504,20 +1333,6 @@
     "dependencyTypes": [
       "local",
       "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/components/TaskPoolCard.tsx",
-    "to": "src/features/task-pool/components/GrabTaskButton.tsx",
-    "unresolvedTo": "../../task-pool/components/GrabTaskButton",
-    "dependencyTypes": [
-      "local",
       "import"
     ],
     "rule": {
@@ -1614,34 +1429,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/board/marks/CardMarksProvider.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/save/SaveToBoard.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/board/selection/SelectionActions.tsx",
     "to": "src/features/buddy/aiBuddyBus.ts",
     "unresolvedTo": "../../buddy/aiBuddyBus",
@@ -1673,20 +1460,6 @@
     "from": "src/features/board/selection/SelectionActions.tsx",
     "to": "src/features/buddy/utils/quoteFormat.ts",
     "unresolvedTo": "../../buddy/utils/quoteFormat",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/selection/SelectionActions.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
     "dependencyTypes": [
       "local",
       "import"
@@ -1771,20 +1544,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/buddy/BuddyProvider.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/buddy/citations/citationArtifact.ts",
     "to": "src/features/data-ingestion/connectors/registry.ts",
     "unresolvedTo": "../../data-ingestion/connectors/registry.ts",
@@ -1832,20 +1591,6 @@
     "from": "src/features/buddy/components/BuddyComposerFilters.tsx",
     "to": "src/features/data-ingestion/data.ts",
     "unresolvedTo": "../../data-ingestion/data",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/buddy/components/BuddyComposerFilters.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
     "dependencyTypes": [
       "local",
       "import"
@@ -1913,20 +1658,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/buddy/components/BuddyModeSwitcher.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/buddy/components/BuddyOrientationCard.tsx",
     "to": "src/features/orientation/components/OrientationEditor.tsx",
     "unresolvedTo": "../../orientation/components/OrientationEditor",
@@ -1961,20 +1692,6 @@
     "dependencyTypes": [
       "local",
       "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/buddy/components/BuddyOrientationCard.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
       "import"
     ],
     "rule": {
@@ -2054,20 +1771,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/buddy/components/BuddyWidget.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/buddy/components/SaveReplyToBoard.tsx",
     "to": "src/features/board/generation/checklistFromMarkdown.ts",
     "unresolvedTo": "../../board/generation/checklistFromMarkdown",
@@ -2085,20 +1788,6 @@
     "from": "src/features/buddy/components/SaveReplyToBoard.tsx",
     "to": "src/features/board/hooks/useInvalidateBoard.ts",
     "unresolvedTo": "../../board/hooks/useInvalidateBoard",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/buddy/components/SaveReplyToBoard.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
     "dependencyTypes": [
       "local",
       "import"
@@ -2282,40 +1971,12 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/IngestionWidget.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/dashboard/components/KnowledgeBaseWidget.tsx",
     "to": "src/features/knowledge-base/types.ts",
     "unresolvedTo": "../../knowledge-base/types",
     "dependencyTypes": [
       "local",
       "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/dashboard/components/KnowledgeBaseWidget.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
       "import"
     ],
     "rule": {
@@ -2468,20 +2129,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/ProjectOverviewWidget.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/dashboard/components/QuickChatWidget.tsx",
     "to": "src/features/buddy/buddyDraftContext.ts",
     "unresolvedTo": "../../buddy/buddyDraftContext",
@@ -2582,54 +2229,11 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/TeamInsightsWidget.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/dashboard/components/TeamOverviewWidget.tsx",
     "to": "src/features/pm-area/memberStatus.ts",
     "unresolvedTo": "../../pm-area/memberStatus",
     "dependencyTypes": [
       "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/dashboard/components/TeamOverviewWidget.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/dashboard/components/TeamOverviewWidget.tsx",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
       "import"
     ],
     "rule": {
@@ -2658,35 +2262,6 @@
     "unresolvedTo": "../../onboarding/hooks/useMyOnboardingStatus",
     "dependencyTypes": [
       "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/dashboard/layout/useDashboardLayout.ts",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/dashboard/organizationOverview.ts",
-    "to": "src/features/projects/ProjectContext.ts",
-    "unresolvedTo": "../projects/ProjectContext",
-    "dependencyTypes": [
-      "local",
-      "type-only",
       "import"
     ],
     "rule": {
@@ -2771,20 +2346,6 @@
     "from": "src/features/data-ingestion/components/IngestionStatusWidget.tsx",
     "to": "src/features/pm-area/components/PmCard.tsx",
     "unresolvedTo": "../../pm-area/components/PmCard",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/components/IngestionStatusWidget.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext.ts",
     "dependencyTypes": [
       "local",
       "import"
@@ -3051,20 +2612,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/faq/components/FaqGroupPanel.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/faq/components/FaqPage.tsx",
     "to": "src/features/pm-area/components/PmCard.tsx",
     "unresolvedTo": "../../pm-area/components/PmCard",
@@ -3082,20 +2629,6 @@
     "from": "src/features/faq/components/FaqPage.tsx",
     "to": "src/features/pm-area/components/PmListToolbar.tsx",
     "unresolvedTo": "../../pm-area/components/PmListToolbar",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/faq/components/FaqPage.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
     "dependencyTypes": [
       "local",
       "import"
@@ -3320,20 +2853,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/knowledge-gaps/components/KnowledgeGapPanel.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/knowledge-gaps/components/KnowledgeGapsPage.tsx",
     "to": "src/features/pm-area/components/PmCard.tsx",
     "unresolvedTo": "../../pm-area/components/PmCard",
@@ -3351,48 +2870,6 @@
     "from": "src/features/knowledge-gaps/components/KnowledgeGapsPage.tsx",
     "to": "src/features/pm-area/components/PmListToolbar.tsx",
     "unresolvedTo": "../../pm-area/components/PmListToolbar",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-gaps/components/KnowledgeGapsPage.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-gaps/MyKnowledgeGapsProvider.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-request/components/FlagToPmButton.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
     "dependencyTypes": [
       "local",
       "import"
@@ -3432,20 +2909,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/knowledge-request/components/KnowledgeRequestInboxPage.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/onboarding-metrics/components/OnboardingMetricsPage.tsx",
     "to": "src/features/pm-area/components/PmCard.tsx",
     "unresolvedTo": "../../pm-area/components/PmCard",
@@ -3463,20 +2926,6 @@
     "from": "src/features/onboarding-metrics/components/OnboardingMetricsPage.tsx",
     "to": "src/features/pm-area/useMemberPeek.ts",
     "unresolvedTo": "../../pm-area/useMemberPeek",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/onboarding-metrics/components/OnboardingMetricsPage.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
     "dependencyTypes": [
       "local",
       "import"
@@ -3600,20 +3049,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/generation/OnboardingJourneyProvider.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/onboarding/graph/JourneyCanvas.tsx",
     "to": "src/features/graph-diagram/edgeStyles.ts",
     "unresolvedTo": "../../graph-diagram/edgeStyles.ts",
@@ -3648,20 +3083,6 @@
     "dependencyTypes": [
       "local",
       "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/orientation/components/TaskOrientationManager.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
       "import"
     ],
     "rule": {
@@ -3775,21 +3196,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/pm-area/analysis/findings.ts",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/pm-area/analysis/HealthPanel.tsx",
     "to": "src/features/knowledge-gaps/format.ts",
     "unresolvedTo": "../../knowledge-gaps/format",
@@ -3832,20 +3238,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/pm-area/analysis/ProjectAnalysisLauncher.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/pm-area/analysis/useProjectAnalysis.ts",
     "to": "src/features/data-ingestion/ingestionSources.ts",
     "unresolvedTo": "../../data-ingestion/ingestionSources",
@@ -3860,68 +3252,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/pm-area/analysis/useProjectAnalysis.ts",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/pm-area/attentionQueue.ts",
     "to": "src/features/onboarding-metrics/types.ts",
     "unresolvedTo": "../onboarding-metrics/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/attentionQueue.ts",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/components/MemberHero.tsx",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/components/MemberOpenItems.tsx",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../../team-management/types",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -3976,35 +3309,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/pm-area/components/MemberPeekPanel.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/components/MemberRow.tsx",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/pm-area/components/MemberSummary.tsx",
     "to": "src/features/onboarding/journey.ts",
     "unresolvedTo": "../../onboarding/journey",
@@ -4022,21 +3326,6 @@
     "from": "src/features/pm-area/components/MemberSummary.tsx",
     "to": "src/features/onboarding/types.ts",
     "unresolvedTo": "../../onboarding/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/components/MemberSummary.tsx",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../../team-management/types",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -4147,50 +3436,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/pm-area/components/overview/InsightCards.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/components/overview/TeamProgressCard.tsx",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../../../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/components/overview/TeamPulseCard.tsx",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../../../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/pm-area/components/PmHeaderStatus.tsx",
     "to": "src/features/data-ingestion/ingestionSources.ts",
     "unresolvedTo": "../../data-ingestion/ingestionSources",
@@ -4210,35 +3455,6 @@
     "unresolvedTo": "../../knowledge-gaps/format",
     "dependencyTypes": [
       "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/components/PmHeaderStatus.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/memberStatus.ts",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
       "import"
     ],
     "rule": {
@@ -4347,80 +3563,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/pm-area/PmWorkspace.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/teamProgress.ts",
-    "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../team-management/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/usePmSectionViewCounts.ts",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/useTeamRoster.ts",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/projects/industry/ProjectIndustryWidget.tsx",
     "to": "src/features/pm-area/components/PmCard.tsx",
     "unresolvedTo": "../../pm-area/components/PmCard",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/settings/components/AccessTokensSection.tsx",
-    "to": "src/features/access/components/AccessManagementView.tsx",
-    "unresolvedTo": "../../access/components/AccessManagementView",
     "dependencyTypes": [
       "local",
       "import"
@@ -4488,51 +3633,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/shortcuts/components/KeyboardShortcutsModal.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/shortcuts/hooks/useGlobalShortcuts.ts",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/shortcuts/shortcuts.ts",
     "to": "src/features/easter-eggs/lib/keyTargets.ts",
     "unresolvedTo": "../easter-eggs/lib/keyTargets",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/starter-work/components/CorpusIssueBrowser.tsx",
-    "to": "src/features/admin/components/SelectionCheckbox.tsx",
-    "unresolvedTo": "../../admin/components/SelectionCheckbox",
     "dependencyTypes": [
       "local",
       "import"
@@ -4558,51 +3661,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/starter-work/components/StarterWorkPoolCloud.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/starter-work/components/StarterWorkSection.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/starter-work/components/StarterWorkTaskDetails.tsx",
     "to": "src/features/orientation/components/OrientationEditor.tsx",
     "unresolvedTo": "../../orientation/components/OrientationEditor",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/task-pool/components/GrabTaskButton.tsx",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
     "dependencyTypes": [
       "local",
       "import"
@@ -4917,20 +3978,6 @@
     "from": "src/features/team-management/pmKit.ts",
     "to": "src/features/pm-area/components/PmListToolbar.tsx",
     "unresolvedTo": "../pm-area/components/PmListToolbar.tsx",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/team-management/pmKit.ts",
-    "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../projects/useProjectContext.ts",
     "dependencyTypes": [
       "local",
       "import"

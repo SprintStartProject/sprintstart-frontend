@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { AlertTriangle, ChevronRight, Database, ShieldCheck, Tag, Users } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Badge } from "../../../components/ui/Badge";
-import { ProjectMonogram } from "../../projects/components/ProjectMonogram";
+import { ProjectMonogram } from "../../projects";
 import {
   getManagerName,
   getProjectSourcesCount,

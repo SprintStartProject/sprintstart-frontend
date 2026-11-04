@@ -16,7 +16,7 @@ import type { DataSource } from "../types.ts";
 import { useQueryFetch } from "../../../hooks/useQueryFetch.ts";
 import { queryKeys } from "../../../services/queryKeys.ts";
 import { formatRelativeDate } from "../../knowledge-gaps/format.ts";
-import { useProjectContext } from "../../projects/useProjectContext.ts";
+import { useProjectContext } from "../../projects";
 import { PmCard, PmCardHeader, PmCardLink } from "../../pm-area/components/PmCard";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 

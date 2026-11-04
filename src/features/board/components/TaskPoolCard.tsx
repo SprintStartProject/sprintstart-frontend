@@ -4,7 +4,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
-import { GrabTaskButton } from "../../task-pool/components/GrabTaskButton";
+import { GrabTaskButton } from "../../task-pool";
 import type { TaskType } from "../../starter-work/types";
 import { BoardCardFrame } from "./BoardCardFrame";
 import type { BoardCard, BoardPoolTask, TaskPoolContent } from "../types";

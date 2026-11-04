@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Ban, Check, ChevronRight, Inbox, Loader2, Plus, Search, UserCheck } from "lucide-react";
-import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
+import { SelectionCheckbox } from "../../admin";
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";

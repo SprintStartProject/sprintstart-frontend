@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { canAccessRoute } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { SHORTCUTS, isShortcutPress } from "../shortcuts";
 import { isModalSurfaceOpen } from "../lib/modalSurface";
 

@@ -11,7 +11,7 @@ import { knowledgeRequestService } from "../../../services/knowledgeRequestServi
 import { queryKeys } from "../../../services/queryKeys";
 import { PmSectionHeader } from "../../pm-area/components/PmCard";
 import { INBOX_VIEW_PARAM } from "../../pm-area/pmWorkspacePaths";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { RequestCard } from "./RequestCard";
 import { CanonicalAnswerCard } from "./CanonicalAnswerCard";
 

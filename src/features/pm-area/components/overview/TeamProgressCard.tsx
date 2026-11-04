@@ -1,7 +1,7 @@
 import { ChartPie } from "lucide-react";
 import { EmptyState } from "../../../../components/ui/EmptyState";
 import { SkeletonGroup, SkeletonLine } from "../../../../components/ui/Skeleton";
-import type { TeamOverviewUser } from "../../../team-management/types";
+import type { TeamOverviewUser } from "../../../team-management";
 import { phaseSpread, teamProgressData } from "../../teamProgress";
 import { DonutChart } from "../charts/DonutChart";
 import { PmCard, PmCardHeader, PmCardLink, PmEyebrow } from "../PmCard";

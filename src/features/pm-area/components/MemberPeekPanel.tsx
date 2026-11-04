@@ -15,7 +15,7 @@ import { getUserOnboardingPath, getUserSkillLevels } from "../../../services/tea
 import { formatDuration, formatMoment } from "../../onboarding-metrics/format";
 import { isAwaitingFirstResponse } from "../../onboarding-metrics/hireStatus";
 import { hireMoments } from "../../onboarding-metrics/moments";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { memberName, waitingOn } from "../memberStatus";
 import { MEMBER_PHASE_PARAM, MEMBER_STEP_PARAM } from "../pmWorkspacePaths";
 import { useMemberOpenItems } from "../useMemberOpenItems";

@@ -1,4 +1,4 @@
-import type { TeamOverviewUser } from "../team-management/types";
+import type { TeamOverviewUser } from "../team-management";
 import type { ChartDatum } from "./components/charts/chartTypes";
 import { memberStage, progressPercent } from "./memberStatus";
 

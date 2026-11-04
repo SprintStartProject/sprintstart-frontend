@@ -5,7 +5,7 @@ import { queryKeys } from "../../../services/queryKeys";
 import { formatNumber } from "../../data-ingestion/data";
 import { fetchIngestionSources } from "../../data-ingestion/ingestionSources";
 import type { DataSource } from "../../data-ingestion/types";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import type { DashboardWidgetSize } from "../layout/types";
 import { WidgetMetrics, type WidgetMetric } from "./WidgetMetrics";
 import { WidgetShell } from "./WidgetShell";

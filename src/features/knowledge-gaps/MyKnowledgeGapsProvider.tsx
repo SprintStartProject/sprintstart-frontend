@@ -3,7 +3,7 @@ import { useAuth } from "../../context/useAuth";
 import { useQueryFetch } from "../../hooks/useQueryFetch";
 import { knowledgeGapService } from "../../services/knowledgeGapService";
 import { queryKeys } from "../../services/queryKeys";
-import { useProjectContext } from "../projects/useProjectContext";
+import { useProjectContext } from "../projects";
 import { MyKnowledgeGapsContext, type MyKnowledgeGapsValue } from "./MyKnowledgeGapsContext";
 import { readSeenComponents, storeSeenComponents } from "./ownerAnnouncement";
 

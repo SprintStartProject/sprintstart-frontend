@@ -4,7 +4,7 @@ import { BookmarkPlus, Eraser, Highlighter, MessageCircle, Reply } from "lucide-
 import { Button } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { useFocusMode } from "../../../context/useFocusMode";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { boardService } from "../../../services/boardService";
 import { useInvalidateBoard } from "../hooks/useInvalidateBoard";
 import { rememberOrigin } from "../layout/cardOrigins";
