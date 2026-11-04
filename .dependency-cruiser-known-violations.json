@@ -3530,9 +3530,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/components/journey/JourneyGraph.tsx",
+    "from": "src/features/onboarding/components/journey/graphView/graphKit.ts",
     "to": "src/features/graph-diagram/EdgeLegend.tsx",
-    "unresolvedTo": "../../../graph-diagram/EdgeLegend",
+    "unresolvedTo": "../../../../graph-diagram/EdgeLegend",
     "dependencyTypes": [
       "local",
       "import"
@@ -3544,9 +3544,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/components/journey/JourneyGraph.tsx",
+    "from": "src/features/onboarding/components/journey/graphView/graphKit.ts",
     "to": "src/features/graph-diagram/graphLayout.ts",
-    "unresolvedTo": "../../../graph-diagram/graphLayout",
+    "unresolvedTo": "../../../../graph-diagram/graphLayout",
     "dependencyTypes": [
       "local",
       "import"
