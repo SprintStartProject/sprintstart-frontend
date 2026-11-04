@@ -4,7 +4,7 @@ import {
   parseOrgMetadata,
   type OrgMetadataArtifactMetadata,
   type OrgMetadataTeam,
-} from "../../../knowledge-base/orgMetadata.ts";
+} from "../../../../services/orgMetadata.ts";
 import type { Artifact } from "../../../../services/knowledgeTypes.ts";
 
 /**

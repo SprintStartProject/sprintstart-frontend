@@ -16,7 +16,7 @@
  */
 
 import type { Artifact } from "../../services/knowledgeTypes";
-import { parseOrgMetadata } from "./orgMetadata";
+import { parseOrgMetadata } from "../../services/orgMetadata";
 
 export interface GithubArtifactMetadata {
   /**
