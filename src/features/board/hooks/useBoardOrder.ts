@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { moveTo } from "../layout/boardOrder";
+import { moveTo } from "../../../utils/moveTo";
 import type { CardStack } from "../layout/cardStacks";
 import type { BoardCard } from "../types";
 

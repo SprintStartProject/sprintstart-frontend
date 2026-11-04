@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { moveTo } from "../../../../src/features/board/layout/boardOrder";
+import { moveTo } from "../../../src/utils/moveTo";
 
 describe("moving a card in the board's order", () => {
   const order = ["a", "b", "c", "d", "e"];
