@@ -129,8 +129,8 @@ export function buildSections(
  * disappears when a profile refresh reports it complete. Both shift every entry below them by a row.
  *
  * Folding the visible paths into the `layoutId` means a changed list is simply a different shared
- * element: the pill appears where it belongs instead of animating from a position that no longer
- * exists. While the list is stable — which is nearly always — nothing changes.
+ * element: the pill appears where it belongs instead of animating from a position that has gone.
+ * While the list is stable — which is nearly always — nothing changes.
  */
 export function indicatorLayoutIdFor(instanceId: string, sections: SidebarSection[]): string {
   const paths = sections.flatMap((section) => section.items.map((item) => item.path));
