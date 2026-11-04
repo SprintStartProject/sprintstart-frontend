@@ -1,4 +1,4 @@
-import type { SourceSystem } from "../../services/sourceSystems.ts";
+import type { SourceSystem } from "./sourceSystems.ts";
 
 export type { SourceSystem };
 

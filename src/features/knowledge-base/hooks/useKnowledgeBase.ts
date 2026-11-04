@@ -10,7 +10,7 @@ import type {
   KnowledgeListParams,
   SourceSystem,
   UploadFormat,
-} from "../types";
+} from "../../../services/knowledgeTypes";
 import {
   DEFAULT_ARTIFACT_SORT,
   DEFAULT_FORMAT_ORDER,

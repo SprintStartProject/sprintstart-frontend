@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, type Dispatch } from "react
 import { knowledgeService } from "../../../services/knowledgeService";
 import { drawerReducer, initialState, type DrawerAction, type DrawerState } from "../drawerState";
 import { runSummary } from "../summaryStream";
-import type { Artifact } from "../types";
+import type { Artifact } from "../../../services/knowledgeTypes";
 
 interface ArtifactDrawerData {
   state: DrawerState;

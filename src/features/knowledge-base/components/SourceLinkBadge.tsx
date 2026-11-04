@@ -1,7 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { getConnector } from "../../data-ingestion/connectors/registry.ts";
 import { toSourceSystem } from "../../../services/sourceSystems.ts";
-import type { SourceSystem } from "../types";
+import type { SourceSystem } from "../../../services/knowledgeTypes";
 
 /**
  * The connector's wording for opening the resource at its origin, or a neutral

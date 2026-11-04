@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArtifactBulkActions } from "../../../../../src/features/knowledge-base/components/ArtifactBulkActions";
-import type { Artifact } from "../../../../../src/features/knowledge-base/types";
+import type { Artifact } from "../../../../../src/services/knowledgeTypes";
 import { knowledgeService } from "../../../../../src/services/knowledgeService";
 
 function makeUpload(id: string, title: string): Artifact {

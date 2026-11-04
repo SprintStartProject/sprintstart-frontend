@@ -8,7 +8,7 @@ import {
   KNOWLEDGE_TAB_ORDER,
 } from "../tabs.ts";
 import type { KnowledgeTab } from "../tabs.ts";
-import type { ArtifactSort, SourceSystem, UploadFormat } from "../types.ts";
+import type { ArtifactSort, SourceSystem, UploadFormat } from "../../../services/knowledgeTypes.ts";
 import { hasRepositoryFacet } from "../../data-ingestion/connectors/registry.ts";
 import { normalizeDateRange, type DateRange } from "../dateRange.ts";
 

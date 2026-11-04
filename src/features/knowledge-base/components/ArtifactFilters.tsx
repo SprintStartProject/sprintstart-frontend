@@ -32,7 +32,7 @@ import {
   type KnowledgeTab,
   type UploadFormat,
 } from "../tabs";
-import type { ArtifactSort, ArtifactType, SourceSystem } from "../types";
+import type { ArtifactSort, ArtifactType, SourceSystem } from "../../../services/knowledgeTypes";
 import type { DateRange } from "../dateRange.ts";
 import type { KnowledgeBaseHistoryMode } from "../hooks/useKnowledgeBaseUrlState.ts";
 import { ArtifactDateRangeFilter } from "./ArtifactDateRangeFilter.tsx";

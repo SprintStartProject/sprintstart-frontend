@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo } from "react";
 import { ArrowLeft } from "lucide-react";
-import type { Artifact, ArtifactContent } from "../types";
+import type { Artifact, ArtifactContent } from "../../../services/knowledgeTypes";
 import { useArtifactDeletion } from "../hooks/useArtifactDeletion";
 import { useArtifactDrawerData } from "../hooks/useArtifactDrawerData";
 import { useScrollToCitedChunk } from "../hooks/useScrollToCitedChunk";

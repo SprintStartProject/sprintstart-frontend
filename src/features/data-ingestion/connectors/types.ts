@@ -11,7 +11,7 @@ import type {
   SourceDetails,
   SourceInstanceIngestionStatus,
 } from "../types.ts";
-import type { Artifact } from "../../knowledge-base/types.ts";
+import type { Artifact } from "../../../services/knowledgeTypes.ts";
 import type { DraftConnectOutcome, DraftSource } from "./draft.ts";
 import type { SourceSystem } from "../../../services/sourceSystems.ts";
 

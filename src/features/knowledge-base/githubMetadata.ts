@@ -15,7 +15,7 @@
  * treat the two providers alike.
  */
 
-import type { Artifact } from "./types";
+import type { Artifact } from "../../services/knowledgeTypes";
 import { parseOrgMetadata } from "./orgMetadata";
 
 export interface GithubArtifactMetadata {

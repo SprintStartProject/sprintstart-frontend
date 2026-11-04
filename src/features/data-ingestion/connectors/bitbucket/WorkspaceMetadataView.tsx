@@ -5,7 +5,7 @@ import {
   parseBitbucketWorkspaceMetadata,
   type BitbucketWorkspaceMetadata,
 } from "../../../knowledge-base/bitbucketWorkspaceMetadata.ts";
-import type { Artifact } from "../../../knowledge-base/types.ts";
+import type { Artifact } from "../../../../services/knowledgeTypes.ts";
 
 /** A labeled metadata row (icon + label + value) of the workspace profile. */
 function WorkspaceProfileRow({

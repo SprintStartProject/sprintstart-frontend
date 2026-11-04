@@ -6,7 +6,7 @@ import { ArrowRight, BookOpen, FileText } from "lucide-react";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { useAuth } from "../../../context/useAuth";
 import { useProjectContext } from "../../projects";
-import type { Artifact } from "../../knowledge-base/types";
+import type { Artifact } from "../../../services/knowledgeTypes";
 
 const PREVIEW_COUNT = 4;
 

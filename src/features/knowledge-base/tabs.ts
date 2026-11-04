@@ -1,12 +1,18 @@
 import { CONNECTORS, KNOWLEDGE_BASE_SOURCE_ORDER } from "../data-ingestion/connectors/registry.ts";
-import type { Artifact, ArtifactSort, ArtifactType, SourceSystem, UploadFormat } from "./types";
+import type {
+  Artifact,
+  ArtifactSort,
+  ArtifactType,
+  SourceSystem,
+  UploadFormat,
+} from "../../services/knowledgeTypes";
 
 /**
  * Upload file formats the knowledge base classifies an upload into. Declared
  * beside the artifact types they filter on, and re-exported from `./types` so
  * the facet's labels and its values stay next to each other.
  */
-export type { UploadFormat } from "./types";
+export type { UploadFormat } from "../../services/knowledgeTypes";
 
 /**
  * Human-readable display names for the artifact sources (connectors), from the

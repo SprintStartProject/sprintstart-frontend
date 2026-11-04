@@ -5,7 +5,7 @@ import {
   type OrgMetadataArtifactMetadata,
   type OrgMetadataTeam,
 } from "../../../knowledge-base/orgMetadata.ts";
-import type { Artifact } from "../../../knowledge-base/types.ts";
+import type { Artifact } from "../../../../services/knowledgeTypes.ts";
 
 /**
  * Renders a labeled metadata row (icon + label + value) for the org profile.

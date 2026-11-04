@@ -1,6 +1,6 @@
 import { useCallback, useEffect, type RefObject } from "react";
 import { scrollToCitedLines } from "../citedChunkScroll";
-import type { ArtifactContent } from "../types";
+import type { ArtifactContent } from "../../../services/knowledgeTypes";
 
 /** Time for ReactMarkdown / SyntaxHighlighter to finish rendering the DOM nodes to scroll to. */
 const RENDER_SETTLE_MS = 120;

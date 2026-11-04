@@ -2,7 +2,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useArtifactDeletion } from "../../../../../src/features/knowledge-base/hooks/useArtifactDeletion";
 import type { DrawerAction } from "../../../../../src/features/knowledge-base/drawerState";
-import type { Artifact } from "../../../../../src/features/knowledge-base/types";
+import type { Artifact } from "../../../../../src/services/knowledgeTypes";
 import { knowledgeService } from "../../../../../src/services/knowledgeService";
 
 interface Hoisted {
