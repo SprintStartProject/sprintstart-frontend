@@ -1537,14 +1537,8 @@
     }
   },
   "src/features/onboarding/components/journey/JourneyGraph.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/features/onboarding/components/journey/PhaseChooser.tsx": {
