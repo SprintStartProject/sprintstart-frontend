@@ -1,5 +1,5 @@
-import type { JourneyEdgeTone } from "./edgeTone.ts";
 import { EDGE_STYLE_SWATCH } from "./edgeStyles.ts";
+import type { JourneyEdgeTone } from "./edgeStyles.ts";
 
 /** What each style is called in a legend. */
 const TONE_LABEL: Record<JourneyEdgeTone, string> = {
