@@ -546,20 +546,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/arrival/components/thread/boardKit.ts",
-    "to": "src/features/board/layout/boardOrder.ts",
-    "unresolvedTo": "../../../board/layout/boardOrder",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/buddy/citations/citationArtifact.ts",
     "to": "src/features/data-ingestion/connectors/registry.ts",
     "unresolvedTo": "../../data-ingestion/connectors/registry.ts",
