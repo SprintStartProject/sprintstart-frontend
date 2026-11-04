@@ -914,17 +914,6 @@
       "count": 1
     }
   },
-  "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "src/features/dashboard/components/NextStepWidget.tsx": {
     "complexity": {
       "count": 1
