@@ -18,7 +18,7 @@ import { getTeamOverview } from "../../../services/teamManagementService";
 import { useProjectContext } from "../../projects";
 import { daysSince, formatDateTime, formatRelativeDate } from "../format";
 import { SEVERITY_FILL, SEVERITY_STYLES } from "../severity";
-import type { KnowledgeGap } from "../types";
+import type { KnowledgeGap } from "../../../services/knowledgeGapTypes";
 
 // Nudge the PM to re-ingest when the newest artifact is older than this.
 const STALE_AFTER_DAYS = 30;

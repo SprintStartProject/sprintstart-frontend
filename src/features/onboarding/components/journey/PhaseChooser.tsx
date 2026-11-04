@@ -1,5 +1,5 @@
 import { ArrowRight, CircleHelp, Signpost, SquareCheckBig } from "lucide-react";
-import type { OnboardingPhaseEndpoint } from "../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../services/onboardingTypes";
 
 /**
  * The fork in a path: several phases just opened, and the member decides which one comes first.

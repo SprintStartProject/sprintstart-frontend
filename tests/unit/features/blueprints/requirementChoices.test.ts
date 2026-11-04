@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { availableRequirementChoices } from "../../../../src/features/blueprints/requirementChoices.ts";
 import { mapPhase } from "../../../../src/features/blueprints/pathTransforms.ts";
-import type { BlueprintPath, BlueprintPhase } from "../../../../src/features/blueprints/types.ts";
+import type { BlueprintPath, BlueprintPhase } from "../../../../src/services/blueprintTypes.ts";
 
 const catalog = {
   skills: [

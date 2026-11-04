@@ -1,5 +1,5 @@
 import { CircleSlash, FileQuestion, Timer, TriangleAlert, type LucideIcon } from "lucide-react";
-import type { OnboardingGenerationIssueEndpoint } from "./types.ts";
+import type { OnboardingGenerationIssueEndpoint } from "../../services/onboardingTypes.ts";
 
 export type IssueStatus = OnboardingGenerationIssueEndpoint["status"];
 

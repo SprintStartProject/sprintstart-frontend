@@ -3,8 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { TeamMemberDetailPage } from "../../../src/pages/TeamMemberDetailPage";
-import type { TeamOverviewUser, ProjectRole } from "../../../src/features/team-management/types";
-import type { KnowledgeGap } from "../../../src/features/knowledge-gaps/types";
+import type { TeamOverviewUser, ProjectRole } from "../../../src/services/teamManagementTypes";
+import type { KnowledgeGap } from "../../../src/services/knowledgeGapTypes";
 import { knowledgeGapService } from "../../../src/services/knowledgeGapService";
 import { onboardingService } from "../../../src/services/onboardingService";
 

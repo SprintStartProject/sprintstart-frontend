@@ -1,7 +1,7 @@
 import { Check, Minus, Plus } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { fullName } from "../roleRules";
-import type { TeamOverviewUser } from "../types";
+import type { TeamOverviewUser } from "../../../services/teamManagementTypes";
 
 type MemberRowProps = {
   user: TeamOverviewUser;

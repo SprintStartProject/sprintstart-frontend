@@ -3,7 +3,7 @@ import { withGraphNodes } from "../../../../src/features/blueprints/withGraphNod
 import type {
   BlueprintGraphNode,
   BlueprintPath,
-} from "../../../../src/features/blueprints/types.ts";
+} from "../../../../src/services/blueprintTypes.ts";
 
 function pathOf(...phaseIds: string[]): BlueprintPath {
   return {

@@ -42,4 +42,4 @@ export type {
   QuestionAttemptsReviewEndpoint,
   StepStatus,
   UpsertQuestion,
-} from "./types";
+} from "../../services/onboardingTypes";

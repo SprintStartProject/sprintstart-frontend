@@ -5,7 +5,7 @@ import type {
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
   QuestionAttemptResult,
-} from "./types";
+} from "../../services/onboardingTypes";
 
 /** What "continue" says and does once an item in a phase is behind the member. */
 export type ContinueStep =

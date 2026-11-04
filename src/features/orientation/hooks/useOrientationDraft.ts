@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { STEP_ORDER } from "../steps";
-import type { AuthorOrientationInput, OrientationPacket, OrientationStep } from "../types";
+import type { AuthorOrientationInput, OrientationPacket, OrientationStep } from "../../../services/orientationTypes";
 
 // A process-wide counter for stable local keys. Only ever used for React `key`s and never persisted
 // or sent anywhere, so uniqueness within a session is all that matters — not a ref, so it can be read

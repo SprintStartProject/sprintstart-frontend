@@ -28,7 +28,7 @@ import { mergedStepCount } from "../mergedSteps";
 import { radioCardClassName } from "../radioCard";
 import { AddArrivalStepModal } from "./AddArrivalStepModal";
 import { ArrivalStepThread } from "./ArrivalStepThread";
-import type { ArrivalScope, ArrivalStep, UpdateArrivalStepRequest } from "../types";
+import type { ArrivalScope, ArrivalStep, UpdateArrivalStepRequest } from "../../../services/arrivalTypes";
 
 /** Spells out every short badge word the thread and the edit drawer use, for the "What the badges
  * mean" hint next to the step count — the badges themselves stay terse on purpose. */

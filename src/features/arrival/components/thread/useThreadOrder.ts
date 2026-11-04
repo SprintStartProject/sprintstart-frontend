@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { ArrivalScope, ArrivalStep } from "../../types";
+import type { ArrivalScope, ArrivalStep } from "../../../../services/arrivalTypes";
 import { moveTo } from "./boardKit";
 import { MOVE_COOLDOWN_MS, reorderByKeys, rowId, sameKeys, targetKeyUnder } from "./threadRules";
 

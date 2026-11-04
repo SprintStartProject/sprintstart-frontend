@@ -9,7 +9,7 @@ import { SEVERITY_ORDER } from "../severity";
 import { addAnnouncedComponents, readAnnouncedComponents } from "../ownerAnnouncement";
 import { useMyKnowledgeGaps } from "../useMyKnowledgeGaps";
 import { GapTypeChips, SeverityBar, SeverityPill } from "./SeverityIndicators";
-import type { KnowledgeGap } from "../types";
+import type { KnowledgeGap } from "../../../services/knowledgeGapTypes";
 
 /** Missing types spelled out on a row before the rest collapse into a `+n`. */
 const VISIBLE_TYPE_COUNT = 4;

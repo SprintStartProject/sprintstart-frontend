@@ -5,7 +5,7 @@ import { useState } from "react";
 import { blockingPhases, phaseProgress, phaseState, type PhaseState } from "../../journey";
 import { ProgressRing } from "../../graph/JourneyNodeCards";
 import { phaseStateLabel } from "../../graph/nodeLabels";
-import type { OnboardingPhaseEndpoint } from "../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../services/onboardingTypes";
 
 type Props = {
   phases: OnboardingPhaseEndpoint[];

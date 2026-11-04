@@ -4,7 +4,7 @@ import type {
   FAQDetail,
   FAQRebuildScope,
   FAQRebuildPreview,
-} from "../features/faq/types";
+} from "./faqTypes";
 /**
  * FAQ insights are project-scoped: the groups are built from the questions asked in
  * one project's chats, so every call has to say which project it means.

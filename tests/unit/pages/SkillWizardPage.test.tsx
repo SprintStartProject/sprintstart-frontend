@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { SkillWizardPage } from "../../../src/pages/SkillWizardPage";
-import type { TeamOverviewUser, Skill } from "../../../src/features/team-management/types";
+import type { TeamOverviewUser, Skill } from "../../../src/services/teamManagementTypes";
 
 vi.mock("../../../src/context/useAuth", () => ({
   useAuth: () => ({ profile: { id: "user1", firstName: "Test", lastName: "User" } }),

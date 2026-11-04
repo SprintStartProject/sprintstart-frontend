@@ -1,4 +1,4 @@
-import type { BlueprintPathOverview, BlueprintStatus } from "./types.ts";
+import type { BlueprintPathOverview, BlueprintStatus } from "../../services/blueprintTypes.ts";
 
 /**
  * What is actually true of one blueprint, as opposed to what its newest version's status says.

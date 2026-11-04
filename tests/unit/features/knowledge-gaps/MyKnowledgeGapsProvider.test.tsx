@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MyKnowledgeGapsProvider } from "../../../../src/features/knowledge-gaps/MyKnowledgeGapsProvider";
 import { useMyKnowledgeGaps } from "../../../../src/features/knowledge-gaps/useMyKnowledgeGaps";
-import type { KnowledgeGap } from "../../../../src/features/knowledge-gaps/types";
+import type { KnowledgeGap } from "../../../../src/services/knowledgeGapTypes";
 
 const { mocks } = vi.hoisted(() => ({
   mocks: {

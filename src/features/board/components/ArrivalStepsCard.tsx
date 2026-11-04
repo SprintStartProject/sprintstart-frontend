@@ -7,7 +7,7 @@ import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy";
 import { ArrivalStepList } from "../../arrival/components/ArrivalStepList";
 import { summarise } from "../../arrival/summarise";
-import type { ArrivalStep } from "../../arrival/types";
+import type { ArrivalStep } from "../../../services/arrivalTypes";
 import type { ArrivalStepsContent, BoardCard } from "../types";
 
 type ArrivalStepsCardProps = {

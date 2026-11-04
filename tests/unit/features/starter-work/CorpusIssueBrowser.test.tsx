@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CorpusIssueBrowser } from "../../../../src/features/starter-work/components/CorpusIssueBrowser";
 import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { starterWorkService } from "../../../../src/services/starterWorkService";
-import type { StarterWorkCandidate } from "../../../../src/features/starter-work/types";
+import type { StarterWorkCandidate } from "../../../../src/services/starterWorkTypes";
 
 function render(ui: ReactElement) {
   return testingRender(<ToastProvider>{ui}</ToastProvider>);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { blueprintService } from "../../services/blueprintService.ts";
 import type { PathPageContext } from "./pathPageContext.ts";
-import type { BlueprintPath } from "./types.ts";
+import type { BlueprintPath } from "../../services/blueprintTypes.ts";
 
 /** The version-history overlay: whether it is open, and the versions it lists. */
 export function useVersionHistory(context: PathPageContext) {

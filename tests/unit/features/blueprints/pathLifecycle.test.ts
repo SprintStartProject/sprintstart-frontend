@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { groupBlueprints, lifecycleOf } from "../../../../src/features/blueprints/pathLifecycle.ts";
-import type { BlueprintPathOverview } from "../../../../src/features/blueprints/types.ts";
+import type { BlueprintPathOverview } from "../../../../src/services/blueprintTypes.ts";
 
 function overview(over: Partial<BlueprintPathOverview> = {}): BlueprintPathOverview {
   return {

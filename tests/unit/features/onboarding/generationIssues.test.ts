@@ -4,7 +4,7 @@ import {
   issueStatusLabel,
   retryCouldHelp,
 } from "../../../../src/features/onboarding/generationIssues";
-import type { OnboardingGenerationIssueEndpoint } from "../../../../src/features/onboarding/types";
+import type { OnboardingGenerationIssueEndpoint } from "../../../../src/services/onboardingTypes";
 
 function issue(
   title: string,

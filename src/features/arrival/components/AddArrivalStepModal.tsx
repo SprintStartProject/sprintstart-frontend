@@ -20,7 +20,7 @@ import { Textarea } from "../../../components/ui/Textarea";
 import { howStepGetsDone } from "../howItsDone";
 import { radioCardClassName } from "../radioCard";
 import { slugifyStepKey } from "../slug";
-import type { ArrivalScope, DerivableArrivalStep } from "../types";
+import type { ArrivalScope, DerivableArrivalStep } from "../../../services/arrivalTypes";
 
 type AddArrivalStepModalProps = {
   hasProject: boolean;

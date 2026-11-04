@@ -10,7 +10,7 @@ import { insightsService } from "../../../services/faqService";
 import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects";
 import { formatAskedAt } from "../format";
-import type { FAQGroup } from "../types";
+import type { FAQGroup } from "../../../services/faqTypes";
 import { TrendBadge } from "./TrendBadge";
 
 function GroupDetail({ groupId }: { groupId: string }) {

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { KnowledgeGapPanel } from "../../../../../src/features/knowledge-gaps/components/KnowledgeGapPanel";
-import type { KnowledgeGap } from "../../../../../src/features/knowledge-gaps/types";
+import type { KnowledgeGap } from "../../../../../src/services/knowledgeGapTypes";
 import type { ProjectContextValue } from "../../../../../src/features/projects/ProjectContext";
 import { createProjectContextValue } from "../../../setup/projectContext";
 

@@ -16,7 +16,7 @@ import { phaseItems } from "../../../../../../src/features/onboarding/journey";
 import type {
   OnboardingPhaseEndpoint,
   OnboardingStepEndpoint,
-} from "../../../../../../src/features/onboarding/types";
+} from "../../../../../../src/services/onboardingTypes";
 
 function step(over: Partial<OnboardingStepEndpoint>): OnboardingStepEndpoint {
   return {

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { starterWorkService } from "../../../services/starterWorkService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { ProposalStatus } from "../types";
+import type { ProposalStatus } from "../../../services/starterWorkTypes";
 
 /**
  * Loads the starter-work pool at one status, for the compact overview surface.

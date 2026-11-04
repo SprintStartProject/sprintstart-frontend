@@ -25,7 +25,7 @@ import {
   phaseProgress,
   skipRequestOf,
 } from "../journey";
-import type { OnboardingPhaseEndpoint } from "../types";
+import type { OnboardingPhaseEndpoint } from "../../../services/onboardingTypes";
 import { ITEM_NODE_SIZE, itemGraphLayout } from "./graphLayouts";
 import type { JourneyNodeRenderState } from "./JourneyCanvas";
 import { itemKindLabel, itemStateLabel, phaseStateLabel } from "./nodeLabels";

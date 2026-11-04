@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from "react";
 import type { CreateKind, EditTarget, SortKind } from "../../pathEditorTypes.ts";
-import type { BlueprintPhase } from "../../types.ts";
+import type { BlueprintPhase } from "../../../../services/blueprintTypes.ts";
 
 /** A set of ids that are collapsed in the outline, and the two things to do with it. */
 export type CollapsedIds = {

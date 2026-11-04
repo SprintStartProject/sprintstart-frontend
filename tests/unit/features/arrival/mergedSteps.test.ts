@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mergedStepCount } from "../../../../src/features/arrival/mergedSteps";
-import type { ArrivalStep } from "../../../../src/features/arrival/types";
+import type { ArrivalStep } from "../../../../src/services/arrivalTypes";
 
 const step = (key: string, projectId: string | null): ArrivalStep => ({
   key,

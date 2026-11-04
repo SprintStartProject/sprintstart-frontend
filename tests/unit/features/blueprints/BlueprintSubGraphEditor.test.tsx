@@ -8,7 +8,7 @@ import type {
   BlueprintPhase,
   BlueprintQuestion,
   BlueprintStep,
-} from "../../../../src/features/blueprints/types.ts";
+} from "../../../../src/services/blueprintTypes.ts";
 
 const step = {
   id: "s1",

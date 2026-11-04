@@ -1,7 +1,7 @@
 import type { FilterSelectOption } from "../../components/ui/FilterSelect";
 import { skillSuggestionKey } from "./skillSuggestion";
-import { isSkillLinkedToRole } from "./types";
-import type { ProjectRole, Skill, SkillSuggestion, TeamOverviewUser } from "./types";
+import { isSkillLinkedToRole } from "../../services/teamManagementTypes";
+import type { ProjectRole, Skill, SkillSuggestion, TeamOverviewUser } from "../../services/teamManagementTypes";
 
 export type RoleSort = "name" | "members" | "skills";
 

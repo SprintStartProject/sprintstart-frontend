@@ -24,7 +24,7 @@ import { orientationService } from "../../../services/orientationService";
 import { queryKeys } from "../../../services/queryKeys";
 import { OrientationEditor } from "../../orientation";
 import { formatRelativeDate } from "../format";
-import type { StarterWorkTask } from "../types";
+import type { StarterWorkTask } from "../../../services/starterWorkTypes";
 import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type StarterWorkTaskDetailsProps = {

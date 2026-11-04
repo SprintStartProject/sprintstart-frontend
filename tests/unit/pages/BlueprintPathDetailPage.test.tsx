@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { BlueprintPathDetailPage } from "../../../src/pages/BlueprintPathDetailPage.tsx";
-import type { BlueprintPath } from "../../../src/features/blueprints/types.ts";
+import type { BlueprintPath } from "../../../src/services/blueprintTypes.ts";
 
 const { mocks } = vi.hoisted(() => ({
   mocks: {

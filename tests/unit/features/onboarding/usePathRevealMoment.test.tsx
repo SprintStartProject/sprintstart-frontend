@@ -7,7 +7,7 @@ import type {
   OnboardingStepEndpoint,
   QuestionStatus,
   StepStatus,
-} from "../../../../src/features/onboarding/types";
+} from "../../../../src/services/onboardingTypes";
 
 const mockRevealPath = vi.hoisted(() => vi.fn<(handlers?: { onLaunched?: () => void }) => void>());
 

@@ -3,7 +3,7 @@
 // and that picture has to be the graph one zooms into.
 
 import { phaseItems } from "../journey";
-import type { OnboardingPhaseEndpoint } from "../types";
+import type { OnboardingPhaseEndpoint } from "../../../services/onboardingTypes";
 import { resolveLayout, type GraphPoint, type LayoutOptions } from "./layout";
 import { ITEM_NODE_SIZE, PHASE_NODE_SIZE } from "./nodeLabels";
 

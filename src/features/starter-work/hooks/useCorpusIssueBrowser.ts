@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { starterWorkService } from "../../../services/starterWorkService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { StarterWorkCandidate, StarterWorkTask } from "../types";
+import type { StarterWorkCandidate, StarterWorkTask } from "../../../services/starterWorkTypes";
 import type { PoolFlightRect } from "../components/poolFlight";
 
 function toMessage(error: unknown, fallback: string): string {

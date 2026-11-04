@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { KnowledgeGap } from "../../features/knowledge-gaps/types";
-import type { OnboardingPathEndpoint } from "../../features/onboarding/types";
-import type { ProjectRole, TeamOverviewUser } from "../../features/team-management/types";
+import type { KnowledgeGap } from "../../services/knowledgeGapTypes";
+import type { OnboardingPathEndpoint } from "../../services/onboardingTypes";
+import type { ProjectRole, TeamOverviewUser } from "../../services/teamManagementTypes";
 import { knowledgeGapService } from "../../services/knowledgeGapService";
 import {
   getProjectRoles,

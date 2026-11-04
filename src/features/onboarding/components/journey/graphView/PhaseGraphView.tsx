@@ -9,7 +9,7 @@ import type { GraphPoint } from "../../../graph/layout";
 import { phaseStateLabel } from "../../../graph/nodeLabels";
 import { itemNumbers } from "../../../itemNumbers";
 import { itemState } from "../../../journey";
-import type { OnboardingPhaseEndpoint } from "../../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../../services/onboardingTypes";
 import { EdgeLegend } from "./graphKit";
 import {
   MAP_EDGE_TONES,

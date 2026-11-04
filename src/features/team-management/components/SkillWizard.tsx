@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
-import { isSkillLinkedToRole } from "../types";
-import type { Skill, SkillLevel, TeamOverviewUser } from "../types";
+import { isSkillLinkedToRole } from "../../../services/teamManagementTypes";
+import type { Skill, SkillLevel, TeamOverviewUser } from "../../../services/teamManagementTypes";
 
 export type CreateSkillAssessmentRequest = {
   userId: string;

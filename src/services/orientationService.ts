@@ -3,7 +3,7 @@ import type {
   AuthorOrientationInput,
   MyOrientation,
   OrientationPacket,
-} from "../features/orientation/types";
+} from "./orientationTypes";
 
 const BASE = "/api/v1/onboarding";
 

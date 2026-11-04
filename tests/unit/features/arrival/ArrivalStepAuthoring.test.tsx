@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ArrivalStepAuthoring } from "../../../../src/features/arrival/components/ArrivalStepAuthoring";
 import { arrivalService } from "../../../../src/services/arrivalService";
-import type { ArrivalStep, DerivableArrivalStep } from "../../../../src/features/arrival/types";
+import type { ArrivalStep, DerivableArrivalStep } from "../../../../src/services/arrivalTypes";
 
 vi.mock("../../../../src/services/arrivalService", () => ({
   arrivalService: {

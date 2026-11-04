@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useToast } from "../../../context/useToast.ts";
-import type { BlueprintQuestion, BlueprintStep } from "../types.ts";
+import type { BlueprintQuestion, BlueprintStep } from "../../../services/blueprintTypes.ts";
 
 type Args = {
   step: BlueprintStep | null;

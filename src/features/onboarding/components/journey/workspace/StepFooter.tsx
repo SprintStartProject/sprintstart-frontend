@@ -7,7 +7,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { Button } from "../../../../../components/ui/Button";
-import type { OnboardingStepDetail } from "../../../types";
+import type { OnboardingStepDetail } from "../../../../../services/onboardingTypes";
 import { isBehind, tasksToGoLabel } from "./workspaceRules";
 import type { Busy, Drawer, TaskProgress } from "./workspaceRules";
 

@@ -15,7 +15,7 @@ import type {
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
   OnboardingStepEndpoint,
-} from "./types";
+} from "../../services/onboardingTypes";
 
 /** A step still waiting to be done — neither finished nor skipped nor locked. */
 export function isStepOpen(step: OnboardingStepEndpoint): boolean {

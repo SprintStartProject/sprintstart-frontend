@@ -4,4 +4,4 @@ export {
   SeverityBar,
   SeveritySummaryBar,
 } from "../../../knowledge-gaps/components/SeverityIndicators";
-export type { KnowledgeGap } from "../../../knowledge-gaps/types";
+export type { KnowledgeGap } from "../../../../services/knowledgeGapTypes";

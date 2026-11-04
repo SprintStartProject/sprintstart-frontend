@@ -10,7 +10,7 @@ import {
   unseenFirst,
   visibleStatusFilters,
 } from "../../../../src/features/starter-work/components/pool/poolRules";
-import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
+import type { StarterWorkTask } from "../../../../src/services/starterWorkTypes";
 
 function task(id: string, over: Partial<StarterWorkTask> = {}): StarterWorkTask {
   return {

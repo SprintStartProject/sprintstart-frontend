@@ -5,7 +5,7 @@ import { Field } from "../../../components/ui/Field.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
 import { Select } from "../../../components/ui/Select.tsx";
 import { Textarea } from "../../../components/ui/Textarea.tsx";
-import type { BlueprintStep } from "../types.ts";
+import type { BlueprintStep } from "../../../services/blueprintTypes.ts";
 import { Detail, DetailList, EmptyDetailListItem, ItemRow, SaveError } from "./DetailParts.tsx";
 import { fieldSetter, type BlueprintStepMetadata } from "./metadata.ts";
 

@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../../../../../src/context/ToastProvider";
 import { JourneyGraph } from "../../../../../../src/features/onboarding/components/journey/JourneyGraph";
-import type { OnboardingPhaseEndpoint } from "../../../../../../src/features/onboarding/types";
+import type { OnboardingPhaseEndpoint } from "../../../../../../src/services/onboardingTypes";
 
 type CanvasProps = Record<string, unknown> & {
   cameraRef: { current: unknown };

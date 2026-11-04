@@ -6,7 +6,7 @@ import { useProjectContext } from "../pmKit";
 import { skillSuggestionKey } from "../skillSuggestion";
 import { suggestionsToApply, uniqueSuggestions } from "../roleRules";
 import { useRoleSkillSuggestions } from "../useRoleSkillSuggestions";
-import type { Skill, SkillSuggestion } from "../types";
+import type { Skill, SkillSuggestion } from "../../../services/teamManagementTypes";
 
 type Args = {
   /**

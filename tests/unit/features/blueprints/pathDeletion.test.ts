@@ -10,7 +10,7 @@ import {
 import type {
   BlueprintGraphNode,
   BlueprintPath,
-} from "../../../../src/features/blueprints/types.ts";
+} from "../../../../src/services/blueprintTypes.ts";
 
 const { service } = vi.hoisted(() => ({
   service: {

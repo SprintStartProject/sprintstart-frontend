@@ -8,7 +8,7 @@ import {
   itemGraphLayout,
 } from "../../../graph/graphLayouts";
 import { layeredLayout, resolveLayout, type GraphPoint } from "../../../graph/layout";
-import type { OnboardingPhaseEndpoint } from "../../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../../services/onboardingTypes";
 import {
   MAP_KEY,
   PHASE_KEY,

@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { BuddyOrientationCard } from "../../../../src/features/buddy/components/BuddyOrientationCard";
-import type { MyOrientation } from "../../../../src/features/orientation/types";
+import type { MyOrientation } from "../../../../src/services/orientationTypes";
 
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =

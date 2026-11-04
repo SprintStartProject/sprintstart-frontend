@@ -1,7 +1,7 @@
 import { Minus, Network, Pencil } from "lucide-react";
 import { Badge } from "../../../../components/ui/Badge.tsx";
 import { Button } from "../../../../components/ui/Button.tsx";
-import type { BlueprintPhase } from "../../types.ts";
+import type { BlueprintPhase } from "../../../../services/blueprintTypes.ts";
 import { CollapseToggle } from "./CollapseToggle.tsx";
 import type { OutlineActions } from "./outlineActions.ts";
 

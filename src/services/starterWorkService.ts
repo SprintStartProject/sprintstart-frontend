@@ -8,7 +8,7 @@ import type {
   StarterWorkReconcileOutcome,
   StarterWorkTask,
   UnreviewedStarterWork,
-} from "../features/starter-work/types";
+} from "./starterWorkTypes";
 
 const BASE_URL = "/api/v1/onboarding/starter-work";
 

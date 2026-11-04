@@ -5,7 +5,7 @@ import { BlueprintPathsPage } from "../../../src/pages/BlueprintPathsPage.tsx";
 import type {
   BlueprintPath,
   BlueprintPathOverview,
-} from "../../../src/features/blueprints/types.ts";
+} from "../../../src/services/blueprintTypes.ts";
 
 const { mocks } = vi.hoisted(() => ({
   mocks: {

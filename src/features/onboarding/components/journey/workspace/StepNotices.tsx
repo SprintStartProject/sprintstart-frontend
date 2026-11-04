@@ -1,5 +1,5 @@
 import { SkipForward, ThumbsDown, ThumbsUp } from "lucide-react";
-import type { OnboardingStepDetail } from "../../../types";
+import type { OnboardingStepDetail } from "../../../../../services/onboardingTypes";
 import type { SkipState } from "./workspaceRules";
 
 /** Where the skip request stands, told above the tasks. */

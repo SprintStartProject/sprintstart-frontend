@@ -29,7 +29,7 @@ import { useProjectContext } from "../../projects";
 import { HireTimelineCard } from "./HireTimelineCard";
 import { formatDuration } from "../format";
 import { isAwaitingFirstResponse } from "../hireStatus";
-import type { HireTimeline } from "../types";
+import type { HireTimeline } from "../../../services/onboardingMetricsTypes";
 
 /**
  * Narrows the per-hire list: to those a PM might act on, for a busy project, or to those whose

@@ -10,7 +10,7 @@ import type { JourneyEdgeTone } from "../../../graph/JourneyCanvas";
 import { itemStateLabel, phaseStateLabel } from "../../../graph/nodeLabels";
 import type { GraphPoint } from "../../../graph/layout";
 import { ITEM_NODE_SIZE } from "../../../graph/graphLayouts";
-import type { OnboardingPhaseEndpoint } from "../../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../../services/onboardingTypes";
 import type { GraphEditing } from "./graphTypes";
 
 export type PhaseNode = {

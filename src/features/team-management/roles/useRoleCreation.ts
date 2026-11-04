@@ -3,7 +3,7 @@ import { useToast } from "../../../context/useToast";
 import { parseApiError } from "../../../services/apiError";
 import { acceptSkillSuggestion, createProjectRole } from "../../../services/teamManagementService";
 import type { PendingSkill } from "../components/NewRoleSkillsInput";
-import type { Skill } from "../types";
+import type { Skill } from "../../../services/teamManagementTypes";
 
 /**
  * The picked skills, one after another: each answer is the role's whole skill list, so the last

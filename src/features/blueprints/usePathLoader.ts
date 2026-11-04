@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NavigateFunction } from "react-router-dom";
 import { blueprintService, type BlueprintScope } from "../../services/blueprintService.ts";
-import type { BlueprintPath } from "./types.ts";
+import type { BlueprintPath } from "../../services/blueprintTypes.ts";
 import { withGraphNodes } from "./withGraphNodes.ts";
 
 /** What the route, the signed-in user and the selected project say about this page. */

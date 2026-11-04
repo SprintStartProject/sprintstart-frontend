@@ -5,7 +5,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../../src/context/ToastProvider";
 import { TeamMemberDetailPage } from "../../../src/pages/TeamMemberDetailPage";
-import type { TeamOverviewUser } from "../../../src/features/team-management/types";
+import type { TeamOverviewUser } from "../../../src/services/teamManagementTypes";
 import { onboardingService } from "../../../src/services/onboardingService";
 
 const mocks = vi.hoisted(() => ({

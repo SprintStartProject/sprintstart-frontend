@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { phaseItems } from "../journey";
 import { setOnboardingPlace, type OnboardingPlace } from "../onboardingPlace";
-import type { OnboardingPhaseEndpoint } from "../types";
+import type { OnboardingPhaseEndpoint } from "../../../services/onboardingTypes";
 import type { ViewMode } from "./useJourneyView";
 
 type Params = {

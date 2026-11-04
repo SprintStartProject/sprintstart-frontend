@@ -1,4 +1,4 @@
-import type { ArrivalScope, ArrivalStep } from "../../types";
+import type { ArrivalScope, ArrivalStep } from "../../../../services/arrivalTypes";
 
 const EMPTY_SET = new Set<string>();
 

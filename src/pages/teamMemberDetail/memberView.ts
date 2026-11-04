@@ -1,4 +1,4 @@
-import type { TeamOverviewUser } from "../../features/team-management/types";
+import type { TeamOverviewUser } from "../../services/teamManagementTypes";
 import {
   allStepsOf,
   getActualMinutes,

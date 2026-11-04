@@ -3,7 +3,7 @@
 // (Presentational components live in components/SeverityIndicators.tsx.)
 
 import { CircleCheck, Info, OctagonAlert, TriangleAlert, type LucideIcon } from "lucide-react";
-import type { KnowledgeGapSeverity } from "./types";
+import type { KnowledgeGapSeverity } from "../../services/knowledgeGapTypes";
 
 /** Sort weight so higher-impact gaps come first (high → medium → low → covered). */
 export const SEVERITY_ORDER: Record<KnowledgeGapSeverity, number> = {

@@ -1,6 +1,6 @@
 import { blueprintService, type BlueprintScope } from "../../services/blueprintService.ts";
 import type { SortKind } from "./pathEditorTypes.ts";
-import type { BlueprintPath, BlueprintPhase } from "./types.ts";
+import type { BlueprintPath, BlueprintPhase } from "../../services/blueprintTypes.ts";
 
 type Positioned = { id: string; position: number };
 type Revisioned = { id: string; revision: number };

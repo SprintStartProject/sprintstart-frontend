@@ -4,7 +4,7 @@ import { Badge } from "../../../../components/ui/Badge";
 import { Button } from "../../../../components/ui/Button";
 import { DragHandle } from "../../../../components/ui/DragHandle";
 import { howStepGetsDone } from "../../howItsDone";
-import type { ArrivalStep } from "../../types";
+import type { ArrivalStep } from "../../../../services/arrivalTypes";
 
 type StepRowProps = {
   step: ArrivalStep;

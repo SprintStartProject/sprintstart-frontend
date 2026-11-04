@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import type { Goal } from "../features/starter-work/types";
+import type { Goal } from "./starterWorkTypes";
 
 const BASE_URL = "/api/v1/onboarding/starter-work/me";
 

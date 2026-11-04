@@ -1,4 +1,4 @@
-import type { BlueprintGraphNode, BlueprintPath } from "./types.ts";
+import type { BlueprintGraphNode, BlueprintPath } from "../../services/blueprintTypes.ts";
 
 /**
  * A loaded path with its phases' graph coordinates and prerequisite edges filled in.

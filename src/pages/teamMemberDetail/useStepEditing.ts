@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useToast } from "../../context/useToast";
-import type { OnboardingTaskEndpoint } from "../../features/onboarding/types";
+import type { OnboardingTaskEndpoint } from "../../services/onboardingTypes";
 import {
   createOnboardingTaskForStep,
   deleteOnboardingStep,

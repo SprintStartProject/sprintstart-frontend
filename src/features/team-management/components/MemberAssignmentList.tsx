@@ -3,7 +3,7 @@ import { Input } from "../../../components/ui/Input";
 import { SaveButton } from "../../../components/ui/SaveButton";
 import { PmFilterChip } from "../pmKit";
 import type { MemberFilter } from "../roleRules";
-import type { TeamOverviewUser } from "../types";
+import type { TeamOverviewUser } from "../../../services/teamManagementTypes";
 import { MemberRow } from "./MemberRow";
 
 type MemberAssignmentListProps = {

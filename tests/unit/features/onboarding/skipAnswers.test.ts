@@ -10,7 +10,7 @@ import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
   OnboardingStepSkip,
-} from "../../../../src/features/onboarding/types.ts";
+} from "../../../../src/services/onboardingTypes.ts";
 
 function skip(over: Partial<OnboardingStepSkip>): OnboardingStepSkip {
   return {

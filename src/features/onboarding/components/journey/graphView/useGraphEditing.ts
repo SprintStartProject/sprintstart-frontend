@@ -1,7 +1,7 @@
 import { useToast } from "../../../../../context/useToast";
 import type { PhaseItem } from "../../../journey";
 import type { GraphPoint } from "../../../graph/layout";
-import type { OnboardingPhaseEndpoint } from "../../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../../services/onboardingTypes";
 import { EDGE_REFUSAL_MESSAGE, edgeRefusal } from "./graphKit";
 import { freeSpot, pinnedPositions, ruleNodes, type PhaseNode } from "./graphRules";
 import type { GraphEditing, SaveLayout } from "./graphTypes";

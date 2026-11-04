@@ -6,7 +6,7 @@ import { onboardingService } from "../../../services/onboardingService";
 import { queryKeys } from "../../../services/queryKeys";
 import { initialPhaseId } from "../initialPhase";
 import { sortedPhases } from "../journey";
-import type { OnboardingPathEndpoint } from "../types";
+import type { OnboardingPathEndpoint } from "../../../services/onboardingTypes";
 
 export type LoadingState = "loading" | "empty" | "success" | "error";
 

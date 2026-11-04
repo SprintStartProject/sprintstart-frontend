@@ -10,7 +10,7 @@ import type {
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
   OnboardingStepEndpoint,
-} from "./types";
+} from "../../services/onboardingTypes";
 
 /** A node of a phase graph: one step or one knowledge-check question. */
 export type PhaseItem =

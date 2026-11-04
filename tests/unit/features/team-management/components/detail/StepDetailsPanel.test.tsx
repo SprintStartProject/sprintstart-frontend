@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { StepDetailsPanel } from "../../../../../../src/features/team-management/components/detail/StepDetailsPanel";
-import type { OnboardingTaskEndpoint } from "../../../../../../src/features/onboarding/types";
+import type { OnboardingTaskEndpoint } from "../../../../../../src/services/onboardingTypes";
 
 const mockStep = {
   id: "step1",

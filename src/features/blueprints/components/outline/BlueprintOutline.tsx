@@ -2,7 +2,7 @@ import { BookOpenCheck, ListChecks, Milestone, Plus } from "lucide-react";
 import { Button } from "../../../../components/ui/Button.tsx";
 import { EmptyState } from "../../../../components/ui/EmptyState.tsx";
 import { PhasePrerequisites } from "../PhasePrerequisites.tsx";
-import type { BlueprintPath, BlueprintPhase } from "../../types.ts";
+import type { BlueprintPath, BlueprintPhase } from "../../../../services/blueprintTypes.ts";
 import type { OutlineActions } from "./outlineActions.ts";
 import { PhaseHeader } from "./PhaseHeader.tsx";
 import { PhaseRequirements } from "./PhaseRequirements.tsx";

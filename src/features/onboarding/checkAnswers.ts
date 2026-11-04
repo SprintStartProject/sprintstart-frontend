@@ -2,7 +2,7 @@
 // question. Kept out of the component file so the modal can use
 // them without breaking Fast Refresh.
 
-import type { OnboardingQuestionEndpoint, QuestionAttemptSubmission } from "./types";
+import type { OnboardingQuestionEndpoint, QuestionAttemptSubmission } from "../../services/onboardingTypes";
 
 /** A user's in-progress answer to one question, before it is submitted. */
 export interface DraftAnswer {

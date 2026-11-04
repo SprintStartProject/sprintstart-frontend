@@ -1,6 +1,6 @@
 import { MessageCircle, PenLine, UserRound } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
-import type { OnboardingStepEndpoint } from "../types";
+import type { OnboardingStepEndpoint } from "../../../services/onboardingTypes";
 
 type StepOriginBadgeProps = {
   step: OnboardingStepEndpoint;

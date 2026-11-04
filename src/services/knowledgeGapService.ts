@@ -3,7 +3,7 @@ import type {
   KnowledgeGapOverview,
   KnowledgeGap,
   KnowledgeGapOwner,
-} from "../features/knowledge-gaps/types";
+} from "./knowledgeGapTypes";
 
 /**
  * Knowledge gaps are detected and cached per project, so every call carries the

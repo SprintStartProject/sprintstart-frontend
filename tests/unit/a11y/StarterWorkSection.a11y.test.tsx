@@ -8,7 +8,7 @@ import { userService } from "../../../src/services/userService";
 import type {
   StarterWorkCandidate,
   StarterWorkTask,
-} from "../../../src/features/starter-work/types";
+} from "../../../src/services/starterWorkTypes";
 
 vi.mock("../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =

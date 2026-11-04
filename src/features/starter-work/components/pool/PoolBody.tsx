@@ -2,7 +2,7 @@ import { PackageOpen } from "lucide-react";
 import { EmptyState } from "../../../../components/ui/EmptyState";
 import { Pagination } from "../../../../components/ui/Pagination";
 import { SkeletonGroup } from "../../../../components/ui/Skeleton";
-import type { StarterWorkTask } from "../../types";
+import type { StarterWorkTask } from "../../../../services/starterWorkTypes";
 import type { CloudSlotStyle } from "./cloudLayout";
 import { PoolCloudGrid } from "./PoolCloudGrid";
 import { PoolListRow } from "./PoolListRow";

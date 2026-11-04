@@ -4,7 +4,7 @@ import { Marked } from "../../board";
 import type { CardMark } from "../../board";
 import { groupByScope } from "../scopeGroups";
 import { safeStepHref } from "../stepHref";
-import type { ArrivalStep } from "../types";
+import type { ArrivalStep } from "../../../services/arrivalTypes";
 
 /**
  * The read-and-optionally-write rendering of an arrival list: grouped by scope, one row per step.
