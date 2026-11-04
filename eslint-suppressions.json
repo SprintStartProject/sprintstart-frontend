@@ -45,13 +45,10 @@
   },
   "src/components/layout/SidebarNavLink.tsx": {
     "complexity": {
-      "count": 2
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/components/layout/SidebarResizeHandle.tsx": {
