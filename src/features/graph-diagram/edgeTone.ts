@@ -10,14 +10,17 @@
 export type JourneyEdgeTone = "done" | "active" | "waiting" | "upstream" | "rule";
 
 /** What each style is called in a legend. */
-const TONE_LABEL: Record<JourneyEdgeTone, string> = {
-  done: "done",
-  active: "ready now",
-  waiting: "waiting",
-  upstream: "comes first",
-  rule: "locks",
-};
-
 export function toneLabel(tone: JourneyEdgeTone): string {
-  return TONE_LABEL[tone];
+  switch (tone) {
+    case "done":
+      return "done";
+    case "active":
+      return "ready now";
+    case "waiting":
+      return "waiting";
+    case "upstream":
+      return "comes first";
+    case "rule":
+      return "locks";
+  }
 }
