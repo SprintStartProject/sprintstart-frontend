@@ -262,17 +262,6 @@
       "count": 1
     }
   },
-  "src/features/admin/components/ProjectDetailsDrawer.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/features/admin/components/ProjectPeopleSection.tsx": {
     "complexity": {
       "count": 2
@@ -393,17 +382,6 @@
     },
     "max-lines-per-function": {
       "count": 1
-    }
-  },
-  "src/features/arrival/components/ArrivalStepThread.tsx": {
-    "complexity": {
-      "count": 2
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 4
     }
   },
   "src/features/arrival/hooks/useArrivalAuthoring.ts": {
@@ -914,17 +892,6 @@
       "count": 1
     }
   },
-  "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "src/features/dashboard/components/NextStepWidget.tsx": {
     "complexity": {
       "count": 1
@@ -1058,13 +1025,10 @@
   },
   "src/features/data-ingestion/components/RepositoryDiscovery.tsx": {
     "complexity": {
-      "count": 3
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/features/data-ingestion/components/RunDetailsPanel.tsx": {
@@ -1564,17 +1528,6 @@
   },
   "src/features/onboarding/components/journey/QuestionWorkspace.tsx": {
     "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "src/features/onboarding/components/journey/StepWorkspace.tsx": {
-    "complexity": {
-      "count": 2
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {

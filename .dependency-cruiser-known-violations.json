@@ -303,9 +303,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/ProjectDetailsDrawer.tsx",
+    "from": "src/features/admin/components/projectDrawer/projectsKit.ts",
     "to": "src/features/projects/components/ProjectMonogram.tsx",
-    "unresolvedTo": "../../projects/components/ProjectMonogram",
+    "unresolvedTo": "../../../projects/components/ProjectMonogram",
     "dependencyTypes": [
       "local",
       "import"
@@ -317,9 +317,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/ProjectDetailsDrawer.tsx",
+    "from": "src/features/admin/components/projectDrawer/projectsKit.ts",
     "to": "src/features/projects/industry/ProjectIndustryPanel.tsx",
-    "unresolvedTo": "../../projects/industry/ProjectIndustryPanel",
+    "unresolvedTo": "../../../projects/industry/ProjectIndustryPanel",
     "dependencyTypes": [
       "local",
       "import"
@@ -546,9 +546,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/arrival/components/ArrivalStepThread.tsx",
+    "from": "src/features/arrival/components/thread/boardKit.ts",
     "to": "src/features/board/layout/boardOrder.ts",
-    "unresolvedTo": "../../board/layout/boardOrder",
+    "unresolvedTo": "../../../board/layout/boardOrder",
     "dependencyTypes": [
       "local",
       "import"
@@ -833,9 +833,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
+    "from": "src/features/dashboard/components/gaps/gapsKit.ts",
     "to": "src/features/knowledge-gaps/components/SeverityIndicators.tsx",
-    "unresolvedTo": "../../knowledge-gaps/components/SeverityIndicators",
+    "unresolvedTo": "../../../knowledge-gaps/components/SeverityIndicators",
     "dependencyTypes": [
       "local",
       "import"
@@ -847,9 +847,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
+    "from": "src/features/dashboard/components/gaps/gapsKit.ts",
     "to": "src/features/knowledge-gaps/format.ts",
-    "unresolvedTo": "../../knowledge-gaps/format",
+    "unresolvedTo": "../../../knowledge-gaps/format",
     "dependencyTypes": [
       "local",
       "import"
@@ -861,9 +861,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
+    "from": "src/features/dashboard/components/gaps/gapsKit.ts",
     "to": "src/features/knowledge-gaps/severity.ts",
-    "unresolvedTo": "../../knowledge-gaps/severity",
+    "unresolvedTo": "../../../knowledge-gaps/severity",
     "dependencyTypes": [
       "local",
       "import"
@@ -875,9 +875,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
+    "from": "src/features/dashboard/components/gaps/gapsKit.ts",
     "to": "src/features/knowledge-gaps/types.ts",
-    "unresolvedTo": "../../knowledge-gaps/types",
+    "unresolvedTo": "../../../knowledge-gaps/types",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -1132,9 +1132,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/components/journey/StepWorkspace.tsx",
+    "from": "src/features/onboarding/components/journey/workspace/buddyKit.ts",
     "to": "src/features/buddy/aiBuddyBus.ts",
-    "unresolvedTo": "../../../buddy/aiBuddyBus",
+    "unresolvedTo": "../../../../buddy/aiBuddyBus",
     "dependencyTypes": [
       "local",
       "import"
@@ -1146,9 +1146,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/components/journey/StepWorkspace.tsx",
+    "from": "src/features/onboarding/components/journey/workspace/buddyKit.ts",
     "to": "src/features/buddy/components/AskTheBuddy.tsx",
-    "unresolvedTo": "../../../buddy/components/AskTheBuddy",
+    "unresolvedTo": "../../../../buddy/components/AskTheBuddy",
     "dependencyTypes": [
       "local",
       "import"
