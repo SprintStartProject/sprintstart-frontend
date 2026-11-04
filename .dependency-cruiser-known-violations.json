@@ -876,9 +876,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/arrival/components/ArrivalStepThread.tsx",
+    "from": "src/features/arrival/components/thread/boardKit.ts",
     "to": "src/features/board/layout/boardOrder.ts",
-    "unresolvedTo": "../../board/layout/boardOrder",
+    "unresolvedTo": "../../../board/layout/boardOrder",
     "dependencyTypes": [
       "local",
       "import"
