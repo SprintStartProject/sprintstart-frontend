@@ -89,9 +89,10 @@ export function RepositoryDiscovery({
   const isDiscovering = discovery.state === "loading" || discovery.state === "loadingMore";
   const isBusy = isDiscovering || isConnecting;
 
+  const { idsByFullName, projectFullNames } = connected;
   const linkStates = useMemo(
-    () => linkStatesFor(repositories, resolvedOwner, connected),
-    [repositories, resolvedOwner, connected],
+    () => linkStatesFor(repositories, resolvedOwner, { idsByFullName, projectFullNames }),
+    [repositories, resolvedOwner, idsByFullName, projectFullNames],
   );
   const selection = useMemo<DiscoverySelection[]>(
     () =>
@@ -100,9 +101,9 @@ export function RepositoryDiscovery({
         selected: picker.selected,
         owner: resolvedOwner,
         linkStates,
-        idsByFullName: connected.idsByFullName,
+        idsByFullName,
       }),
-    [repositories, picker.selected, resolvedOwner, linkStates, connected.idsByFullName],
+    [repositories, picker.selected, resolvedOwner, linkStates, idsByFullName],
   );
 
   // Report the resolved selection up. `onSelectionChange` must be stable (a
