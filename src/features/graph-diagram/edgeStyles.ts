@@ -8,7 +8,8 @@
 // restates a style from memory is a legend that goes quietly
 // wrong.
 
-import type { GraphEdgeTone, JourneyEdgeTone } from "./graphLayout.ts";
+import type { JourneyEdgeTone } from "./edgeTone.ts";
+import type { GraphEdgeTone } from "./graphLayout.ts";
 
 /**
  * How firm an arrow is, said in the styles the canvas can draw.

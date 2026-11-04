@@ -1,14 +1,6 @@
 import { EDGE_STYLE_SWATCH } from "./edgeStyles.ts";
-import type { JourneyEdgeTone } from "./graphLayout.ts";
-
-/** What each style is called in a legend. */
-const TONE_LABEL: Record<JourneyEdgeTone, string> = {
-  done: "done",
-  active: "ready now",
-  waiting: "waiting",
-  upstream: "comes first",
-  rule: "locks",
-};
+import { toneLabel } from "./edgeTone.ts";
+import type { JourneyEdgeTone } from "./edgeTone.ts";
 
 /**
  * A short sample of one edge style, drawn from the table the canvas strokes with.
@@ -63,7 +55,7 @@ export function EdgeLegend({
       {tones.map((tone) => (
         <li key={tone} className="flex items-center gap-1.5">
           <EdgeSwatch tone={tone} />
-          {TONE_LABEL[tone]}
+          {toneLabel(tone)}
         </li>
       ))}
     </ul>
