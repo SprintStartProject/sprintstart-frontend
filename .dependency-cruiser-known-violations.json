@@ -662,62 +662,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintNodeCard.tsx",
-    "to": "src/features/graph-diagram/graphLayout.ts",
-    "unresolvedTo": "../../graph-diagram/graphLayout.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/components/PhasePrerequisites.tsx",
-    "to": "src/features/graph-diagram/graphLayout.ts",
-    "unresolvedTo": "../../graph-diagram/graphLayout.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/components/PhasePrerequisites.tsx",
-    "to": "src/features/graph-diagram/lockWords.ts",
-    "unresolvedTo": "../../graph-diagram/lockWords.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/pathShape.ts",
-    "to": "src/features/graph-diagram/graphLayout.ts",
-    "unresolvedTo": "../graph-diagram/graphLayout.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/board/components/ArrivalStepsCard.tsx",
     "to": "src/features/arrival/components/ArrivalStepList.tsx",
     "unresolvedTo": "../../arrival/components/ArrivalStepList",
@@ -867,20 +811,6 @@
     "dependencyTypes": [
       "local",
       "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/components/DiagramCard.tsx",
-    "to": "src/features/graph-diagram/DiagramCanvas.tsx",
-    "unresolvedTo": "../../graph-diagram/DiagramCanvas",
-    "dependencyTypes": [
-      "local",
       "import"
     ],
     "rule": {
@@ -1624,34 +1554,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/components/journey/graphView/graphKit.ts",
-    "to": "src/features/graph-diagram/EdgeLegend.tsx",
-    "unresolvedTo": "../../../../graph-diagram/EdgeLegend",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/onboarding/components/journey/graphView/graphKit.ts",
-    "to": "src/features/graph-diagram/graphLayout.ts",
-    "unresolvedTo": "../../../../graph-diagram/graphLayout",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/onboarding/components/journey/StepWorkspace.tsx",
     "to": "src/features/buddy/aiBuddyBus.ts",
     "unresolvedTo": "../../../buddy/aiBuddyBus",
@@ -1669,20 +1571,6 @@
     "from": "src/features/onboarding/components/journey/StepWorkspace.tsx",
     "to": "src/features/buddy/components/AskTheBuddy.tsx",
     "unresolvedTo": "../../../buddy/components/AskTheBuddy",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/onboarding/graph/JourneyCanvas.tsx",
-    "to": "src/features/graph-diagram/edgeStyles.ts",
-    "unresolvedTo": "../../graph-diagram/edgeStyles.ts",
     "dependencyTypes": [
       "local",
       "import"

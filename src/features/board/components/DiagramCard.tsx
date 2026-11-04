@@ -4,7 +4,7 @@ import { boardService } from "../../../services/boardService";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { type GraphShape } from "../../competency-graph";
-import { DiagramCanvas, type DiagramCanvasEdge } from "../../graph-diagram/DiagramCanvas";
+import { DiagramCanvas, type DiagramCanvasEdge } from "../../graph-diagram";
 import { AskTheBuddy } from "../../buddy";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";

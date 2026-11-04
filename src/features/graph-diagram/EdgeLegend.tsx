@@ -1,4 +1,4 @@
-import type { JourneyEdgeTone } from "../onboarding/graph/JourneyCanvas.tsx";
+import type { JourneyEdgeTone } from "./edgeTone.ts";
 import { EDGE_STYLE_SWATCH } from "./edgeStyles.ts";
 
 /** What each style is called in a legend. */

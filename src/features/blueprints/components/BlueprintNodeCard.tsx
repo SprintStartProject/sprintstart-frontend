@@ -1,6 +1,6 @@
 import { KeyRound, type LucideIcon } from "lucide-react";
 import { Badge, type BadgeVariant } from "../../../components/ui/Badge.tsx";
-import { compactTitlePx, detailForZoom } from "../../graph-diagram/graphLayout.ts";
+import { compactTitlePx, detailForZoom } from "../../graph-diagram";
 import type { BlueprintGraphCanvasNodeProps } from "./BlueprintGraphCanvas.tsx";
 
 /**
