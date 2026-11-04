@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { AlertCircle, ArrowRight, CircleHelp, Rocket, Signpost } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
-import type { MyOnboardingStatus } from "../../onboarding/hooks/useMyOnboardingStatus";
-import type { OnboardingNextAction } from "../../onboarding/nextAction";
+import type { MyOnboardingStatus } from "../../onboarding";
+import type { OnboardingNextAction } from "../../onboarding";
 
 /** The ring at a card's full width, and the one that still fits a quarter-row card. */
 const RING_SIZE = 104;

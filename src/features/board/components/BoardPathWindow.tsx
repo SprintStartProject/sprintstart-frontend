@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import { ArrowRight, CheckCircle2, Milestone, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../../components/ui/Button.tsx";
-import { phaseProgress, sortedPhases } from "../../onboarding/journey.ts";
-import { resolveNextAction } from "../../onboarding/nextAction.ts";
-import { onboardingPlaceUrl } from "../../onboarding/onboardingPlace.ts";
-import type { OnboardingPathEndpoint } from "../../onboarding/types.ts";
+import { phaseProgress, sortedPhases } from "../../onboarding";
+import { resolveNextAction } from "../../onboarding";
+import { onboardingPlaceUrl } from "../../onboarding";
+import type { OnboardingPathEndpoint } from "../../onboarding";
 
 type BoardPathWindowProps = {
   /** The hire's path, or null while it loads and when there is none. */

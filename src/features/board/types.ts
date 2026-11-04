@@ -1,5 +1,5 @@
 import type { ArrivalStep } from "../arrival/types";
-import type { StepStatus } from "../onboarding/types";
+import type { StepStatus } from "../onboarding";
 import type { TaskType } from "../starter-work";
 
 /**

@@ -8,7 +8,7 @@
 // restates a style from memory is a legend that goes quietly
 // wrong.
 
-import type { JourneyEdgeTone } from "../onboarding/graph/JourneyCanvas.tsx";
+import type { JourneyEdgeTone } from "./edgeTone.ts";
 import type { GraphEdgeTone } from "./graphLayout.ts";
 
 /**

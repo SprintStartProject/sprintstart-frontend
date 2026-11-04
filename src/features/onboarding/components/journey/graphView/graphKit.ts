@@ -1,2 +1,2 @@
-export { EdgeLegend } from "../../../../graph-diagram/EdgeLegend";
-export { EDGE_REFUSAL_MESSAGE, edgeRefusal } from "../../../../graph-diagram/graphLayout";
+export { EdgeLegend } from "../../../../graph-diagram";
+export { EDGE_REFUSAL_MESSAGE, edgeRefusal } from "../../../../graph-diagram";

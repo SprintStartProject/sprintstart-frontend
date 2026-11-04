@@ -1,4 +1,4 @@
-import { useMyOnboardingStatus } from "../../onboarding/hooks/useMyOnboardingStatus";
+import { useMyOnboardingStatus } from "../../onboarding";
 import type { DashboardWidgetSize } from "../layout/types";
 import { NextStepWidget } from "./NextStepWidget";
 

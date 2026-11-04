@@ -1,2 +1,2 @@
-export { isSkipPending } from "../../../../onboarding/journey";
-export type { OnboardingStepEndpoint, OnboardingTaskEndpoint } from "../../../../onboarding/types";
+export { isSkipPending } from "../../../../onboarding";
+export type { OnboardingStepEndpoint, OnboardingTaskEndpoint } from "../../../../onboarding";
