@@ -2062,13 +2062,10 @@
   },
   "src/features/team-management/components/detail/MemberJourneySection.tsx": {
     "complexity": {
-      "count": 2
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 4
+      "count": 1
     }
   },
   "src/features/team-management/components/detail/PhaseCheckAdminModal.tsx": {
