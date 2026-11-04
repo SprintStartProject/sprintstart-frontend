@@ -5,10 +5,10 @@ import { Spinner } from "../../../components/ui/Spinner";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy";
-import { ArrivalStepList } from "../../arrival/components/ArrivalStepList";
+import { ArrivalStepList } from "../../arrival";
 import { Marked } from "./Marked";
-import { summarise } from "../../arrival/summarise";
-import type { ArrivalStep } from "../../arrival/types";
+import { summarise } from "../../arrival";
+import type { ArrivalStep } from "../../arrival";
 import type { ArrivalStepsContent, BoardCard } from "../types";
 
 type ArrivalStepsCardProps = {

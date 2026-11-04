@@ -560,64 +560,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/board/components/ArrivalStepsCard.tsx",
-    "to": "src/features/arrival/components/ArrivalStepList.tsx",
-    "unresolvedTo": "../../arrival/components/ArrivalStepList",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/components/ArrivalStepsCard.tsx",
-    "to": "src/features/arrival/summarise.ts",
-    "unresolvedTo": "../../arrival/summarise",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/components/ArrivalStepsCard.tsx",
-    "to": "src/features/arrival/types.ts",
-    "unresolvedTo": "../../arrival/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/types.ts",
-    "to": "src/features/arrival/types.ts",
-    "unresolvedTo": "../arrival/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/buddy/citations/citationArtifact.ts",
     "to": "src/features/data-ingestion/connectors/registry.ts",
     "unresolvedTo": "../../data-ingestion/connectors/registry.ts",
