@@ -16,7 +16,7 @@ import {
   formatNumber,
 } from "../../../../src/features/data-ingestion/data";
 import { CONNECTORS } from "../../../../src/features/data-ingestion/connectors/registry";
-import { SOURCE_SYSTEMS } from "../../../../src/features/data-ingestion/connectors/sourceSystems";
+import { SOURCE_SYSTEMS } from "../../../../src/services/sourceSystems";
 import {
   bitbucketRepositoryOf,
   confluenceSpaceOf,

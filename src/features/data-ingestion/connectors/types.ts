@@ -13,7 +13,7 @@ import type {
 } from "../types.ts";
 import type { Artifact } from "../../knowledge-base/types.ts";
 import type { DraftConnectOutcome, DraftSource } from "./draft.ts";
-import type { SourceSystem } from "./sourceSystems.ts";
+import type { SourceSystem } from "../../../services/sourceSystems.ts";
 
 /** How a connector presents itself wherever its sources are named. */
 export type ConnectorMeta = {

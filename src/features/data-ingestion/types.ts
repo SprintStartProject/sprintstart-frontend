@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { IconComponent } from "../../components/icons/types.ts";
-import type { SourceSystem } from "./connectors/sourceSystems.ts";
+import type { SourceSystem } from "../../services/sourceSystems.ts";
 
 export type { SourceSystem };
 

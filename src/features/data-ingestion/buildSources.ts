@@ -4,7 +4,7 @@ import { parseGithubRepositoryReference } from "../../services/sources/githubRep
 import type { JiraInstanceDto } from "../../services/sources/jiraService.ts";
 import type { NotionWorkspaceConnectionDto } from "../../services/sources/notionService.ts";
 import { CONNECTORS } from "./connectors/registry.ts";
-import { toSourceSystem, type SourceSystem } from "./connectors/sourceSystems.ts";
+import { toSourceSystem, type SourceSystem } from "../../services/sourceSystems.ts";
 import { createDataSource } from "./data.ts";
 import type { DataSource, IngestionRun, SourceInstanceIngestionStatus } from "./types.ts";
 

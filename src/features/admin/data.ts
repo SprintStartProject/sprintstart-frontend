@@ -2,7 +2,7 @@ import type { BadgeVariant } from "../../components/ui/Badge";
 import { SIDE_PANEL_SLIDE_MS } from "../../styles/tokens";
 import type { ProjectRole, Skill } from "../team-management";
 import { deriveSourceStatus, SOURCE_META } from "../data-ingestion/data";
-import { toSourceSystem } from "../data-ingestion/connectors/sourceSystems";
+import { toSourceSystem } from "../../services/sourceSystems";
 import type { SourceMeta } from "../data-ingestion/types";
 import type { ProjectManager } from "../../services/projectService";
 import type {
