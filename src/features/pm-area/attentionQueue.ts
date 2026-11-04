@@ -1,5 +1,5 @@
 import type { AttentionItem } from "../onboarding-metrics/types";
-import type { TeamOverviewUser } from "../team-management/types";
+import type { TeamOverviewUser } from "../team-management";
 import { daysOnStep, isAtRisk, memberName } from "./memberStatus";
 
 export type AttentionReasonKind = "skip" | "feedback" | "waiting-review" | "drifting" | "stuck";

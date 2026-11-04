@@ -1,6 +1,6 @@
 import { AlertTriangle, ShieldCheck } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
-import { ProjectMonogram } from "../../projects/components/ProjectMonogram";
+import { ProjectMonogram } from "../../projects";
 import type { ProjectSummary } from "../types";
 import { AccessBadge } from "./Badges";
 

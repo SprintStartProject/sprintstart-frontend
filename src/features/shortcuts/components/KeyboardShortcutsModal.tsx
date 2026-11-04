@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import { Modal } from "../../../components/ui/Modal";
 import { canAccessRoute } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { SHORTCUTS, shortcutChord, type ShortcutCategory, type ShortcutItem } from "../shortcuts";
 
 /** Reading order of the help — the registry's own order inside each group. */

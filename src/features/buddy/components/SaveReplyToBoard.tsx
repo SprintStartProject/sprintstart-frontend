@@ -5,7 +5,7 @@ import { useToast } from "../../../context/useToast";
 import { boardService } from "../../../services/boardService";
 import { extractChecklist, toChecklistRequest } from "../../board/generation/checklistFromMarkdown";
 import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 
 type SaveReplyToBoardProps = {
   /** The buddy's reply, as Markdown. Nothing renders when it holds no list. */

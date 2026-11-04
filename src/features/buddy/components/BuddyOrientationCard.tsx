@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { OrientationPanel } from "../../orientation/components/OrientationPanel";
 import { OrientationEditor } from "../../orientation/components/OrientationEditor";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { orientationService } from "../../../services/orientationService";
 import type { MyOrientation } from "../../orientation/types";
 

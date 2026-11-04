@@ -15,7 +15,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatMinutes, type PhaseState } from "../../onboarding/journey";
 import type { OnboardingPathEndpoint } from "../../onboarding/types";
-import type { TeamOverviewUser } from "../../team-management/types";
+import type { TeamOverviewUser } from "../../team-management";
 import type { OnboardingFeedback, UserSkillLevel } from "../../../services/teamManagementService";
 import { memberSummaryData } from "../memberSummary";
 import {

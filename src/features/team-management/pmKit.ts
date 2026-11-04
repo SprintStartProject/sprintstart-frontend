@@ -6,4 +6,4 @@
  * only one that changes.
  */
 export { PmFilterChip, PmListToolbar } from "../pm-area/components/PmListToolbar.tsx";
-export { useProjectContext } from "../projects/useProjectContext.ts";
+export { useProjectContext } from "../projects";

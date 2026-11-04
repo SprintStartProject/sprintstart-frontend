@@ -5,7 +5,7 @@ import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { AddTaskToBoard } from "./AddTaskToBoard";
-import { GrabTaskButton } from "../../task-pool/components/GrabTaskButton";
+import { GrabTaskButton } from "../../task-pool";
 import type { BoardCard, SuggestedTasksContent } from "../types";
 
 type SuggestedTasksCardProps = {

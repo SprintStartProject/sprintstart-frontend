@@ -1,4 +1,4 @@
-import { AccessManagementView } from "../../access/components/AccessManagementView";
+import { AccessManagementView } from "../../access";
 
 type TokensTabProps = {
   sourceFilter: string;

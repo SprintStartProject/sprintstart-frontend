@@ -4,7 +4,7 @@ import { Calendar, Check, Filter, RotateCcw, TriangleAlert, X } from "lucide-rea
 import { centralSpringToken } from "../../../styles/tokens";
 import { SOURCE_META } from "../../data-ingestion/data";
 import type { SourceSystem } from "../../data-ingestion/connectors/sourceSystems";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { useAvailableSources } from "../hooks/useAvailableSources";
 import { isFilterRangeInvalid } from "../utils/filterRange";
 import type { BuddySessionFilters } from "../types";

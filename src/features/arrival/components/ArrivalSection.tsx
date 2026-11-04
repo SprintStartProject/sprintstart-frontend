@@ -1,5 +1,5 @@
 import { ArrivalStepAuthoring } from "./ArrivalStepAuthoring";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { useAuth } from "../../../context/useAuth";
 import { PermissionGroup } from "../../../services/types";
 

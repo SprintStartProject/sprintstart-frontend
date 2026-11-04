@@ -22,7 +22,7 @@ import { Spinner } from "../../../components/ui/Spinner";
 import { queryKeys } from "../../../services/queryKeys";
 import { PmSectionHeader, PmStat } from "../../pm-area/components/PmCard";
 import { PmFilterChip, PmListToolbar } from "../../pm-area/components/PmListToolbar";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { formatAskedAt } from "../format";
 import { FaqGroupPanel } from "./FaqGroupPanel";
 import { RebuildFaqDialog } from "./RebuildFaqDialog";

@@ -10,7 +10,7 @@ import type {
   ProjectUser,
   ProjectUserSummary,
 } from "../../services/projectService";
-import type { ProjectRole, Skill } from "../team-management/types";
+import type { ProjectRole, Skill } from "../team-management";
 
 export type LoadingState = "idle" | "loading" | "success" | "error";
 export type UserFilter =

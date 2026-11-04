@@ -1,8 +1,5 @@
 import { useState } from "react";
-import {
-  AccessManagementView,
-  DEFAULT_ACCESS_SOURCE_FILTER,
-} from "../../access/components/AccessManagementView";
+import { AccessManagementView, DEFAULT_ACCESS_SOURCE_FILTER } from "../../access";
 
 /**
  * Access-token hub for the Settings page.

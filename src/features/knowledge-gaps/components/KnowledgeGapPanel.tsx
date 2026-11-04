@@ -15,7 +15,7 @@ import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { queryKeys } from "../../../services/queryKeys";
 import { getTeamOverview } from "../../../services/teamManagementService";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { daysSince, formatDateTime, formatRelativeDate } from "../format";
 import { SEVERITY_FILL, SEVERITY_STYLES } from "../severity";
 import type { KnowledgeGap } from "../types";

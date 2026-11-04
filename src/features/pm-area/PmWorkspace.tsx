@@ -26,7 +26,7 @@ import { KnowledgeGapsPage } from "../knowledge-gaps/components/KnowledgeGapsPag
 import { KnowledgeRequestInboxPage } from "../knowledge-request/components/KnowledgeRequestInboxPage";
 import { useOpenEscalationCount } from "../knowledge-request/useOpenEscalationCount";
 import { OnboardingMetricsPage } from "../onboarding-metrics/components/OnboardingMetricsPage";
-import { useProjectContext } from "../projects/useProjectContext";
+import { useProjectContext } from "../projects";
 import { ProjectAnalysisLauncher } from "./analysis/ProjectAnalysisLauncher";
 import { MemberPeekPanel } from "./components/MemberPeekPanel";
 import { PmHeaderStatus } from "./components/PmHeaderStatus";

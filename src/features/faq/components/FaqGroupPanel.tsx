@@ -8,7 +8,7 @@ import { IconTile } from "../../../components/ui/IconTile";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { insightsService } from "../../../services/faqService";
 import { queryKeys } from "../../../services/queryKeys";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { formatAskedAt } from "../format";
 import type { FAQGroup } from "../types";
 import { TrendBadge } from "./TrendBadge";

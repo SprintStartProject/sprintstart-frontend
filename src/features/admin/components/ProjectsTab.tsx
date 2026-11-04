@@ -19,7 +19,7 @@ import {
   getSourceHealth,
   pluralize,
 } from "../data";
-import { ProjectMonogram } from "../../projects/components/ProjectMonogram";
+import { ProjectMonogram } from "../../projects";
 import type { AdminUser, ProjectOverview } from "../types";
 import { SourceHealthChip } from "./SourceHealthChip";
 import { SourceTypeChips } from "./SourceTypeChips";

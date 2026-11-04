@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, FileText } from "lucide-react";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { useAuth } from "../../../context/useAuth";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import type { Artifact } from "../../knowledge-base/types";
 
 const PREVIEW_COUNT = 4;

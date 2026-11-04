@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { FilterSelect } from "../../../components/ui/FilterSelect";
-import type { ProjectRole, TeamOverviewUser } from "../../team-management/types";
+import type { ProjectRole, TeamOverviewUser } from "../../team-management";
 import { memberName } from "../memberStatus";
 
 type MemberHeroProps = {

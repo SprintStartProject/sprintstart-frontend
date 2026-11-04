@@ -30,7 +30,7 @@ import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/
 import { queryKeys } from "../../../services/queryKeys";
 import { PmSectionHeader, PmStat } from "../../pm-area/components/PmCard";
 import { PmFilterChip, PmListToolbar } from "../../pm-area/components/PmListToolbar";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 
 type GapSortOption = "severity" | "date" | "component";
 
