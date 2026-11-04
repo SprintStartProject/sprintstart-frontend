@@ -47,7 +47,7 @@ export async function createSession(): Promise<string> {
  * Bins one of the hire's conversations.
  *
  * The conversation leaves the hire's list — the backend keeps it, messages and all, until its
- * retention window ends and then deletes it for good. The list read no longer returns it, so
+ * retention window ends and then deletes it for good. The list read does not return it, so
  * taking the row out client-side is the same thing the next read would show.
  *
  * @param sessionId - The conversation to bin. One of the hire's own; the backend answers `404`

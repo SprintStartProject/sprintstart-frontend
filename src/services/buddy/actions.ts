@@ -71,8 +71,8 @@ export async function confirmStoredProposal(proposalId: string): Promise<BuddyAc
 }
 
 /**
- * Dismisses a *team-mode* proposal by id. Nothing changes but the proposal — it can no longer be
- * confirmed. The same `404` rule as `confirmStoredProposal` applies.
+ * Dismisses a *team-mode* proposal by id. Nothing changes but the proposal — it cannot be
+ * confirmed any more. The same `404` rule as `confirmStoredProposal` applies.
  */
 export async function dismissStoredProposal(proposalId: string): Promise<BuddyActionResult> {
   return await apiClient.fetch<BuddyActionResult>(

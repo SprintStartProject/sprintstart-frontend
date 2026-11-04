@@ -89,7 +89,7 @@ function parseDataLine(line: string): BuddyStreamChunk | null {
   } catch {
     // A malformed chunk is skipped, never fatal -- the same tolerance the backend applies,
     // and what `aiStreamService` already does with the identical framing. One unparseable
-    // line (a keep-alive, a proxy's own text, a truncated tail) used to throw out of the
+    // line (a keep-alive, a proxy's own text, a truncated tail) must not throw out of the
     // loop and take the rest of the reply with it.
     return null;
   }
