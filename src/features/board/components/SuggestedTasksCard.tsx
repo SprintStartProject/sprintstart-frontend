@@ -3,7 +3,7 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../buddy";
 import { AddTaskToBoard } from "./AddTaskToBoard";
 import { GrabTaskButton } from "../../task-pool";
 import type { BoardCard, SuggestedTasksContent } from "../types";

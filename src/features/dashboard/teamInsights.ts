@@ -3,9 +3,9 @@
 
 import { canAccessRoute } from "../../auth/accessPolicy";
 import type { UserProfile } from "../../services/types";
-import type { FAQGroup } from "../faq/types";
-import type { KnowledgeGap, KnowledgeGapSeverity } from "../knowledge-gaps/types";
-import { SEVERITIES } from "../knowledge-gaps/severity";
+import type { FAQGroup } from "../faq";
+import type { KnowledgeGap, KnowledgeGapSeverity } from "../knowledge-gaps";
+import { SEVERITIES } from "../knowledge-gaps";
 
 /**
  * Whether the dashboard's flexible slot may show team insights to this user.

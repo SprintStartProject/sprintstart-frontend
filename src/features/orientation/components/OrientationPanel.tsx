@@ -3,8 +3,8 @@ import { OrientationSectionCard } from "./OrientationSectionCard";
 import { ReportOrientationProblem } from "./ReportOrientationProblem";
 import { SourceLinks } from "./SourceLinks";
 import { useOpenSteps } from "../hooks/useOpenSteps";
-import { AiActivityLog } from "../../ai-activity/AiActivityLog";
-import type { AiActivityEntry } from "../../ai-activity/useAiStream";
+import { AiActivityLog } from "../../ai-activity";
+import type { AiActivityEntry } from "../../ai-activity";
 import type { MyOrientation, OrientationPacket } from "../types";
 
 type OrientationPanelProps = {

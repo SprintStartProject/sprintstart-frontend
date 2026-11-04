@@ -3,7 +3,7 @@ import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { getTeamOverview } from "../../../services/teamManagementService";
 import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects";
-import { memberStage } from "../../pm-area/memberStatus";
+import { memberStage } from "../../pm-area";
 import type { TeamOverviewUser } from "../../team-management";
 import type { DashboardWidgetSize } from "../layout/types";
 import { WidgetBar } from "./WidgetBar";

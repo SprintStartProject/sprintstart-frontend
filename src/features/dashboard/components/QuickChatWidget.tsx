@@ -2,9 +2,9 @@ import { useCallback, useState, type RefCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
-import { useBuddyDraftActions } from "../../buddy/buddyDraftContext";
-import { SleepyBot } from "../../buddy/components/SleepyBot";
-import { withSeed } from "../../buddy/hooks/useBuddy";
+import { useBuddyDraftActions } from "../../buddy";
+import { SleepyBot } from "../../buddy";
+import { withSeed } from "../../buddy";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { DashboardWidgetSize } from "../layout/types";
 

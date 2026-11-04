@@ -5,7 +5,7 @@ import { IconTile } from "../../../components/ui/IconTile";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { getSessions } from "../../../services/buddyService";
 import { queryKeys } from "../../../services/queryKeys";
-import { formatRelativeDate } from "../../buddy/format";
+import { formatRelativeDate } from "../../buddy";
 
 const PREVIEW_COUNT = 4;
 

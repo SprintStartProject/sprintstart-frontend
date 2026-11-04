@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRepeatClicks } from "../../easter-eggs/hooks/useRepeatClicks";
+import { useRepeatClicks } from "../../easter-eggs";
 
 const TOAST_DURATION_MS = 3000;
 const TOGGLE_DEBOUNCE_MS = 2000;

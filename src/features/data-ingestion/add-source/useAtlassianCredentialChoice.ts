@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService.ts";
-import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials.ts";
+import { useAtlassianCredentials } from "../../settings";
 
 /**
  * The stored Atlassian credential a Jira or Confluence form picks, with the list it picks

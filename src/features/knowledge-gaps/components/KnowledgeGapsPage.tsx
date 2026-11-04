@@ -28,8 +28,8 @@ import { Button } from "../../../components/ui/Button";
 import type { FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { queryKeys } from "../../../services/queryKeys";
-import { PmSectionHeader, PmStat } from "../../pm-area/components/PmCard";
-import { PmFilterChip, PmListToolbar } from "../../pm-area/components/PmListToolbar";
+import { PmSectionHeader, PmStat } from "../../pm-area";
+import { PmFilterChip, PmListToolbar } from "../../pm-area";
 import { useProjectContext } from "../../projects";
 
 type GapSortOption = "severity" | "date" | "component";

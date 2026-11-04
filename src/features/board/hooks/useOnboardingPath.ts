@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../../services/apiClient";
 import { onboardingService } from "../../../services/onboardingService";
-import { onBuddyPathChanged } from "../../buddy/aiBuddyBus";
+import { onBuddyPathChanged } from "../../buddy";
 import type { OnboardingPathEndpoint } from "../../onboarding/types";
 
 /**

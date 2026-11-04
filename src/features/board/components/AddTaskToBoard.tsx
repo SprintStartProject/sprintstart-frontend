@@ -1,6 +1,6 @@
 import { ListChecks } from "lucide-react";
 import { SaveToBoard } from "../save/SaveToBoard";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../buddy";
 import { checklistFromTask, taskSteps, type TaskForChecklist } from "../generation/taskChecklist";
 
 type AddTaskToBoardProps = TaskForChecklist & {

@@ -3,9 +3,9 @@ import { Check, ChevronDown, ExternalLink, LayoutList, Search, UserCheck } from 
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../buddy";
 import { GrabTaskButton } from "../../task-pool";
-import type { TaskType } from "../../starter-work/types";
+import type { TaskType } from "../../starter-work";
 import { BoardCardFrame } from "./BoardCardFrame";
 import type { BoardCard, BoardPoolTask, TaskPoolContent } from "../types";
 

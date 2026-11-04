@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { OrientationPanel } from "../../orientation/components/OrientationPanel";
-import { OrientationEditor } from "../../orientation/components/OrientationEditor";
+import { OrientationPanel } from "../../orientation";
+import { OrientationEditor } from "../../orientation";
 import { useProjectContext } from "../../projects";
 import { orientationService } from "../../../services/orientationService";
-import type { MyOrientation } from "../../orientation/types";
+import type { MyOrientation } from "../../orientation";
 
 /**
  * The orientation packet as a rich card inside the buddy conversation, rendered once the hire

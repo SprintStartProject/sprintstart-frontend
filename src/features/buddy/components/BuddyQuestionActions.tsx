@@ -1,4 +1,4 @@
-import { FlagToPmButton } from "../../knowledge-request/components/FlagToPmButton";
+import { FlagToPmButton } from "../../knowledge-request";
 
 /**
  * What a hire can do with a question they have already asked.

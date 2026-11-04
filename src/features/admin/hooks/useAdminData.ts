@@ -4,7 +4,7 @@ import { adminUserService } from "../../../services/adminUserService";
 import { projectService } from "../../../services/projectService";
 import { queryKeys } from "../../../services/queryKeys";
 import { enrichUsersWithProjectNames, getAvailableProjects } from "../data";
-import { useGithubTokens } from "../../settings/hooks/useGithubTokens";
+import { useGithubTokens } from "../../settings";
 import type { AdminUser, LoadingState, ProjectOverview } from "../types";
 
 type AdminOverview = {

@@ -1,4 +1,4 @@
-import type { AttentionItem } from "../onboarding-metrics/types";
+import type { AttentionItem } from "../onboarding-metrics";
 import type { TeamOverviewUser } from "../team-management";
 import { daysOnStep, isAtRisk, memberName } from "./memberStatus";
 

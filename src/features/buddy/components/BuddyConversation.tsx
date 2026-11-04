@@ -10,8 +10,8 @@ import type { BuddyComposerQueue } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
 import { BuddyReplyActions } from "./BuddyReplyActions";
 import { ArrowDown, MessagesSquare } from "lucide-react";
-import { SaveToBoard } from "../../board/save/SaveToBoard";
-import { transcriptNote } from "../../board/generation/chatToCard";
+import { SaveToBoard } from "../../board";
+import { transcriptNote } from "../../board";
 import { useStickToBottom } from "../hooks/useStickToBottom";
 import { RAIL_TOGGLE_CLEARANCE } from "../../../components/layout/ConversationRail";
 

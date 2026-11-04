@@ -2,7 +2,7 @@ import { useState } from "react";
 import { MessageCircle, PartyPopper, X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { useFocusMode } from "../../../context/useFocusMode";
-import { openAiBuddy } from "../../buddy/aiBuddyBus";
+import { openAiBuddy } from "../../buddy";
 import { isPhaseOpen } from "../../onboarding/activePhase";
 import type { OnboardingPathEndpoint } from "../../onboarding/types";
 import { readOfferedRecaps, writeOfferedRecaps } from "../layout/phaseRecaps";

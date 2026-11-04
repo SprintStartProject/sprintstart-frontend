@@ -22,7 +22,7 @@ import { IconTile } from "../../../components/ui/IconTile";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { orientationService } from "../../../services/orientationService";
 import { queryKeys } from "../../../services/queryKeys";
-import { OrientationEditor } from "../../orientation/components/OrientationEditor";
+import { OrientationEditor } from "../../orientation";
 import { formatRelativeDate } from "../format";
 import type { StarterWorkTask } from "../types";
 import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";

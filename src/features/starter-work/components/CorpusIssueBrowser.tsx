@@ -11,7 +11,7 @@ import { Pagination } from "../../../components/ui/Pagination";
 import { useToast } from "../../../context/useToast";
 import { useIsSmUp } from "../../../hooks/useIsSmUp";
 import { getQuickActionRevealVariants, quickActionSpringToken } from "../../../styles/tokens";
-import { BuddyMarkdown } from "../../buddy/components/BuddyMarkdown";
+import { BuddyMarkdown } from "../../buddy";
 import { useCorpusIssueBrowser } from "../hooks/useCorpusIssueBrowser";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
 import type { CandidatePoolState, StarterWorkCandidate, StarterWorkTask } from "../types";

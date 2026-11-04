@@ -1,5 +1,5 @@
 import type { AppRoute } from "../../auth/accessPolicy";
-import { isTextEntryTarget } from "../easter-eggs/lib/keyTargets";
+import { isTextEntryTarget } from "../easter-eggs";
 
 /**
  * Every chord in the app, defined once.

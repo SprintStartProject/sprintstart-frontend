@@ -1,7 +1,7 @@
 import { Award } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../buddy";
 import type { BoardCard, BoardCompetency, CompetencyProgressContent } from "../types";
 
 type CompetencyProgressCardProps = {

@@ -7,7 +7,7 @@ import { emptyDraft, isAnswered, toSubmission, type DraftAnswer } from "../../ch
 import type { OnboardingQuestionEndpoint, QuestionAttemptResult } from "../../types";
 import { CheckQuestionCard } from "../CheckQuestionCard";
 import { ConfettiBurst } from "../ConfettiBurst";
-import { AskTheBuddy } from "../../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../../buddy";
 import { askAboutQuestion, askAboutWrongAnswer } from "../../buddyDrafts";
 import {
   clearRevealed,
