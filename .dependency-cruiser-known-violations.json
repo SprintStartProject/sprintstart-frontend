@@ -232,38 +232,6 @@
     ]
   },
   {
-    "type": "cycle",
-    "from": "src/features/graph-diagram/edgeStyles.ts",
-    "to": "src/features/onboarding/graph/JourneyCanvas.tsx",
-    "unresolvedTo": "../onboarding/graph/JourneyCanvas.tsx",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/features/onboarding/graph/JourneyCanvas.tsx",
-        "dependencyTypes": [
-          "local",
-          "type-only",
-          "import"
-        ]
-      },
-      {
-        "name": "src/features/graph-diagram/edgeStyles.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
     "type": "dependency",
     "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/AddSourceFlow.tsx",
@@ -581,76 +549,6 @@
     "from": "src/features/arrival/components/ArrivalStepThread.tsx",
     "to": "src/features/board/layout/boardOrder.ts",
     "unresolvedTo": "../../board/layout/boardOrder",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/graphKit.ts",
-    "to": "src/features/graph-diagram/EdgeLegend.tsx",
-    "unresolvedTo": "../../graph-diagram/EdgeLegend.tsx",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/graphKit.ts",
-    "to": "src/features/graph-diagram/graphLayout.ts",
-    "unresolvedTo": "../../graph-diagram/graphLayout.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/graphKit.ts",
-    "to": "src/features/graph-diagram/lockWords.ts",
-    "unresolvedTo": "../../graph-diagram/lockWords.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/graphKit.ts",
-    "to": "src/features/onboarding/graph/JourneyCanvas.tsx",
-    "unresolvedTo": "../../onboarding/graph/JourneyCanvas.tsx",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/blueprints/graphKit.ts",
-    "to": "src/features/onboarding/graph/layout.ts",
-    "unresolvedTo": "../../onboarding/graph/layout.ts",
     "dependencyTypes": [
       "local",
       "import"
@@ -1112,36 +1010,6 @@
     "unresolvedTo": "../../../knowledge-base/components/FileUploadZone.tsx",
     "dependencyTypes": [
       "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/graph-diagram/EdgeLegend.tsx",
-    "to": "src/features/onboarding/graph/JourneyCanvas.tsx",
-    "unresolvedTo": "../onboarding/graph/JourneyCanvas.tsx",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/graph-diagram/edgeStyles.ts",
-    "to": "src/features/onboarding/graph/JourneyCanvas.tsx",
-    "unresolvedTo": "../onboarding/graph/JourneyCanvas.tsx",
-    "dependencyTypes": [
-      "local",
-      "type-only",
       "import"
     ],
     "rule": {
