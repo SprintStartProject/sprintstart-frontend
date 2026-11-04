@@ -3572,9 +3572,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/components/journey/StepWorkspace.tsx",
+    "from": "src/features/onboarding/components/journey/workspace/buddyKit.ts",
     "to": "src/features/buddy/aiBuddyBus.ts",
-    "unresolvedTo": "../../../buddy/aiBuddyBus",
+    "unresolvedTo": "../../../../buddy/aiBuddyBus",
     "dependencyTypes": [
       "local",
       "import"
@@ -3586,9 +3586,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/components/journey/StepWorkspace.tsx",
+    "from": "src/features/onboarding/components/journey/workspace/buddyKit.ts",
     "to": "src/features/buddy/components/AskTheBuddy.tsx",
-    "unresolvedTo": "../../../buddy/components/AskTheBuddy",
+    "unresolvedTo": "../../../../buddy/components/AskTheBuddy",
     "dependencyTypes": [
       "local",
       "import"
