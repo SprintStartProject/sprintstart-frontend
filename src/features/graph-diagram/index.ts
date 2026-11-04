@@ -2,7 +2,6 @@ export { DiagramCanvas } from "./DiagramCanvas";
 export type { DiagramCanvasEdge } from "./DiagramCanvas";
 export { EdgeLegend, EdgeSwatch } from "./EdgeLegend";
 export { EDGE_STYLE_SWATCH } from "./edgeStyles";
-export type { JourneyEdgeTone } from "./edgeStyles";
 export {
   EDGE_REFUSAL_MESSAGE,
   GRAPH_NODE_HEIGHT,
@@ -26,5 +25,6 @@ export type {
   GraphPoint,
   GraphPositions,
   GraphRuleNode,
+  JourneyEdgeTone,
 } from "./graphLayout";
 export { LOCK_SENTENCE } from "./lockWords";

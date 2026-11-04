@@ -536,6 +536,17 @@ export function blueprintEdgePath(
 }
 
 /**
+ * How an edge is drawn: satisfied, the one being worked through right now, still waiting, or —
+ * while somebody is pointing at a node — one of the things standing in that node's way.
+ *
+ * The first three are states a graph with progress on it has. `upstream` is not a state: it is an
+ * answer to "why is this shut", which only exists while a node is being pointed at, and it is
+ * drawn apart from the other three so that the two halves of a lit run can be told apart at a
+ * glance instead of by following arrowheads.
+ */
+export type JourneyEdgeTone = "done" | "active" | "waiting" | "upstream" | "rule";
+
+/**
  * How firm one arrow is, on a graph whose arrows do not all come from the same place.
  *
  * A Blueprint has one kind: every arrow is a rule its author wrote. A hire's board has three — a
