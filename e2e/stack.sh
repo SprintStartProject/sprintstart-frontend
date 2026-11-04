@@ -6,7 +6,8 @@
 #   bash e2e/stack.sh up      # start and wait until backend and Keycloak answer
 #   bash e2e/stack.sh down    # stop and delete everything, volumes included
 #   bash e2e/stack.sh logs    # follow the logs
-#   bash e2e/stack.sh dump    # print the last 200 lines of every service (for CI)
+#   bash e2e/stack.sh dump    # print everything the backend and the AI stub logged, then the last
+#                             # 200 lines of every service, all with timestamps (for CI)
 
 set -euo pipefail
 
@@ -39,6 +40,14 @@ case "${1:-up}" in
         ;;
     down) compose down -v ;;
     logs) compose logs -f ;;
-    dump) compose logs --tail 200 ;;
+    dump)
+        # The backend and the AI stub in full: a journey that fails on a 500 needs the stack trace, which
+        # is long gone from a 200-line tail by the time the run ends. Timestamps let a trace's request
+        # time be matched to the line.
+        echo "== backend and ai-stub, complete"
+        compose logs --no-color --timestamps backend ai-stub
+        echo "== every service, last 200 lines"
+        compose logs --no-color --timestamps --tail 200
+        ;;
     *) echo "usage: e2e/stack.sh up|down|logs|dump"; exit 2 ;;
 esac
