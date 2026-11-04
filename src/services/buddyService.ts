@@ -6,7 +6,7 @@
  * the app imports them from.
  */
 export * from "./buddy/actions";
-export { streamOpenBuddy, type BuddyOpeningHandlers } from "./buddy/opening";
-export { streamMessage, type BuddyMessageOptions } from "./buddy/messageStream";
+export { streamOpenBuddy } from "./buddy/opening";
+export { streamMessage } from "./buddy/messageStream";
 export * from "./buddy/sessions";
 export * from "./buddy/suggestions";
