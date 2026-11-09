@@ -1,0 +1,32 @@
+/**
+ * Reordering a list of ids by naming where one of them should land.
+ *
+ * A reorder replaces the whole order rather than describing a move, which makes *which list* it is
+ * computed over the only thing that matters. Expressed over the items on screen it silently drops
+ * everything the current view is hiding; expressed over all of them it is always complete.
+ *
+ * Naming the item to land next to costs nothing and is exact, so this takes a target id rather than
+ * an index and can be handed the full order whatever the person happens to be looking at.
+ */
+
+/**
+ * The order that results from putting `movedId` where `targetId` currently is.
+ *
+ * `ids` is the whole order. `targetId` is an item the person can see — the one they dropped on, or
+ * the neighbour above the one they stepped past — so however many hidden items lie between the
+ * two, the moved item lands exactly where it was aimed.
+ *
+ * An id the order does not know, or an item asked to move onto itself, leaves the order alone:
+ * guessing at a move nobody can name is worse than not moving.
+ */
+export function moveTo(ids: string[], movedId: string, targetId: string): string[] {
+  const from = ids.indexOf(movedId);
+  const to = ids.indexOf(targetId);
+  if (from === -1 || to === -1 || from === to) return ids;
+
+  const next = [...ids];
+  next.splice(from, 1);
+  next.splice(to, 0, movedId);
+
+  return next;
+}

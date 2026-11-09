@@ -238,7 +238,7 @@
     "unresolvedTo": "../../../projects/components/ProjectMonogram",
     "dependencyTypes": [
       "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -252,79 +252,7 @@
     "unresolvedTo": "../../../projects/industry/ProjectIndustryPanel",
     "dependencyTypes": [
       "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/arrival/components/thread/boardKit.ts",
-    "to": "src/features/board/layout/boardOrder.ts",
-    "unresolvedTo": "../../../board/layout/boardOrder",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/components/ArrivalStepsCard.tsx",
-    "to": "src/features/arrival/components/ArrivalStepList.tsx",
-    "unresolvedTo": "../../arrival/components/ArrivalStepList",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/components/ArrivalStepsCard.tsx",
-    "to": "src/features/arrival/summarise.ts",
-    "unresolvedTo": "../../arrival/summarise",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/components/ArrivalStepsCard.tsx",
-    "to": "src/features/arrival/types.ts",
-    "unresolvedTo": "../../arrival/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/types.ts",
-    "to": "src/features/arrival/types.ts",
-    "unresolvedTo": "../arrival/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -361,26 +289,12 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
-    "to": "src/features/knowledge-gaps/components/MyKnowledgeGapsDrawer.tsx",
-    "unresolvedTo": "../../knowledge-gaps/components/MyKnowledgeGapsDrawer",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/dashboard/components/gaps/gapsKit.ts",
     "to": "src/features/knowledge-gaps/components/SeverityIndicators.tsx",
     "unresolvedTo": "../../../knowledge-gaps/components/SeverityIndicators",
     "dependencyTypes": [
       "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -394,7 +308,7 @@
     "unresolvedTo": "../../../knowledge-gaps/format",
     "dependencyTypes": [
       "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -408,7 +322,7 @@
     "unresolvedTo": "../../../knowledge-gaps/severity",
     "dependencyTypes": [
       "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -423,6 +337,20 @@
     "dependencyTypes": [
       "local",
       "type-only",
+      "export"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-feature-internals"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
+    "to": "src/features/knowledge-gaps/components/MyKnowledgeGapsDrawer.tsx",
+    "unresolvedTo": "../../knowledge-gaps/components/MyKnowledgeGapsDrawer",
+    "dependencyTypes": [
+      "local",
       "import"
     ],
     "rule": {
@@ -465,7 +393,7 @@
     "unresolvedTo": "../../../../buddy/aiBuddyBus",
     "dependencyTypes": [
       "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -479,7 +407,7 @@
     "unresolvedTo": "../../../../buddy/components/AskTheBuddy",
     "dependencyTypes": [
       "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -554,7 +482,7 @@
     "dependencyTypes": [
       "local",
       "type-only",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -945,7 +873,7 @@
     "dependencyTypes": [
       "local",
       "type-only",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -960,7 +888,7 @@
     "dependencyTypes": [
       "local",
       "type-only",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",

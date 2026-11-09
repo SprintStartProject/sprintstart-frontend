@@ -1,10 +1,11 @@
+import type { ReactNode } from "react";
 import { Check, ExternalLink } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
-import { Marked } from "../../board";
-import type { CardMark } from "../../board";
 import { groupByScope } from "../scopeGroups";
 import { safeStepHref } from "../stepHref";
 import type { ArrivalStep } from "../types";
+
+const plainText = (text: string): ReactNode => text;
 
 /**
  * The read-and-optionally-write rendering of an arrival list: grouped by scope, one row per step.
@@ -16,16 +17,17 @@ import type { ArrivalStep } from "../types";
  */
 export function ArrivalStepList({
   steps,
-  marks = [],
-  cardId,
+  renderText = plainText,
   pendingKey = null,
   failedKey = null,
   onConfirm,
 }: {
   steps: ArrivalStep[];
-  /** The card's highlights, matched by their words — left out where there is no card to point at. */
-  marks?: CardMark[];
-  cardId?: string;
+  /**
+   * How a step's words are drawn. The board card passes one that lays the hire's highlights over
+   * them; left out, the words are shown as they are.
+   */
+  renderText?: (text: string) => ReactNode;
   pendingKey?: string | null;
   failedKey?: string | null;
   /** Omitted for a read-only rendering, e.g. the arrival preview drawer's example states. */
@@ -55,8 +57,7 @@ export function ArrivalStepList({
               <ArrivalStepRow
                 key={step.key}
                 step={step}
-                marks={marks}
-                cardId={cardId}
+                renderText={renderText}
                 pending={pendingKey === step.key}
                 failed={failedKey === step.key}
                 onConfirm={onConfirm ? () => onConfirm(step) : undefined}
@@ -75,15 +76,13 @@ export function ArrivalStepList({
  */
 function ArrivalStepRow({
   step,
-  marks,
-  cardId,
+  renderText,
   pending,
   failed,
   onConfirm,
 }: {
   step: ArrivalStep;
-  marks: CardMark[];
-  cardId?: string;
+  renderText: (text: string) => ReactNode;
   pending: boolean;
   failed: boolean;
   onConfirm?: () => void;
@@ -99,12 +98,10 @@ function ArrivalStepRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className={`text-sm ${step.settled ? "text-app-text-muted" : "text-app-text"}`}>
-            <Marked text={step.title} marks={marks} cardId={cardId} />
+            {renderText(step.title)}
           </p>
           {step.description && (
-            <p className="mt-1 text-xs text-app-text-muted">
-              <Marked text={step.description} marks={marks} cardId={cardId} />
-            </p>
+            <p className="mt-1 text-xs text-app-text-muted">{renderText(step.description)}</p>
           )}
           {step.settled && <SettledNote step={step} />}
           {failed && (
