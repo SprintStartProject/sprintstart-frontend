@@ -261,48 +261,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/arrival/components/thread/boardKit.ts",
-    "to": "src/features/board/layout/boardOrder.ts",
-    "unresolvedTo": "../../../board/layout/boardOrder",
-    "dependencyTypes": [
-      "local",
-      "export"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/components/ArrivalStepsCard.tsx",
-    "to": "src/features/arrival/components/ArrivalStepList.tsx",
-    "unresolvedTo": "../../arrival/components/ArrivalStepList",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/board/components/ArrivalStepsCard.tsx",
-    "to": "src/features/arrival/summarise.ts",
-    "unresolvedTo": "../../arrival/summarise",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/buddy/components/BuddyWidget.tsx",
     "to": "src/features/knowledge-base/components/ArtifactViewerDrawer.tsx",
     "unresolvedTo": "../../knowledge-base/components/ArtifactViewerDrawer",
