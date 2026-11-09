@@ -1,5 +1,5 @@
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
-import type { BlueprintPath } from "../types.ts";
+import type { BlueprintPath } from "../../../services/blueprintTypes.ts";
 import { DELETE_CONSEQUENCE, LIFECYCLE_COPY, kindLabels } from "../pathEditorCopy.ts";
 import type { CreateKind, LifecycleAction } from "../pathEditorTypes.ts";
 

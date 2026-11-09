@@ -13,7 +13,7 @@ import {
   User,
 } from "lucide-react";
 
-import type { KnowledgeGapSeverity } from "../types";
+import type { KnowledgeGapSeverity } from "../../../services/knowledgeGapTypes";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { useToast } from "../../../context/useToast";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";

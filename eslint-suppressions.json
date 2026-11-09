@@ -2121,6 +2121,14 @@
       "count": 1
     }
   },
+  "src/router/routePrefetch.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
   "src/services/aiStreamService.ts": {
     "complexity": {
       "count": 1
@@ -2185,14 +2193,6 @@
   },
   "src/services/projectService.ts": {
     "max-lines": {
-      "count": 1
-    }
-  },
-  "src/services/routePrefetch.ts": {
-    "complexity": {
-      "count": 2
-    },
-    "max-lines-per-function": {
       "count": 1
     }
   },

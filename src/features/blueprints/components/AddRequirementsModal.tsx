@@ -7,7 +7,7 @@ import { Select } from "../../../components/ui/Select.tsx";
 import { availableRequirementChoices } from "../requirementChoices.ts";
 import type { RequirementType } from "../pathEditorTypes.ts";
 import type { RequirementPicker } from "../useRequirementPicker.ts";
-import type { BlueprintPhase } from "../types.ts";
+import type { BlueprintPhase } from "../../../services/blueprintTypes.ts";
 
 const FORM_ID = "add-phase-requirements";
 

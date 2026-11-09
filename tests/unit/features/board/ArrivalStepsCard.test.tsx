@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { BoardGrid } from "../../../../src/features/board/components/BoardGrid";
 import { arrivalService } from "../../../../src/services/arrivalService";
-import type { ArrivalStep, MyArrival } from "../../../../src/features/arrival/types";
+import type { ArrivalStep, MyArrival } from "../../../../src/services/arrivalTypes";
 import type { Board, BoardCard, ArrivalStepsContent } from "../../../../src/features/board/types";
 
 vi.mock("../../../../src/services/arrivalService", () => ({

@@ -1,7 +1,10 @@
 import type { Dispatch, SetStateAction } from "react";
 import { continueAfter, type ContinueStep } from "../pageRules";
 import type { PhaseItem } from "../journey";
-import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "../types";
+import type {
+  OnboardingPathEndpoint,
+  OnboardingPhaseEndpoint,
+} from "../../../services/onboardingTypes";
 import type { ViewMode } from "./useJourneyView";
 
 /** What a "continue" does on this page, handed in by the hook that owns the state it moves. */

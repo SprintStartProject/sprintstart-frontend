@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { HireTimelineCard } from "../../../../src/features/onboarding-metrics/components/HireTimelineCard";
-import type { HireTimeline } from "../../../../src/features/onboarding-metrics/types";
+import type { HireTimeline } from "../../../../src/services/onboardingMetricsTypes";
 
 const hire = (over: Partial<HireTimeline> = {}): HireTimeline => ({
   userId: "h1",

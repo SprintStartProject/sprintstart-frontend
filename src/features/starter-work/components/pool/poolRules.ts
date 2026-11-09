@@ -1,6 +1,6 @@
 import { formatRelativeDate } from "../../format";
 import { parseCandidateSource } from "../../sourceId";
-import type { StarterWorkTask } from "../../types";
+import type { StarterWorkTask } from "../../../../services/starterWorkTypes";
 
 export type PoolStatusFilter = "all" | "unseen" | "seen" | "taskZero" | "closed";
 

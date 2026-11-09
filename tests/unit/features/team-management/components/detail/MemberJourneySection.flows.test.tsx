@@ -15,7 +15,7 @@ import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
   OnboardingStepEndpoint,
-} from "../../../../../../src/features/onboarding/types";
+} from "../../../../../../src/services/onboardingTypes";
 
 vi.mock("../../../../../../src/context/useAuth", () => ({
   useAuth: () => ({ profile: { id: "pm-1" } }),

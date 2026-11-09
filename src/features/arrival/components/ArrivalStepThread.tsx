@@ -1,6 +1,6 @@
 import { useReducedMotion } from "framer-motion";
 import { EmptyState } from "../../../components/ui/EmptyState";
-import type { ArrivalScope, ArrivalStep } from "../types";
+import type { ArrivalScope, ArrivalStep } from "../../../services/arrivalTypes";
 import { ThreadSection, ThreadSectionLabel } from "./thread/ThreadSection";
 import { threadModel } from "./thread/threadRules";
 import { useThreadOrder } from "./thread/useThreadOrder";

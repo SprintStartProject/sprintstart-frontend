@@ -10,7 +10,7 @@ import { parseCandidateSource, trackerLabel } from "../../starter-work";
 import { orientationService } from "../../../services/orientationService";
 import { starterWorkService } from "../../../services/starterWorkService";
 import type { StarterWorkTask } from "../../starter-work";
-import type { MyOrientation } from "../types";
+import type { MyOrientation } from "../../../services/orientationTypes";
 
 /** How many task rows sit on one page before the list paginates — matches the issue browser. */
 const PAGE_SIZE = 8;

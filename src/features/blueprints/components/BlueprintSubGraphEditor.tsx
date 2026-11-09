@@ -13,7 +13,7 @@ import type {
   BlueprintPhase,
   BlueprintQuestion,
   BlueprintStep,
-} from "../types.ts";
+} from "../../../services/blueprintTypes.ts";
 
 type Props = {
   phase: BlueprintPhase;

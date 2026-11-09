@@ -1,5 +1,5 @@
 import type { RequirementCatalog, RequirementType } from "./pathEditorTypes.ts";
-import type { BlueprintPhase } from "./types.ts";
+import type { BlueprintPhase } from "../../services/blueprintTypes.ts";
 
 /** What can still be added to a phase: the catalog's entries of this type that it does not require yet. */
 export function availableRequirementChoices(

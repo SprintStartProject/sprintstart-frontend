@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { BlueprintGraphNode } from "../types.ts";
+import type { BlueprintGraphNode } from "../../../services/blueprintTypes.ts";
 import type { NodeSelection } from "./useNodeSelection.ts";
 
 /**

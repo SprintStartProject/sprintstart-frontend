@@ -16,7 +16,7 @@ import {
   nameList,
   type MemberFilter,
 } from "../roleRules";
-import type { TeamOverviewUser } from "../types";
+import type { TeamOverviewUser } from "../../../services/teamManagementTypes";
 
 type Outcome = {
   done: AssignmentChange[];

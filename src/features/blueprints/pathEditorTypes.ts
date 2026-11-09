@@ -6,7 +6,7 @@ import type {
   BlueprintResource,
   BlueprintStep,
   BlueprintTask,
-} from "./types.ts";
+} from "../../services/blueprintTypes.ts";
 
 export type CreateKind = "phase" | "step" | "task" | "resource" | "question" | "option";
 export type CreateTarget = {

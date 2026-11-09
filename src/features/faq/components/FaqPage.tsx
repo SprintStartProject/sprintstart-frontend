@@ -9,7 +9,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import type { FAQGroup, FAQRebuildScope } from "../types";
+import type { FAQGroup, FAQRebuildScope } from "../../../services/faqTypes";
 import { insightsService } from "../../../services/faqService";
 import { useToast } from "../../../context/useToast";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";

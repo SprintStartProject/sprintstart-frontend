@@ -11,7 +11,7 @@ import {
   saveUserSkillAssessments,
 } from "../services/teamManagementService";
 import type { CreateSkillAssessmentRequest } from "../services/teamManagementService";
-import type { Skill, TeamOverviewUser } from "../features/team-management/types";
+import type { Skill, TeamOverviewUser } from "../services/teamManagementTypes";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PhasePrerequisites } from "../../../../src/features/blueprints/components/PhasePrerequisites.tsx";
-import type { BlueprintPhase } from "../../../../src/features/blueprints/types.ts";
+import type { BlueprintPhase } from "../../../../src/services/blueprintTypes.ts";
 
 function phase(id: string, blockerIds: string[] = [], position = 0): BlueprintPhase {
   return {

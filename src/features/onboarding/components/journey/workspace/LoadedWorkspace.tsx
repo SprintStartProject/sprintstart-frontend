@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useToast } from "../../../../../context/useToast";
 import { useMoments } from "../../../../moments";
-import type { OnboardingStepDetail } from "../../../types";
+import type { OnboardingStepDetail } from "../../../../../services/onboardingTypes";
 import { FeedbackDrawer, SkipDrawer } from "./Drawers";
 import { FeedbackNotice, SkipNotice } from "./StepNotices";
 import { StepFooter } from "./StepFooter";

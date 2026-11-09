@@ -1,4 +1,4 @@
-import type { ArrivalScope, ArrivalStep } from "../../types";
+import type { ArrivalScope, ArrivalStep } from "../../../../services/arrivalTypes";
 import { ThreadRow } from "./ThreadRow";
 import { rowId } from "./threadRules";
 import type { StepEntry } from "./threadRules";

@@ -1,6 +1,9 @@
 import { Plus, X } from "lucide-react";
 import { Button } from "../../../../components/ui/Button.tsx";
-import type { BlueprintPhase, BlueprintPhaseRequirement } from "../../types.ts";
+import type {
+  BlueprintPhase,
+  BlueprintPhaseRequirement,
+} from "../../../../services/blueprintTypes.ts";
 import type { OutlineActions } from "./outlineActions.ts";
 
 interface RequirementChipProps {

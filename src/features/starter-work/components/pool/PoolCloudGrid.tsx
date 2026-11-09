@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { centralSpringToken } from "../../../../styles/tokens";
-import type { StarterWorkTask } from "../../types";
+import type { StarterWorkTask } from "../../../../services/starterWorkTypes";
 import type { CloudSlotStyle } from "./cloudLayout";
 import { PoolCloudCard } from "./PoolCloudCard";
 

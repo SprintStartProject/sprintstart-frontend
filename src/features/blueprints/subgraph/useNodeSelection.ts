@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { BlueprintGraphNode, BlueprintPhase } from "../types.ts";
+import type { BlueprintGraphNode, BlueprintPhase } from "../../../services/blueprintTypes.ts";
 import {
   EMPTY_QUESTION_METADATA,
   EMPTY_STEP_METADATA,

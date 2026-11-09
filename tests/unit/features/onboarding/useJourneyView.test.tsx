@@ -7,7 +7,7 @@ import {
   hireJourneyViewKey,
   readJourneyView,
 } from "../../../../src/features/onboarding/journeyViewMemory";
-import type { OnboardingPhaseEndpoint } from "../../../../src/features/onboarding/types";
+import type { OnboardingPhaseEndpoint } from "../../../../src/services/onboardingTypes";
 
 type Generation = OnboardingJourneyValue["generation"];
 

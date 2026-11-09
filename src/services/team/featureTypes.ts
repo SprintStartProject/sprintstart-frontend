@@ -13,11 +13,11 @@ export type {
   SkillStatus,
   SkillSuggestion,
   TeamOverviewUser,
-} from "../../features/team-management/types.ts";
+} from "../teamManagementTypes.ts";
 export type {
   OnboardingPhaseEndpoint,
   OnboardingPathEndpoint,
   OnboardingStepEndpoint,
   OnboardingTaskEndpoint,
   StepType,
-} from "../../features/onboarding/types.ts";
+} from "../onboardingTypes.ts";

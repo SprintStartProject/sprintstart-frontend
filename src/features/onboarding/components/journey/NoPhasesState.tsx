@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "../../../../components/ui/Button";
 import { retryCouldHelp } from "../../generationIssues";
-import type { OnboardingGenerationIssueEndpoint } from "../../types";
+import type { OnboardingGenerationIssueEndpoint } from "../../../../services/onboardingTypes";
 import { GenerationIssueSummary } from "../GenerationIssueSummary";
 import { CenteredState, StateIcon } from "./CenteredState";
 

@@ -4,7 +4,7 @@ import { useToast } from "../../../context/useToast";
 import { SLIDING_PANEL_EXIT_MS } from "../../../components/ui/SlidingTabPanel";
 import { planArrival, type Arrival, type ArrivalPlan } from "../arrival";
 import { linkedCardId, phaseItems, type PhaseItem } from "../journey";
-import type { OnboardingPathEndpoint } from "../types";
+import type { OnboardingPathEndpoint } from "../../../services/onboardingTypes";
 import type { LoadingState } from "./usePathLoading";
 
 type NavigationState = { focusQuestionId?: string; choosePhase?: boolean } | null;

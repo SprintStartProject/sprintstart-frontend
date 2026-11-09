@@ -22,7 +22,7 @@ import type {
   Skill,
   SkillSuggestion,
   TeamOverviewUser,
-} from "../../../../src/features/team-management/types";
+} from "../../../../src/services/teamManagementTypes";
 
 const frontend: ProjectRole = { id: "r1", name: "Frontend", description: "Builds the UI" };
 const backend: ProjectRole = { id: "r2", name: "Backend", description: "Owns the services" };

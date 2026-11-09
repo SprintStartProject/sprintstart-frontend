@@ -1,7 +1,10 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, ExternalLink, Lightbulb } from "lucide-react";
 import { centralSpringToken } from "../../../../../styles/tokens";
-import type { OnboardingResourceEndpoint, OnboardingTaskEndpoint } from "../../../types";
+import type {
+  OnboardingResourceEndpoint,
+  OnboardingTaskEndpoint,
+} from "../../../../../services/onboardingTypes";
 import { TaskCheckItem } from "../../TaskCheckItem";
 import type { TaskProgress } from "./workspaceRules";
 

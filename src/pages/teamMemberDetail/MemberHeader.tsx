@@ -2,7 +2,7 @@ import { MemberHero } from "../../features/pm-area/components/MemberHero";
 import { MemberSignals } from "../../features/pm-area/components/MemberSummary";
 import { useTeamRoster } from "../../features/pm-area/useTeamRoster";
 import { MemberGapsPanel } from "../../features/team-management/components/detail/MemberGapsPanel";
-import type { TeamOverviewUser } from "../../features/team-management/types";
+import type { TeamOverviewUser } from "../../services/teamManagementTypes";
 import { BackToTeam } from "./MemberParts";
 import type { MemberView } from "./memberView";
 import type { MemberPageModel } from "./useMemberPage";

@@ -3,7 +3,7 @@ import { PageHeader } from "../../../components/layout/PageHeader.tsx";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { versionWord } from "../pathLifecycle.ts";
-import type { BlueprintPath } from "../types.ts";
+import type { BlueprintPath } from "../../../services/blueprintTypes.ts";
 
 const STATUS_BADGE = { ACTIVE: "success", ARCHIVED: "neutral", DRAFT: "warning" } as const;
 

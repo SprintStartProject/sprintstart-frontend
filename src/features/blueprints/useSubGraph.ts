@@ -17,7 +17,7 @@ import type {
   BlueprintPhase,
   BlueprintQuestion,
   BlueprintStep,
-} from "./types.ts";
+} from "../../services/blueprintTypes.ts";
 import type { BlueprintQuestionMetadata, BlueprintStepMetadata } from "./subgraph/metadata.ts";
 
 /** The fixed phase whose own graph is open, and the thin nodes it is drawn from. */

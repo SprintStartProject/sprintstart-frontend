@@ -6,7 +6,7 @@ import type {
   OnboardingResourceEndpoint,
   OnboardingStepDetail,
   OnboardingTaskEndpoint,
-} from "../../../types";
+} from "../../../../../services/onboardingTypes";
 import { onBuddyPathChanged } from "./buddyKit";
 import { failureMessage, keepTyping, needsRead, sortedByPosition } from "./workspaceRules";
 import type { LoadedStep } from "./workspaceRules";

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowRight, CheckCircle2, Lock } from "lucide-react";
 import { blockingPhases, phaseProgress, phaseState, phasesUnlockedBy } from "../../journey";
-import type { OnboardingPhaseEndpoint } from "../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../services/onboardingTypes";
 
 function PhaseLinks({
   label,

@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MemberGapsPanel } from "../../../../../../src/features/team-management/components/detail/MemberGapsPanel";
-import type { KnowledgeGap } from "../../../../../../src/features/knowledge-gaps/types";
+import type { KnowledgeGap } from "../../../../../../src/services/knowledgeGapTypes";
 
 function gap(overrides: Partial<KnowledgeGap>): KnowledgeGap {
   return {

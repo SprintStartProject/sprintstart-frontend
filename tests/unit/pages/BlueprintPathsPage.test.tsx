@@ -2,10 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { BlueprintPathsPage } from "../../../src/pages/BlueprintPathsPage.tsx";
-import type {
-  BlueprintPath,
-  BlueprintPathOverview,
-} from "../../../src/features/blueprints/types.ts";
+import type { BlueprintPath, BlueprintPathOverview } from "../../../src/services/blueprintTypes.ts";
 
 const { mocks } = vi.hoisted(() => ({
   mocks: {

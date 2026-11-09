@@ -4,7 +4,7 @@ import type {
   BlueprintPhase,
   BlueprintQuestion,
   BlueprintStep,
-} from "../types.ts";
+} from "../../../services/blueprintTypes.ts";
 import type { BlueprintQuestionMetadata, BlueprintStepMetadata } from "./metadata.ts";
 import { useMetadataSaving } from "./useMetadataSaving.ts";
 import { useNodeDeletion } from "./useNodeDeletion.ts";

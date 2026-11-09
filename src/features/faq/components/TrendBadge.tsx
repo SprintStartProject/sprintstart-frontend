@@ -1,7 +1,7 @@
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import type { BadgeSize } from "../../../components/ui/Badge";
-import type { FAQTrend } from "../types";
+import type { FAQTrend } from "../../../services/faqTypes";
 
 /**
  * How the trend reads on the panel.

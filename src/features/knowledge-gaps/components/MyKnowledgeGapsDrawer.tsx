@@ -7,7 +7,7 @@ import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer"
 import { formatDateTime, formatRelativeDate } from "../format";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
 import { GapTypeChips, SeverityPill, SeveritySummaryBar } from "./SeverityIndicators";
-import type { KnowledgeGap } from "../types";
+import type { KnowledgeGap } from "../../../services/knowledgeGapTypes";
 
 export type MyKnowledgeGapsDrawerProps = {
   isOpen: boolean;

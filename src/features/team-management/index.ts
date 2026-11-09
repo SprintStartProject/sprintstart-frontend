@@ -1,1 +1,1 @@
-export type { ProjectRole, Skill, TeamOverviewUser } from "./types";
+export type { ProjectRole, Skill, TeamOverviewUser } from "../../services/teamManagementTypes";

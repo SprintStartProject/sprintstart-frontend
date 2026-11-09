@@ -3,7 +3,10 @@
 // answer was seen (`skip.answerSeenAt`), so this holds across devices.
 
 import { phaseItems, type PhaseItem } from "./journey";
-import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "./types";
+import type {
+  OnboardingPathEndpoint,
+  OnboardingPhaseEndpoint,
+} from "../../services/onboardingTypes";
 
 /** The PM's answer to this step's skip request, while the member has not seen it yet. */
 export function unseenSkipAnswerOf(item: PhaseItem): "approved" | "declined" | null {

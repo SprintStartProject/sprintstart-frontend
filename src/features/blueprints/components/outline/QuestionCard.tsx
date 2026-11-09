@@ -1,6 +1,6 @@
 import { CircleCheckBig, Minus, Pencil, Plus, Square } from "lucide-react";
 import { Button } from "../../../../components/ui/Button.tsx";
-import type { BlueprintOption, BlueprintQuestion } from "../../types.ts";
+import type { BlueprintOption, BlueprintQuestion } from "../../../../services/blueprintTypes.ts";
 import { CollapseToggle } from "./CollapseToggle.tsx";
 import type { OutlineActions } from "./outlineActions.ts";
 import { activatesOnKey } from "./activatesOnKey.ts";

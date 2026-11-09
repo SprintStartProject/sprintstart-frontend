@@ -3,7 +3,7 @@ import { useToast } from "../../../context/useToast";
 import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 import { useIsSmUp } from "../../../hooks/useIsSmUp";
 import { useProjectContext } from "../../projects";
-import type { StarterWorkTask } from "../types";
+import type { StarterWorkTask } from "../../../services/starterWorkTypes";
 import { CLOUD_LAYOUTS, CLOUD_PAGE_SIZE, LIST_PAGE_SIZE } from "./pool/cloudLayout";
 import { PoolBody } from "./pool/PoolBody";
 import { PoolFilterBar } from "./pool/PoolFilterBar";

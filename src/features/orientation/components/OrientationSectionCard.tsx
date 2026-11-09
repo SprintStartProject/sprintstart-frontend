@@ -3,7 +3,7 @@ import remarkGfm from "remark-gfm";
 import { ChevronDown } from "lucide-react";
 import { SourceLinks } from "./SourceLinks";
 import { STEP_LABELS } from "../steps";
-import type { OrientationSection } from "../types";
+import type { OrientationSection } from "../../../services/orientationTypes";
 
 type OrientationSectionCardProps = {
   section: OrientationSection;

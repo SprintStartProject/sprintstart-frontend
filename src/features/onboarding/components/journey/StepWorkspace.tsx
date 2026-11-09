@@ -1,5 +1,5 @@
 import { AlertCircle, Loader2 } from "lucide-react";
-import type { OnboardingStepDetail } from "../../types";
+import type { OnboardingStepDetail } from "../../../../services/onboardingTypes";
 import { LoadedWorkspace } from "./workspace/LoadedWorkspace";
 import { useStepData } from "./workspace/useStepData";
 

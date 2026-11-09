@@ -10,7 +10,7 @@ import type {
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
   QuestionAttemptResult,
-} from "../types";
+} from "../../../services/onboardingTypes";
 
 /** The celebratory layer, handed in because it is another feature's. */
 export type Moments = {

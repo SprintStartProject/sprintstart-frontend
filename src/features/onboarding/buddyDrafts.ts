@@ -6,7 +6,7 @@ import type {
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
   OnboardingStepEndpoint,
-} from "./types";
+} from "../../services/onboardingTypes";
 
 /**
  * Taking what you are looking at on your path into the conversation.

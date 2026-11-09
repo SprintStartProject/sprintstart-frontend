@@ -23,22 +23,17 @@ import { Textarea } from "../../../components/ui/Textarea";
 import { IconTile } from "../../../components/ui/IconTile";
 import { useToast } from "../../../context/useToast";
 import { useArrivalAuthoring } from "../hooks/useArrivalAuthoring";
+import { BADGE_LEGEND } from "../badgeLegend";
 import { howStepGetsDone } from "../howItsDone";
 import { mergedStepCount } from "../mergedSteps";
 import { radioCardClassName } from "../radioCard";
 import { AddArrivalStepModal } from "./AddArrivalStepModal";
 import { ArrivalStepThread } from "./ArrivalStepThread";
-import type { ArrivalScope, ArrivalStep, UpdateArrivalStepRequest } from "../types";
-
-/** Spells out every short badge word the thread and the edit drawer use, for the "What the badges
- * mean" hint next to the step count — the badges themselves stay terse on purpose. */
-const BADGE_LEGEND =
-  "Auto only: only SprintStart can check this, the hire can't tick it themselves. " +
-  "Auto or tick: SprintStart checks it automatically, or the hire can tick it off themselves. " +
-  "Self-tick: the hire ticks it off themselves, nothing is checked. " +
-  "GitHub / First PR: tied to that specific check. " +
-  "Override: a project's own version of a company step. " +
-  "Overridden: the company step that override replaces.";
+import type {
+  ArrivalScope,
+  ArrivalStep,
+  UpdateArrivalStepRequest,
+} from "../../../services/arrivalTypes";
 
 /**
  * Authoring both arrival lists at once — the company-wide list every new hire gets, and (when

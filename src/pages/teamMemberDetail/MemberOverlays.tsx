@@ -3,7 +3,7 @@ import { PanelPresence } from "../../components/ui/PanelPresence";
 import { MemberDetailDialogs } from "../../features/team-management/components/detail/MemberDetailDialogs";
 import { PhaseCheckAdminModal } from "../../features/team-management/components/detail/PhaseCheckAdminModal";
 import { StepDetailsPanel } from "../../features/team-management/components/detail/StepDetailsPanel";
-import type { TeamOverviewUser } from "../../features/team-management/types";
+import type { TeamOverviewUser } from "../../services/teamManagementTypes";
 import { formatMinutes, getStepStatusStyles } from "./memberRules";
 import type { MemberView } from "./memberView";
 import type { MemberPageModel } from "./useMemberPage";

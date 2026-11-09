@@ -3,7 +3,7 @@ import type {
   HireTimeline,
   ProjectAttention,
   ProjectOnboardingMetrics,
-} from "../features/onboarding-metrics/types";
+} from "./onboardingMetricsTypes";
 
 const BASE = "/api/v1/onboarding/metrics";
 

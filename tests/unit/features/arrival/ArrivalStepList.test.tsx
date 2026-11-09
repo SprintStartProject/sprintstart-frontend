@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ArrivalStepList } from "../../../../src/features/arrival/components/ArrivalStepList";
-import type { ArrivalStep } from "../../../../src/features/arrival/types";
+import type { ArrivalStep } from "../../../../src/services/arrivalTypes";
 
 const step = (over: Partial<ArrivalStep> = {}): ArrivalStep => ({
   key: "vpn",

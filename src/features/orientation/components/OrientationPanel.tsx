@@ -5,7 +5,7 @@ import { SourceLinks } from "./SourceLinks";
 import { useOpenSteps } from "../hooks/useOpenSteps";
 import { AiActivityLog } from "../../ai-activity";
 import type { AiActivityEntry } from "../../ai-activity";
-import type { MyOrientation, OrientationPacket } from "../types";
+import type { MyOrientation, OrientationPacket } from "../../../services/orientationTypes";
 
 type OrientationPanelProps = {
   orientation: MyOrientation | null;

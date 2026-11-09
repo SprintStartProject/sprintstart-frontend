@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useToast } from "../../context/useToast";
-import type { ProjectRole } from "../../features/team-management/types";
+import type { ProjectRole } from "../../services/teamManagementTypes";
 import {
   assignProjectRoleToUser,
   unassignProjectRoleFromUser,

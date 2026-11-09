@@ -5,7 +5,7 @@ import { LIFECYCLE_COPY } from "./pathEditorCopy.ts";
 import type { PendingLifecycle } from "./pathEditorTypes.ts";
 import { blueprintAddress, type PathPageContext } from "./pathPageContext.ts";
 import type { VersionHistory } from "./useVersionHistory.ts";
-import type { BlueprintPath } from "./types.ts";
+import type { BlueprintPath } from "../../services/blueprintTypes.ts";
 
 type Toast = ReturnType<typeof useToast>;
 

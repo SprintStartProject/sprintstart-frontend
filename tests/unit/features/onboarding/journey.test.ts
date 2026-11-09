@@ -12,7 +12,7 @@ import type {
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
   OnboardingStepEndpoint,
-} from "../../../../src/features/onboarding/types";
+} from "../../../../src/services/onboardingTypes";
 
 function step(overrides: Partial<OnboardingStepEndpoint>): OnboardingStepEndpoint {
   return {

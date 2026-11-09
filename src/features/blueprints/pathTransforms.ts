@@ -1,4 +1,4 @@
-import type { BlueprintPath, BlueprintPhase } from "./types.ts";
+import type { BlueprintPath, BlueprintPhase } from "../../services/blueprintTypes.ts";
 
 /** The path with one phase replaced by what `change` makes of it. */
 export function mapPhase(

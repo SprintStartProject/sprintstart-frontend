@@ -5,7 +5,7 @@ import { useDialogFocus } from "../../../../../components/ui/useDialogFocus";
 import { itemState, type PhaseItem } from "../../../journey";
 import { ItemGlyph } from "../../../graph/JourneyNodeCards";
 import { itemKindLabel, itemStateLabel } from "../../../graph/nodeLabels";
-import type { OnboardingPhaseEndpoint } from "../../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../../services/onboardingTypes";
 
 type ItemFocusProps = {
   item: PhaseItem;

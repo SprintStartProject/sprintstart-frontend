@@ -2,7 +2,7 @@ import { blueprintService } from "../../services/blueprintService.ts";
 import type { BlueprintPhaseMetadata } from "./components/BlueprintGraphEditor.tsx";
 import type { PathPageContext } from "./pathPageContext.ts";
 import { mapPhase } from "./pathTransforms.ts";
-import type { BlueprintPhase } from "./types.ts";
+import type { BlueprintPhase } from "../../services/blueprintTypes.ts";
 
 /** Moving a phase on the top-level graph, changing its prerequisites, and renaming it there. */
 export function usePhaseGraphEdits(context: PathPageContext) {

@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { NavigateFunction } from "react-router-dom";
 import type { BlueprintScope } from "../../services/blueprintService.ts";
-import type { BlueprintPath } from "./types.ts";
+import type { BlueprintPath } from "../../services/blueprintTypes.ts";
 
 /** What the path page's hooks need to know about where they are and how to reload. */
 export interface PathPageContext {

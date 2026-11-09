@@ -4,7 +4,7 @@ import type {
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
   QuestionAttemptResult,
-} from "../../types";
+} from "../../../../services/onboardingTypes";
 import { QuestionWorkspace } from "./QuestionWorkspace";
 import { StepWorkspace } from "./StepWorkspace";
 

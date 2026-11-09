@@ -10,7 +10,7 @@ import {
   siblingIds,
 } from "./pathOrdering.ts";
 import type { SortKind } from "./pathEditorTypes.ts";
-import type { BlueprintPath } from "./types.ts";
+import type { BlueprintPath } from "../../services/blueprintTypes.ts";
 
 type Dragged = { kind: SortKind; id: string } | null;
 

@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ArrivalStepThread } from "../../../../src/features/arrival/components/ArrivalStepThread";
-import type { ArrivalStep } from "../../../../src/features/arrival/types";
+import type { ArrivalStep } from "../../../../src/services/arrivalTypes";
 
 const step = (key: string, over: Partial<ArrivalStep> = {}): ArrivalStep => ({
   key,

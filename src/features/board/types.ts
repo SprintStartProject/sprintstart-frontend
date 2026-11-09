@@ -1,4 +1,4 @@
-import type { ArrivalStep } from "../arrival";
+import type { ArrivalStep } from "../../services/arrivalTypes";
 import type { StepStatus } from "../onboarding";
 import type { TaskType } from "../starter-work";
 

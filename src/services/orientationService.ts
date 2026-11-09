@@ -1,9 +1,5 @@
 import { apiClient } from "./apiClient";
-import type {
-  AuthorOrientationInput,
-  MyOrientation,
-  OrientationPacket,
-} from "../features/orientation/types";
+import type { AuthorOrientationInput, MyOrientation, OrientationPacket } from "./orientationTypes";
 
 const BASE = "/api/v1/onboarding";
 

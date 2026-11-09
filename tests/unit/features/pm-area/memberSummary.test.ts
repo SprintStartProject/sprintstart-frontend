@@ -3,7 +3,7 @@ import { memberSummaryData } from "../../../../src/features/pm-area/memberSummar
 import type {
   OnboardingPathEndpoint,
   OnboardingStepEndpoint,
-} from "../../../../src/features/onboarding/types";
+} from "../../../../src/services/onboardingTypes";
 
 function step(
   id: string,

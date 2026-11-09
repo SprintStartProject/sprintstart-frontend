@@ -7,7 +7,7 @@ import { ApiError } from "../../../services/apiClient";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { onboardingService } from "../../../services/onboardingService";
 import { useProjectContext } from "../../projects";
-import type { OnboardingPathEndpoint } from "../types";
+import type { OnboardingPathEndpoint } from "../../../services/onboardingTypes";
 import { describeGenerationError } from "./generationErrors";
 import {
   asFailureReason,

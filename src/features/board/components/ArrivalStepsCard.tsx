@@ -8,7 +8,7 @@ import { AskTheBuddy } from "../../buddy";
 import { ArrivalStepList } from "../../arrival";
 import { Marked } from "./Marked";
 import { summarise } from "../../arrival";
-import type { ArrivalStep } from "../../arrival";
+import type { ArrivalStep } from "../../../services/arrivalTypes";
 import type { ArrivalStepsContent, BoardCard } from "../types";
 
 type ArrivalStepsCardProps = {

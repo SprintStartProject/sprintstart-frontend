@@ -6,7 +6,7 @@ import {
   targetKeyUnder,
   threadModel,
 } from "../../../../src/features/arrival/components/thread/threadRules";
-import type { ArrivalStep } from "../../../../src/features/arrival/types";
+import type { ArrivalStep } from "../../../../src/services/arrivalTypes";
 
 const step = (key: string, projectId: string | null = null): ArrivalStep => ({
   key,

@@ -2,7 +2,7 @@ import { Sparkles, X } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
-import type { Skill, SkillSuggestion } from "../types";
+import type { Skill, SkillSuggestion } from "../../../services/teamManagementTypes";
 import { SkillSuggestionPanel } from "./SkillSuggestionPanel";
 
 type RoleSkillsPanelProps = {

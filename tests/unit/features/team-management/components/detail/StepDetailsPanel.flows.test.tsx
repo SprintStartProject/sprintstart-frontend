@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StepDetailsPanel } from "../../../../../../src/features/team-management/components/detail/StepDetailsPanel";
-import type { OnboardingTaskEndpoint } from "../../../../../../src/features/onboarding/types";
+import type { OnboardingTaskEndpoint } from "../../../../../../src/services/onboardingTypes";
 
 const step = {
   id: "step1",

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { phaseItems, type PhaseItem } from "../../journey";
 import type { OnboardingNextAction } from "../../nextAction";
-import type { OnboardingPhaseEndpoint } from "../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../services/onboardingTypes";
 import { PhaseChooser } from "./PhaseChooser";
 import { PhaseHeaderCard } from "./PhaseHeaderCard";
 import { PhaseItemList } from "./PhaseItemList";

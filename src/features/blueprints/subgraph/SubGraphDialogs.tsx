@@ -1,5 +1,5 @@
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
-import type { BlueprintQuestion, BlueprintStep } from "../types.ts";
+import type { BlueprintQuestion, BlueprintStep } from "../../../services/blueprintTypes.ts";
 import type { NodeDeletion } from "./useNodeDeletion.ts";
 import type { UnsavedGuard } from "./useUnsavedGuard.ts";
 

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { BlueprintPathHeader } from "../../../../src/features/blueprints/components/BlueprintPathHeader.tsx";
-import type { BlueprintPath } from "../../../../src/features/blueprints/types.ts";
+import type { BlueprintPath } from "../../../../src/services/blueprintTypes.ts";
 
 function pathOf(status: BlueprintPath["status"], description = "About it") {
   return { id: "p", title: "Backend onboarding", description, version: 4, status } as BlueprintPath;

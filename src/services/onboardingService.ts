@@ -15,7 +15,7 @@ import type {
   AdminPhaseQuestionsEndpoint,
   UpsertQuestion,
   QuestionAttemptsReviewEndpoint,
-} from "../features/onboarding/types";
+} from "./onboardingTypes";
 
 /**
  * POSTs to a path-generation endpoint and hands its SSE events to `handlers`, for the member's own

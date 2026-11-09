@@ -1,7 +1,7 @@
 import { Clock3 } from "lucide-react";
 import { formatMinutes } from "../../../journey";
 import { askAboutStep } from "../../../buddyDrafts";
-import type { OnboardingStepDetail } from "../../../types";
+import type { OnboardingStepDetail } from "../../../../../services/onboardingTypes";
 import { StepOriginBadge } from "../../StepOriginBadge";
 import { AskTheBuddy } from "./buddyKit";
 import { isBehind, workedLabel } from "./workspaceRules";

@@ -2,7 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useThreadOrder } from "../../../../src/features/arrival/components/thread/useThreadOrder";
 import { rowId } from "../../../../src/features/arrival/components/thread/threadRules";
-import type { ArrivalStep } from "../../../../src/features/arrival/types";
+import type { ArrivalStep } from "../../../../src/services/arrivalTypes";
 
 const step = (key: string): ArrivalStep => ({
   key,

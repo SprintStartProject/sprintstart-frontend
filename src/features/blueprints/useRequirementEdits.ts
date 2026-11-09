@@ -4,7 +4,7 @@ import { useToast } from "../../context/useToast.ts";
 import { blueprintService, type BlueprintScope } from "../../services/blueprintService.ts";
 import { mapPhase } from "./pathTransforms.ts";
 import type { RequirementPicker } from "./useRequirementPicker.ts";
-import type { BlueprintPath } from "./types.ts";
+import type { BlueprintPath } from "../../services/blueprintTypes.ts";
 
 interface EditContext {
   path: BlueprintPath | null;

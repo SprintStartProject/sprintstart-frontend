@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "../../../../services/queryKeys";
 import { starterWorkService } from "../../../../services/starterWorkService";
-import type { StarterWorkTask } from "../../types";
+import type { StarterWorkTask } from "../../../../services/starterWorkTypes";
 import {
   applyStatusFilter,
   countStatuses,

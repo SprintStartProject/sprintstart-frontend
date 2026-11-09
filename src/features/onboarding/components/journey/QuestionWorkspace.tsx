@@ -4,7 +4,10 @@ import { Button } from "../../../../components/ui/Button";
 import { useToast } from "../../../../context/useToast";
 import { onboardingService } from "../../../../services/onboardingService";
 import { emptyDraft, isAnswered, toSubmission, type DraftAnswer } from "../../checkAnswers";
-import type { OnboardingQuestionEndpoint, QuestionAttemptResult } from "../../types";
+import type {
+  OnboardingQuestionEndpoint,
+  QuestionAttemptResult,
+} from "../../../../services/onboardingTypes";
 import { CheckQuestionCard } from "../CheckQuestionCard";
 import { ConfettiBurst } from "../ConfettiBurst";
 import { AskTheBuddy } from "../../../buddy";

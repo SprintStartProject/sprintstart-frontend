@@ -3,7 +3,7 @@ import { Check, ExternalLink } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { groupByScope } from "../scopeGroups";
 import { safeStepHref } from "../stepHref";
-import type { ArrivalStep } from "../types";
+import type { ArrivalStep } from "../../../services/arrivalTypes";
 
 const plainText = (text: string): ReactNode => text;
 

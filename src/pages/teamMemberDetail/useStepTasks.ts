@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type {
   OnboardingPathEndpoint,
   OnboardingTaskEndpoint,
-} from "../../features/onboarding/types";
+} from "../../services/onboardingTypes";
 import { getOnboardingTasksByStep } from "../../services/teamManagementService";
 import { taskCount, type TaskCount } from "./memberRules";
 

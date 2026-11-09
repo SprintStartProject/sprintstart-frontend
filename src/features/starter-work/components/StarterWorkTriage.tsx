@@ -4,7 +4,7 @@ import { Modal } from "../../../components/ui/Modal";
 import { Button } from "../../../components/ui/Button";
 import { Badge } from "../../../components/ui/Badge";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
-import type { StarterWorkTask } from "../types";
+import type { StarterWorkTask } from "../../../services/starterWorkTypes";
 
 type StarterWorkTriageProps = {
   /** Snapshotted once on open — a task leaving or joining the live queue mid-session does not reshuffle it. */

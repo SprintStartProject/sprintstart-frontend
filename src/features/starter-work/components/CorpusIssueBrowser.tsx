@@ -4,7 +4,7 @@ import { Ban, Check, ChevronRight, Inbox, Loader2, Plus, Search, UserCheck } fro
 import { SelectionCheckbox } from "../../admin";
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
-import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
+import { FilterSelect } from "../../../components/ui/FilterSelect";
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Input } from "../../../components/ui/Input";
 import { Pagination } from "../../../components/ui/Pagination";
@@ -13,8 +13,13 @@ import { useIsSmUp } from "../../../hooks/useIsSmUp";
 import { getQuickActionRevealVariants, quickActionSpringToken } from "../../../styles/tokens";
 import { BuddyMarkdown } from "../../buddy";
 import { useCorpusIssueBrowser } from "../hooks/useCorpusIssueBrowser";
+import { POOL_FILTER_OPTIONS, POOL_FILTER_STATE, type PoolFilter } from "../poolFilter";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
-import type { CandidatePoolState, StarterWorkCandidate, StarterWorkTask } from "../types";
+import type {
+  CandidatePoolState,
+  StarterWorkCandidate,
+  StarterWorkTask,
+} from "../../../services/starterWorkTypes";
 import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type CorpusIssueBrowserProps = {
@@ -29,22 +34,6 @@ type CorpusIssueBrowserProps = {
 const PAGE_SIZE = 8;
 /** Labels shown inline on a row before the rest collapse into a "+N" badge. */
 const ROW_LABEL_CAP = 3;
-
-/** The pool-state filter beside the search box. */
-type PoolFilter = "all" | "available" | "in-pool" | "removed";
-
-const POOL_FILTER_OPTIONS: FilterSelectOption<PoolFilter>[] = [
-  { value: "all", label: "All issues" },
-  { value: "available", label: "New" },
-  { value: "in-pool", label: "In the pool" },
-  { value: "removed", label: "Taken out" },
-];
-
-const POOL_FILTER_STATE: Record<Exclude<PoolFilter, "all">, CandidatePoolState> = {
-  available: "AVAILABLE",
-  "in-pool": "IN_POOL",
-  removed: "REMOVED",
-};
 
 /**
  * Browse the open issues a project has already ingested and put one in the pool by hand.

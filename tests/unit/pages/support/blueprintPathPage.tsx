@@ -3,7 +3,7 @@ import { service } from "./blueprintPathMocks.ts";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { LocationProbe } from "./LocationProbe.tsx";
 import { BlueprintPathDetailPage } from "../../../../src/pages/BlueprintPathDetailPage.tsx";
-import type { BlueprintPath } from "../../../../src/features/blueprints/types.ts";
+import type { BlueprintPath } from "../../../../src/services/blueprintTypes.ts";
 
 export const PROJECT_SCOPE = { kind: "project", projectId: "project-1" };
 
