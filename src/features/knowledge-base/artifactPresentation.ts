@@ -1,5 +1,5 @@
 import { isEmptyContent } from "./summarizability";
-import type { Artifact, ArtifactContent } from "./types";
+import type { Artifact, ArtifactContent } from "../../services/knowledgeTypes";
 
 const MARKDOWN_EXTENSIONS = [".md", ".markdown", ".mdown", ".mkd"];
 const PR_OR_ISSUE_TITLE_PREFIXES = ["pr #", "pull request", "issue #", "jira #"];

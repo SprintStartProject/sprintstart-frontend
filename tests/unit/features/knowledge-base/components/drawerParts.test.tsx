@@ -6,7 +6,7 @@ import { DeleteArtifactDialog } from "../../../../../src/features/knowledge-base
 import { DrawerActions } from "../../../../../src/features/knowledge-base/components/DrawerActions";
 import { createMarkdownComponents } from "../../../../../src/features/knowledge-base/components/markdownComponents";
 import { SummaryView } from "../../../../../src/features/knowledge-base/components/SummaryView";
-import type { Artifact, ArtifactContent } from "../../../../../src/features/knowledge-base/types";
+import type { Artifact, ArtifactContent } from "../../../../../src/services/knowledgeTypes";
 
 function artifact(title = "notes.md"): Artifact {
   return {

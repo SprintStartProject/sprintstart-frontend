@@ -3,7 +3,7 @@ import { useAuth } from "../../../context/useAuth";
 import { useToast } from "../../../context/useToast";
 import { knowledgeService } from "../../../services/knowledgeService";
 import type { DrawerAction } from "../drawerState";
-import type { Artifact } from "../types";
+import type { Artifact } from "../../../services/knowledgeTypes";
 
 interface ArtifactDeletionOptions {
   artifact: Artifact | null;

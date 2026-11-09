@@ -146,8 +146,7 @@ describe("threadModel", () => {
       hasProject: true,
     });
 
-    expect(company[0].number).toBe(1);
-    expect(company[2].number).toBe(2);
+    expect(company.map((entry) => entry.number)).toEqual([1, null, 2]);
     expect(company[1]).toMatchObject({ replaced: true, canMoveUp: false, canMoveDown: false });
     expect(project.map((entry) => entry.number)).toEqual([3, 4]);
     expect(project.map((entry) => entry.isOverride)).toEqual([true, false]);

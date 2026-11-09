@@ -16,7 +16,7 @@ import {
   getUserOnboardingFeedback,
   type OnboardingFeedback,
 } from "../../../services/teamManagementService";
-import { fetchIngestionSources } from "../../data-ingestion/ingestionSources";
+import { fetchIngestionSources } from "../../data-ingestion";
 import { useProjectContext } from "../../projects";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { isUnread } from "../useMemberOpenItems";

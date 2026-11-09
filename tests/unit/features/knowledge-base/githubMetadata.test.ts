@@ -5,7 +5,7 @@ import {
   parseBitbucketMetadata,
   parseGithubMetadata,
 } from "../../../../src/features/knowledge-base/githubMetadata";
-import type { Artifact } from "../../../../src/features/knowledge-base/types";
+import type { Artifact } from "../../../../src/services/knowledgeTypes";
 
 describe("parseGithubMetadata", () => {
   afterEach(() => {

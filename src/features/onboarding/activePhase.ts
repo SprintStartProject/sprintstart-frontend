@@ -2,7 +2,10 @@
 // Shared by the member's own onboarding view and the PM member
 // view so both land on the same phase.
 
-import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "../../services/onboardingTypes";
+import type {
+  OnboardingPathEndpoint,
+  OnboardingPhaseEndpoint,
+} from "../../services/onboardingTypes";
 
 /**
  * Whether a phase still has something left to do.

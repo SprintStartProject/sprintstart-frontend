@@ -4,10 +4,10 @@ import {
   deriveSourceStatus,
   getBackendSourceStatusLabel,
   getSourceStatusFromBackend,
-} from "../../data-ingestion/data";
-import { SourceStatusChip } from "../../data-ingestion/components/SourceStatusChip";
-import { SourceSyncBadge } from "../../data-ingestion/components/SourceSyncBadge";
-import { SourceTypeBadge } from "../../data-ingestion/components/SourceTypeBadge";
+} from "../../data-ingestion";
+import { SourceStatusChip } from "../../data-ingestion";
+import { SourceSyncBadge } from "../../data-ingestion";
+import { SourceTypeBadge } from "../../data-ingestion";
 import { getSourceTypeMeta } from "../data";
 import { IconTile } from "../../../components/ui/IconTile";
 

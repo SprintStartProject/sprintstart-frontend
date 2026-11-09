@@ -1,6 +1,9 @@
 import { phaseItems, phaseState } from "./journey";
 import { resolveNextAction } from "./nextAction";
-import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "../../services/onboardingTypes";
+import type {
+  OnboardingPathEndpoint,
+  OnboardingPhaseEndpoint,
+} from "../../services/onboardingTypes";
 
 /** A phase the visit named, or the one holding the item it was sent for. */
 function requestedPhase(

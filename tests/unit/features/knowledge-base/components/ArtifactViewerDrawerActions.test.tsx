@@ -3,10 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../../../../src/context/ToastProvider";
 import { ArtifactViewerDrawer } from "../../../../../src/features/knowledge-base/components/ArtifactViewerDrawer";
 import { ApiError } from "../../../../../src/services/apiClient";
-import type {
-  Artifact,
-  SummaryStreamHandlers,
-} from "../../../../../src/features/knowledge-base/types";
+import type { Artifact, SummaryStreamHandlers } from "../../../../../src/services/knowledgeTypes";
 
 interface AuthHolder {
   auth: { profile: { id: string } | null };

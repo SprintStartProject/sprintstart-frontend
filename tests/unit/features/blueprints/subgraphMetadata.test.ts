@@ -6,10 +6,7 @@ import {
   questionMetadataOf,
   stepMetadataOf,
 } from "../../../../src/features/blueprints/subgraph/metadata.ts";
-import type {
-  BlueprintQuestion,
-  BlueprintStep,
-} from "../../../../src/services/blueprintTypes.ts";
+import type { BlueprintQuestion, BlueprintStep } from "../../../../src/services/blueprintTypes.ts";
 
 const step = {
   id: "s1",

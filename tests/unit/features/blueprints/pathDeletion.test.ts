@@ -7,10 +7,7 @@ import {
   nodesAfterDeletion,
   sendDelete,
 } from "../../../../src/features/blueprints/pathDeletion.ts";
-import type {
-  BlueprintGraphNode,
-  BlueprintPath,
-} from "../../../../src/services/blueprintTypes.ts";
+import type { BlueprintGraphNode, BlueprintPath } from "../../../../src/services/blueprintTypes.ts";
 
 const { service } = vi.hoisted(() => ({
   service: {

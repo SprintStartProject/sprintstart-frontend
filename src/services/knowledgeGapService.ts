@@ -1,9 +1,5 @@
 import { apiClient, ApiError } from "./apiClient";
-import type {
-  KnowledgeGapOverview,
-  KnowledgeGap,
-  KnowledgeGapOwner,
-} from "./knowledgeGapTypes";
+import type { KnowledgeGapOverview, KnowledgeGap, KnowledgeGapOwner } from "./knowledgeGapTypes";
 
 /**
  * Knowledge gaps are detected and cached per project, so every call carries the

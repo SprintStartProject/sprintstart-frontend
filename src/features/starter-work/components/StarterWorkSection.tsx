@@ -21,7 +21,10 @@ import type { PoolFlightItem, PoolFlightRect } from "./poolFlight";
 import { useProjectContext } from "../../projects";
 import { useStarterWorkReview } from "../hooks/useStarterWorkReview";
 import { useStarterWorkPool } from "../hooks/useStarterWorkPool";
-import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../../../services/starterWorkTypes";
+import type {
+  CreateStarterWorkTaskInput,
+  StarterWorkTask,
+} from "../../../services/starterWorkTypes";
 
 type StarterWorkSectionProps = {
   /**

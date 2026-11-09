@@ -14,7 +14,11 @@ import { getQuickActionRevealVariants, quickActionSpringToken } from "../../../s
 import { BuddyMarkdown } from "../../buddy";
 import { useCorpusIssueBrowser } from "../hooks/useCorpusIssueBrowser";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
-import type { CandidatePoolState, StarterWorkCandidate, StarterWorkTask } from "../../../services/starterWorkTypes";
+import type {
+  CandidatePoolState,
+  StarterWorkCandidate,
+  StarterWorkTask,
+} from "../../../services/starterWorkTypes";
 import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type CorpusIssueBrowserProps = {

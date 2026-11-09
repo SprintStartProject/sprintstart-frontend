@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { matchesFormat } from "../../../../src/features/knowledge-base/tabs";
-import type { Artifact } from "../../../../src/features/knowledge-base/types";
+import type { Artifact } from "../../../../src/services/knowledgeTypes";
 
 /** An upload as the backend sends it: no mime, UUID source id, title + language only. */
 function upload(title: string, language: string | null): Artifact {

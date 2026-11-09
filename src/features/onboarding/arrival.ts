@@ -1,5 +1,8 @@
 import { phaseItems, type PhaseItem } from "./journey";
-import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "../../services/onboardingTypes";
+import type {
+  OnboardingPathEndpoint,
+  OnboardingPhaseEndpoint,
+} from "../../services/onboardingTypes";
 
 /**
  * What a visit was sent to the page for.

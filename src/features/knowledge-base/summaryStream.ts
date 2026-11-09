@@ -2,7 +2,7 @@ import type { Dispatch, MutableRefObject } from "react";
 import { knowledgeService } from "../../services/knowledgeService";
 import { ApiError } from "../../services/apiClient";
 import type { DrawerAction } from "./drawerState";
-import type { SummaryStreamHandlers } from "./types";
+import type { SummaryStreamHandlers } from "../../services/knowledgeTypes";
 
 const RETRY_BASE_DELAY_MS = 2000;
 const RETRY_MAX_DELAY_MS = 30000;

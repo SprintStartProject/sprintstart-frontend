@@ -1,4 +1,4 @@
-import type { ArtifactContent, ArtifactSummaryCitation } from "./types";
+import type { ArtifactContent, ArtifactSummaryCitation } from "../../services/knowledgeTypes";
 
 export type ViewMode = "raw" | "summary";
 export type MarkdownViewMode = "rendered" | "source";

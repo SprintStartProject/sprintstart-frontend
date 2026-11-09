@@ -5,10 +5,7 @@ import { StarterWorkSection } from "../../../src/features/starter-work/component
 import { ToastProvider } from "../../../src/context/ToastProvider";
 import { starterWorkService } from "../../../src/services/starterWorkService";
 import { userService } from "../../../src/services/userService";
-import type {
-  StarterWorkCandidate,
-  StarterWorkTask,
-} from "../../../src/services/starterWorkTypes";
+import type { StarterWorkCandidate, StarterWorkTask } from "../../../src/services/starterWorkTypes";
 
 vi.mock("../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =

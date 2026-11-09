@@ -1,6 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
 import { onboardingService } from "../../../../../services/onboardingService";
-import type { OnboardingStepDetail, OnboardingTaskEndpoint } from "../../../../../services/onboardingTypes";
+import type {
+  OnboardingStepDetail,
+  OnboardingTaskEndpoint,
+} from "../../../../../services/onboardingTypes";
 import type { Drafts } from "./useStepData";
 import { failureMessage, pendingSkipOf } from "./workspaceRules";
 import type { Busy, Drawer } from "./workspaceRules";

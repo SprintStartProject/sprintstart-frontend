@@ -9,7 +9,11 @@ import { useToast } from "../../../context/useToast";
 import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { STEP_LABELS, STEP_ORDER } from "../steps";
 import { useOrientationDraft, type DraftStep } from "../hooks/useOrientationDraft";
-import type { AuthorOrientationInput, OrientationPacket, OrientationStep } from "../../../services/orientationTypes";
+import type {
+  AuthorOrientationInput,
+  OrientationPacket,
+  OrientationStep,
+} from "../../../services/orientationTypes";
 
 type OrientationEditorProps = {
   /** The task the orientation belongs to; its title heads the editor. */
