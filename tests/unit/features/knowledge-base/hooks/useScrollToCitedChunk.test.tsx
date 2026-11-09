@@ -1,7 +1,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useScrollToCitedChunk } from "../../../../../src/features/knowledge-base/hooks/useScrollToCitedChunk";
-import type { ArtifactContent } from "../../../../../src/features/knowledge-base/types";
+import type { ArtifactContent } from "../../../../../src/services/knowledgeTypes";
 
 const CONTENT: ArtifactContent = { content: "x", mimeType: "text/plain", isObjectUrl: false };
 

@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useArtifactDrawerData } from "../../../../../src/features/knowledge-base/hooks/useArtifactDrawerData";
-import type { Artifact } from "../../../../../src/features/knowledge-base/types";
+import type { Artifact } from "../../../../../src/services/knowledgeTypes";
 import { knowledgeService } from "../../../../../src/services/knowledgeService";
 
 vi.mock("../../../../../src/services/knowledgeService", () => ({

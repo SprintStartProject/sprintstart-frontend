@@ -1,5 +1,5 @@
 import type { IngestionRunFilter } from "../features/data-ingestion/types";
-import type { KnowledgeListParams } from "../features/knowledge-base/types";
+import type { KnowledgeListParams } from "./knowledgeTypes";
 
 /**
  * Central query-key factory, shared by every migrated hook, invalidation call and

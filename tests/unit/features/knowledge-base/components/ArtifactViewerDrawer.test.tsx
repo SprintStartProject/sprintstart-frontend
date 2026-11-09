@@ -11,7 +11,7 @@ import type {
   Artifact,
   ArtifactSummaryCitation,
   SummaryStreamHandlers,
-} from "../../../../../src/features/knowledge-base/types";
+} from "../../../../../src/services/knowledgeTypes";
 
 vi.mock("../../../../../src/services/knowledgeService", () => ({
   knowledgeService: {

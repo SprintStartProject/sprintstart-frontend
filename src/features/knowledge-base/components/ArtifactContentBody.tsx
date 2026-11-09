@@ -5,7 +5,7 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import type { ContentKind } from "../artifactPresentation";
 import { preprocessMarkdown } from "../markdown";
 import { languageForFilename } from "../sourceLanguage";
-import type { Artifact, ArtifactContent } from "../types";
+import type { Artifact, ArtifactContent } from "../../../services/knowledgeTypes";
 import {
   REHYPE_PLUGINS,
   REMARK_PLUGINS,

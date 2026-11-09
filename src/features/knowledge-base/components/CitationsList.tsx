@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { FileText } from "lucide-react";
-import type { ArtifactSummaryCitation } from "../types";
+import type { ArtifactSummaryCitation } from "../../../services/knowledgeTypes";
 
 interface CitationsListProps {
   citations: ArtifactSummaryCitation[];

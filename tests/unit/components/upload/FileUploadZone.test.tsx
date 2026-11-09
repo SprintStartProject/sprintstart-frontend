@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { FileUploadZone } from "../../../../../src/features/knowledge-base/components/FileUploadZone";
+import { FileUploadZone } from "../../../../src/components/upload/FileUploadZone";
 
 describe("FileUploadZone", () => {
   beforeEach(() => {

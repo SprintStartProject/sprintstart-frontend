@@ -3,7 +3,7 @@ import {
   contentKind,
   shouldRenderAsMarkdown,
 } from "../../../../src/features/knowledge-base/artifactPresentation";
-import type { Artifact, ArtifactContent } from "../../../../src/features/knowledge-base/types";
+import type { Artifact, ArtifactContent } from "../../../../src/services/knowledgeTypes";
 
 function artifact(overrides: Partial<Artifact> = {}): Artifact {
   return {

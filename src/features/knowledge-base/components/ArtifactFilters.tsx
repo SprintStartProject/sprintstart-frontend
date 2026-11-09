@@ -12,7 +12,7 @@ import {
   Search,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
-import { CONNECTOR_LIST } from "../../data-ingestion/connectors/registry.ts";
+import { CONNECTOR_LIST } from "../../data-ingestion";
 import { Input } from "../../../components/ui/Input";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect.tsx";
 import {
@@ -32,7 +32,7 @@ import {
   type KnowledgeTab,
   type UploadFormat,
 } from "../tabs";
-import type { ArtifactSort, ArtifactType, SourceSystem } from "../types";
+import type { ArtifactSort, ArtifactType, SourceSystem } from "../../../services/knowledgeTypes";
 import type { DateRange } from "../dateRange.ts";
 import type { KnowledgeBaseHistoryMode } from "../hooks/useKnowledgeBaseUrlState.ts";
 import { ArtifactDateRangeFilter } from "./ArtifactDateRangeFilter.tsx";

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../../../../src/context/ToastProvider";
 import { ArtifactViewerDrawer } from "../../../../../src/features/knowledge-base/components/ArtifactViewerDrawer";
-import type { Artifact } from "../../../../../src/features/knowledge-base/types";
+import type { Artifact } from "../../../../../src/services/knowledgeTypes";
 
 vi.mock("../../../../../src/services/knowledgeService", () => ({
   knowledgeService: {
