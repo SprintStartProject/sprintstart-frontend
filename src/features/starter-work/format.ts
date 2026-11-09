@@ -32,3 +32,9 @@ export function formatRelativeDate(iso: string): string {
 function plural(value: number, unit: string): string {
   return `${value} ${unit}${value === 1 ? "" : "s"} ago`;
 }
+
+/** Collapses whitespace runs and cuts the text to `maxLength`, ending in an ellipsis when it was cut. */
+export function compactToastDetail(value: string, maxLength: number): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  return compact.length <= maxLength ? compact : compact.slice(0, maxLength - 1).trimEnd() + "…";
+}

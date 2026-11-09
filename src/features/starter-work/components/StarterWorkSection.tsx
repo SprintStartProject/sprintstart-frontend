@@ -21,6 +21,7 @@ import type { PoolFlightItem, PoolFlightRect } from "./poolFlight";
 import { useProjectContext } from "../../projects";
 import { useStarterWorkReview } from "../hooks/useStarterWorkReview";
 import { useStarterWorkPool } from "../hooks/useStarterWorkPool";
+import { compactToastDetail } from "../format";
 import type {
   CreateStarterWorkTaskInput,
   StarterWorkTask,
@@ -34,11 +35,6 @@ type StarterWorkSectionProps = {
    */
   actionsPortalTarget?: HTMLElement | null;
 };
-
-function compactToastDetail(value: string, maxLength: number): string {
-  const compact = value.replace(/\s+/g, " ").trim();
-  return compact.length <= maxLength ? compact : compact.slice(0, maxLength - 1).trimEnd() + "…";
-}
 
 /**
  * Where a PM looks over the starter tasks the corpus produced.
