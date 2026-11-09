@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { ArtifactAiStatus, ArtifactAiStatusResponse } from "../types";
+import type { ArtifactAiStatus, ArtifactAiStatusResponse } from "../../../services/knowledgeTypes";
 
 /** How long a status is trusted before a remount refetches it. */
 export const AI_STATUS_STALE_MS = 5 * 60 * 1000;

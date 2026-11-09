@@ -11,7 +11,7 @@ import type {
   DeleteUploadsResult,
   KnowledgeListParams,
   SummaryStreamHandlers,
-} from "../features/knowledge-base/types";
+} from "./knowledgeTypes";
 
 /**
  * SSE event shape emitted by the artifact summary streaming endpoint.

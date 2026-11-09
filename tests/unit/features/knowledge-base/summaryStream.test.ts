@@ -7,7 +7,7 @@ import {
   runSummary,
   type SummaryRun,
 } from "../../../../src/features/knowledge-base/summaryStream";
-import type { SummaryStreamHandlers } from "../../../../src/features/knowledge-base/types";
+import type { SummaryStreamHandlers } from "../../../../src/services/knowledgeTypes";
 import { ApiError } from "../../../../src/services/apiClient";
 import { knowledgeService } from "../../../../src/services/knowledgeService";
 

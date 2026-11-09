@@ -1,6 +1,6 @@
 import { CheckCircle2, CircleDashed, Hourglass, XCircle, type LucideIcon } from "lucide-react";
 import type { BadgeVariant } from "../../components/ui/Badge";
-import type { ArtifactAiStatus } from "./types";
+import type { ArtifactAiStatus } from "../../services/knowledgeTypes";
 
 /** How one AI status is drawn: text, icon and colour together, never colour alone. */
 export interface AiStatusChipSpec {

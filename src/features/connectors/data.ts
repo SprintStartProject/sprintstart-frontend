@@ -1,6 +1,6 @@
 import { Plug } from "lucide-react";
 import type { ConnectorDto } from "../../services/connectorService.ts";
-import { findConnectorById } from "../data-ingestion/connectors/registry.ts";
+import { findConnectorById } from "../data-ingestion";
 import type { ConnectorListItem, ConnectorMeta } from "./types.ts";
 
 const FALLBACK_CONNECTOR_META: Omit<ConnectorMeta, "label"> = {

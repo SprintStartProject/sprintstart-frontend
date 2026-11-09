@@ -10,7 +10,7 @@ import type {
   KnowledgeListParams,
   SourceSystem,
   UploadFormat,
-} from "../types";
+} from "../../../services/knowledgeTypes";
 import {
   DEFAULT_ARTIFACT_SORT,
   DEFAULT_FORMAT_ORDER,
@@ -20,7 +20,7 @@ import {
   type KnowledgeTab,
   SOURCE_LABELS,
 } from "../tabs";
-import { hasRepositoryFacet } from "../../data-ingestion/connectors/registry.ts";
+import { hasRepositoryFacet } from "../../data-ingestion";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue.ts";
 import { DEFAULT_PAGE_SIZE, useKnowledgeBaseUrlState } from "./useKnowledgeBaseUrlState.ts";
 import type { KnowledgeBaseUrlStateOptions } from "./useKnowledgeBaseUrlState.ts";

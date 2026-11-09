@@ -1,9 +1,9 @@
 import { ArrowRightLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { UserAvatar } from "../../../../../components/common/UserAvatar";
-import { SourceTypeBadge } from "../../../../data-ingestion/components/SourceTypeBadge";
-import { getConnector } from "../../../../data-ingestion/connectors/registry";
-import type { DraftSource } from "../../../../data-ingestion/add-source/projectSourcesDraft";
+import { SourceTypeBadge } from "../../../../data-ingestion";
+import { getConnector } from "../../../../data-ingestion";
+import type { DraftSource } from "../../../../data-ingestion";
 
 /** The minimum a review row needs to render a person with their avatar. */
 export type ReviewPerson = {

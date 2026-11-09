@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
-import { FileUploadZone } from "./FileUploadZone";
+import { FileUploadZone } from "../../../components/upload/FileUploadZone";
 import { knowledgeService } from "../../../services/knowledgeService";
 
 interface UploadArtifactPanelProps {

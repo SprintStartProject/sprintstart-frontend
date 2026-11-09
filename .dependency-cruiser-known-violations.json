@@ -233,82 +233,12 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/wizard/addSourceKit.ts",
-    "to": "src/features/data-ingestion/add-source/AddSourceFlow.tsx",
-    "unresolvedTo": "../../../data-ingestion/add-source/AddSourceFlow",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/addSourceKit.ts",
-    "to": "src/features/data-ingestion/add-source/CredentialSlot.tsx",
-    "unresolvedTo": "../../../data-ingestion/add-source/CredentialSlot",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/addSourceKit.ts",
-    "to": "src/features/data-ingestion/add-source/projectSourcesDraft.ts",
-    "unresolvedTo": "../../../data-ingestion/add-source/projectSourcesDraft",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/addSourceKit.ts",
-    "to": "src/features/data-ingestion/add-source/sourceOwners.ts",
-    "unresolvedTo": "../../../data-ingestion/add-source/sourceOwners",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/addSourceKit.ts",
-    "to": "src/features/data-ingestion/add-source/useSourceDraftForm.ts",
-    "unresolvedTo": "../../../data-ingestion/add-source/useSourceDraftForm",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/admin/components/projectDrawer/projectsKit.ts",
     "to": "src/features/projects/components/ProjectMonogram.tsx",
     "unresolvedTo": "../../../projects/components/ProjectMonogram",
     "dependencyTypes": [
       "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -322,280 +252,7 @@
     "unresolvedTo": "../../../projects/industry/ProjectIndustryPanel",
     "dependencyTypes": [
       "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/SourceList.tsx",
-    "to": "src/features/data-ingestion/components/SourceStatusChip.tsx",
-    "unresolvedTo": "../../data-ingestion/components/SourceStatusChip",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/SourceList.tsx",
-    "to": "src/features/data-ingestion/components/SourceSyncBadge.tsx",
-    "unresolvedTo": "../../data-ingestion/components/SourceSyncBadge",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/SourceList.tsx",
-    "to": "src/features/data-ingestion/components/SourceTypeBadge.tsx",
-    "unresolvedTo": "../../data-ingestion/components/SourceTypeBadge",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/SourceList.tsx",
-    "to": "src/features/data-ingestion/data.ts",
-    "unresolvedTo": "../../data-ingestion/data",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/steps/WizardProvisioning.tsx",
-    "to": "src/features/data-ingestion/add-source/projectSourcesDraft.ts",
-    "unresolvedTo": "../../../../data-ingestion/add-source/projectSourcesDraft",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/steps/WizardProvisioning.tsx",
-    "to": "src/features/data-ingestion/add-source/StagedSourceList.tsx",
-    "unresolvedTo": "../../../../data-ingestion/add-source/StagedSourceList",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/steps/WizardReviewStep.tsx",
-    "to": "src/features/data-ingestion/add-source/projectSourcesDraft.ts",
-    "unresolvedTo": "../../../../data-ingestion/add-source/projectSourcesDraft",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/steps/WizardReviewStep.tsx",
-    "to": "src/features/data-ingestion/components/SourceTypeBadge.tsx",
-    "unresolvedTo": "../../../../data-ingestion/components/SourceTypeBadge",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/steps/WizardReviewStep.tsx",
-    "to": "src/features/data-ingestion/connectors/registry.ts",
-    "unresolvedTo": "../../../../data-ingestion/connectors/registry",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/steps/WizardSourcesStep.tsx",
-    "to": "src/features/data-ingestion/add-source/projectSourcesDraft.ts",
-    "unresolvedTo": "../../../../data-ingestion/add-source/projectSourcesDraft",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/steps/WizardSourcesStep.tsx",
-    "to": "src/features/data-ingestion/add-source/sourceOwners.ts",
-    "unresolvedTo": "../../../../data-ingestion/add-source/sourceOwners",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/components/wizard/steps/WizardSourcesStep.tsx",
-    "to": "src/features/data-ingestion/add-source/StagedSourceList.tsx",
-    "unresolvedTo": "../../../../data-ingestion/add-source/StagedSourceList",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/data.ts",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../data-ingestion/connectors/sourceSystems",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/data.ts",
-    "to": "src/features/data-ingestion/data.ts",
-    "unresolvedTo": "../data-ingestion/data",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/admin/data.ts",
-    "to": "src/features/data-ingestion/types.ts",
-    "unresolvedTo": "../data-ingestion/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/buddy/citations/citationArtifact.ts",
-    "to": "src/features/data-ingestion/connectors/registry.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/registry.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/buddy/citations/citationArtifact.ts",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../../knowledge-base/types.ts",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/buddy/components/BuddyComposerFilters.tsx",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/sourceSystems",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/buddy/components/BuddyComposerFilters.tsx",
-    "to": "src/features/data-ingestion/data.ts",
-    "unresolvedTo": "../../data-ingestion/data",
-    "dependencyTypes": [
-      "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -618,138 +275,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/buddy/hooks/useAvailableSources.ts",
-    "to": "src/features/data-ingestion/connectors/registry.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/registry",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/buddy/hooks/useAvailableSources.ts",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/sourceSystems",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/buddy/hooks/usePointerGaze.ts",
     "to": "src/features/moments/rocketWatch.ts",
     "unresolvedTo": "../../moments/rocketWatch.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/buddy/types.ts",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../data-ingestion/connectors/sourceSystems",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/connectors/data.ts",
-    "to": "src/features/data-ingestion/connectors/registry.ts",
-    "unresolvedTo": "../data-ingestion/connectors/registry.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/dashboard/components/IngestionWidget.tsx",
-    "to": "src/features/data-ingestion/data.ts",
-    "unresolvedTo": "../../data-ingestion/data",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/dashboard/components/IngestionWidget.tsx",
-    "to": "src/features/data-ingestion/ingestionSources.ts",
-    "unresolvedTo": "../../data-ingestion/ingestionSources",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/dashboard/components/IngestionWidget.tsx",
-    "to": "src/features/data-ingestion/types.ts",
-    "unresolvedTo": "../../data-ingestion/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/dashboard/components/KnowledgeBaseWidget.tsx",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../../knowledge-base/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
-    "to": "src/features/knowledge-gaps/components/MyKnowledgeGapsDrawer.tsx",
-    "unresolvedTo": "../../knowledge-gaps/components/MyKnowledgeGapsDrawer",
     "dependencyTypes": [
       "local",
       "import"
@@ -766,7 +294,7 @@
     "unresolvedTo": "../../../knowledge-gaps/components/SeverityIndicators",
     "dependencyTypes": [
       "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -780,7 +308,7 @@
     "unresolvedTo": "../../../knowledge-gaps/format",
     "dependencyTypes": [
       "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -794,7 +322,7 @@
     "unresolvedTo": "../../../knowledge-gaps/severity",
     "dependencyTypes": [
       "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -809,6 +337,20 @@
     "dependencyTypes": [
       "local",
       "type-only",
+      "export"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-cross-feature-internals"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
+    "to": "src/features/knowledge-gaps/components/MyKnowledgeGapsDrawer.tsx",
+    "unresolvedTo": "../../knowledge-gaps/components/MyKnowledgeGapsDrawer",
+    "dependencyTypes": [
+      "local",
       "import"
     ],
     "rule": {
@@ -846,226 +388,12 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/bitbucket/WorkspaceMetadataView.tsx",
-    "to": "src/features/knowledge-base/bitbucketWorkspaceMetadata.ts",
-    "unresolvedTo": "../../../knowledge-base/bitbucketWorkspaceMetadata.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/bitbucket/WorkspaceMetadataView.tsx",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../../../knowledge-base/types.ts",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/github/OrgMetadataView.tsx",
-    "to": "src/features/knowledge-base/orgMetadata.ts",
-    "unresolvedTo": "../../../knowledge-base/orgMetadata.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/github/OrgMetadataView.tsx",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../../../knowledge-base/types.ts",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/knowledgeBaseLink.ts",
-    "to": "src/features/knowledge-base/hooks/useKnowledgeBaseUrlState.ts",
-    "unresolvedTo": "../../knowledge-base/hooks/useKnowledgeBaseUrlState.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/types.ts",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../../knowledge-base/types.ts",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/data-ingestion/connectors/upload/DraftForm.tsx",
-    "to": "src/features/knowledge-base/components/FileUploadZone.tsx",
-    "unresolvedTo": "../../../knowledge-base/components/FileUploadZone.tsx",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-base/components/ArtifactFilters.tsx",
-    "to": "src/features/data-ingestion/connectors/registry.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/registry.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-base/components/ArtifactViewerDrawer.tsx",
-    "to": "src/features/data-ingestion/connectors/registry.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/registry",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-base/components/SourceLinkBadge.tsx",
-    "to": "src/features/data-ingestion/connectors/registry.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/registry.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-base/components/SourceLinkBadge.tsx",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/sourceSystems.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-base/hooks/useKnowledgeBase.ts",
-    "to": "src/features/data-ingestion/connectors/registry.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/registry.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-base/hooks/useKnowledgeBaseUrlState.ts",
-    "to": "src/features/data-ingestion/connectors/registry.ts",
-    "unresolvedTo": "../../data-ingestion/connectors/registry.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-base/tabs.ts",
-    "to": "src/features/data-ingestion/connectors/registry.ts",
-    "unresolvedTo": "../data-ingestion/connectors/registry.ts",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/knowledge-base/types.ts",
-    "to": "src/features/data-ingestion/connectors/sourceSystems.ts",
-    "unresolvedTo": "../data-ingestion/connectors/sourceSystems.ts",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/features/onboarding/components/journey/workspace/buddyKit.ts",
     "to": "src/features/buddy/aiBuddyBus.ts",
     "unresolvedTo": "../../../../buddy/aiBuddyBus",
     "dependencyTypes": [
       "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -1079,35 +407,7 @@
     "unresolvedTo": "../../../../buddy/components/AskTheBuddy",
     "dependencyTypes": [
       "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/analysis/useProjectAnalysis.ts",
-    "to": "src/features/data-ingestion/ingestionSources.ts",
-    "unresolvedTo": "../../data-ingestion/ingestionSources",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-cross-feature-internals"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/features/pm-area/components/PmHeaderStatus.tsx",
-    "to": "src/features/data-ingestion/ingestionSources.ts",
-    "unresolvedTo": "../../data-ingestion/ingestionSources",
-    "dependencyTypes": [
-      "local",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -1182,7 +482,7 @@
     "dependencyTypes": [
       "local",
       "type-only",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -1239,21 +539,6 @@
     "from": "src/services/knowledgeRequestService.ts",
     "to": "src/features/knowledge-request/types.ts",
     "unresolvedTo": "../features/knowledge-request/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-stay-below-the-ui"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/services/knowledgeService.ts",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../features/knowledge-base/types",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -1359,21 +644,6 @@
     "from": "src/services/queryKeys.ts",
     "to": "src/features/data-ingestion/types.ts",
     "unresolvedTo": "../features/data-ingestion/types",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-stay-below-the-ui"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/services/queryKeys.ts",
-    "to": "src/features/knowledge-base/types.ts",
-    "unresolvedTo": "../features/knowledge-base/types",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -1603,7 +873,7 @@
     "dependencyTypes": [
       "local",
       "type-only",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",
@@ -1618,7 +888,7 @@
     "dependencyTypes": [
       "local",
       "type-only",
-      "import"
+      "export"
     ],
     "rule": {
       "severity": "error",

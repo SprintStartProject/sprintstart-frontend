@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { SegmentedTabOption } from "../../components/ui/SegmentedTabs.tsx";
 import { SCHEDULED_SOURCE_SYSTEMS } from "../../features/data-ingestion/connectors/registry.ts";
-import type { SourceSystem } from "../../features/data-ingestion/connectors/sourceSystems.ts";
+import type { SourceSystem } from "../../services/sourceSystems.ts";
 import {
   loadProjectSyncSchedule,
   saveProjectSyncSchedule,

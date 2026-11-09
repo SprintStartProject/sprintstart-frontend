@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
-import { StagedSourceList } from "../../../../data-ingestion/add-source/StagedSourceList";
-import type { DraftSource } from "../../../../data-ingestion/add-source/projectSourcesDraft";
+import { StagedSourceList } from "../../../../data-ingestion";
+import type { DraftSource } from "../../../../data-ingestion";
 
 type WizardProvisioningProps = {
   projectName: string;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DraftSource } from "../connectors/draft.ts";
-import { SOURCE_SYSTEMS, type SourceSystem } from "../connectors/sourceSystems.ts";
+import { SOURCE_SYSTEMS, type SourceSystem } from "../../../services/sourceSystems.ts";
 import type { AddSourceStep } from "./AddSourceFlow.tsx";
 
 const FIRST_SOURCE_SYSTEM = SOURCE_SYSTEMS[0];
