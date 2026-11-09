@@ -90,19 +90,24 @@ type NumberingInput = {
 };
 
 /**
- * The numbers the hire sees, straight through both sections. A replaced company step carries none:
- * the project's own version, further down, is what counts.
+ * The numbers the hire sees, straight through both sections, by scoped row id. A replaced company
+ * step carries none: the project's own version, further down, is what counts. The scope is part of
+ * the key because the two share one step key, and the override's number must not land on the row it
+ * replaced.
  */
 function numbering(input: NumberingInput): Map<string, number | null> {
   const numberByKey = new Map<string, number | null>();
   let running = 0;
 
   for (const step of input.companySteps) {
-    numberByKey.set(step.key, input.overriddenKeys.has(step.key) ? null : ++running);
+    numberByKey.set(
+      rowId("company", step.key),
+      input.overriddenKeys.has(step.key) ? null : ++running,
+    );
   }
   if (input.hasProject) {
     for (const step of input.projectSteps) {
-      numberByKey.set(step.key, ++running);
+      numberByKey.set(rowId("project", step.key), ++running);
     }
   }
   return numberByKey;
@@ -115,6 +120,7 @@ type EntriesInput = {
   /** The keys the server has, to tell an override from a step that only exists in one scope. */
   serverCompanyKeys: Set<string>;
   overriddenKeys: Set<string>;
+  /** By scoped row id, see {@link rowId}. */
   numberByKey: Map<string, number | null>;
   hasProject: boolean;
 };
@@ -129,7 +135,7 @@ function companyEntriesOf(input: EntriesInput): StepEntry[] {
       scope: "company",
       replaced,
       isOverride: false,
-      number: numberByKey.get(step.key) ?? null,
+      number: numberByKey.get(rowId("company", step.key)) ?? null,
       canMoveUp: !replaced && index > 0,
       canMoveDown: !replaced && index < companySteps.length - 1,
     };
@@ -145,7 +151,7 @@ function projectEntriesOf(input: EntriesInput): StepEntry[] {
     scope: "project" as const,
     replaced: false,
     isOverride: serverCompanyKeys.has(step.key),
-    number: numberByKey.get(step.key) ?? null,
+    number: numberByKey.get(rowId("project", step.key)) ?? null,
     canMoveUp: index > 0,
     canMoveDown: index < projectSteps.length - 1,
   }));
