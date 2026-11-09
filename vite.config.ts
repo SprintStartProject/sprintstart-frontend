@@ -13,13 +13,16 @@ const keepAliveAgent = new http.Agent({ keepAlive: true });
 // ignores a later change to `process.env.TZ`, unlike a forked worker.
 process.env.TZ = "Europe/Berlin";
 
+// Keycloakify's plugin copies its dev resources into `public/` when the config loads, deleting the
+// folder first. Several test workers load the config at once (Stryker starts one per core), and
+// whichever finds the folder half-written fails with ENOTEMPTY. Tests need none of it.
+const isTestRun = Boolean(process.env.VITEST ?? process.env.STRYKER_MUTATOR_WORKER);
+
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    keycloakify({
-      accountThemeImplementation: "none",
-    }),
+    isTestRun ? null : keycloakify({ accountThemeImplementation: "none" }),
   ],
   server: {
     proxy: {

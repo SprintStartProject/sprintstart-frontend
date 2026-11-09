@@ -495,17 +495,6 @@
       "count": 1
     }
   },
-  "src/features/board/components/BoardGrid.tsx": {
-    "complexity": {
-      "count": 9
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 5
-    }
-  },
   "src/features/board/components/BoardPathWindow.tsx": {
     "max-lines-per-function": {
       "count": 1
@@ -893,20 +882,6 @@
     },
     "max-lines-per-function": {
       "count": 1
-    }
-  },
-  "src/features/buddy/hooks/useBuddyConversation.ts": {
-    "complexity": {
-      "count": 4
-    },
-    "max-depth": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 3
     }
   },
   "src/features/buddy/hooks/useGreetingReveal.ts": {
@@ -1367,13 +1342,10 @@
   },
   "src/features/knowledge-base/components/ArtifactViewerDrawer.tsx": {
     "complexity": {
-      "count": 5
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/features/knowledge-base/components/FileUploadZone.tsx": {
@@ -2183,13 +2155,10 @@
   },
   "src/pages/BlueprintPathDetailPage.tsx": {
     "complexity": {
-      "count": 6
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 6
+      "count": 1
     }
   },
   "src/pages/BlueprintPathsPage.tsx": {
