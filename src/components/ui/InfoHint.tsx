@@ -28,8 +28,8 @@ type InfoHintProps = {
 /**
  * A small "i" trigger that reveals a section's helper text on hover, keyboard focus, or click.
  *
- * Section headings used to carry their explanation as a paragraph under the title. This tucks the
- * same text behind an info affordance so the heading row stays compact, without losing it. The
+ * Tucks a section heading's explanation behind an info affordance, so the heading row stays
+ * compact without losing it. The
  * tooltip is wired up with `aria-describedby` so it is always in the accessibility tree, and it
  * follows WCAG 2.1 SC 1.4.13 (Content on Hover or Focus): the pointer can move from the trigger
  * onto the open tooltip without it disappearing — the open tooltip accepts pointer events, and

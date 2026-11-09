@@ -22,12 +22,9 @@ interface UploadArtifactModalProps {
 /**
  * Dialog wrapper around `UploadArtifactPanel`.
  *
- * It used to reimplement the focus trap, Escape handling and focus restore that
- * `Modal` already does — roughly a hundred lines that had to be kept in step
- * with the original by hand. All of that now comes from `Modal`; what is left
- * here is the one thing specific to uploading: the dialog must not be
- * dismissable while files are in flight, because closing it would abandon the
- * upload without telling anyone.
+ * Focus trap, Escape handling and focus restore come from `Modal`; what is left here is the one
+ * thing specific to uploading: the dialog must not be dismissable while files are in flight,
+ * because closing it would abandon the upload without telling anyone.
  */
 export function UploadArtifactModal({
   isOpen,

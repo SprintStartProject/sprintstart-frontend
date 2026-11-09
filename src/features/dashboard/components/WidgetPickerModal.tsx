@@ -48,10 +48,8 @@ export type WidgetPickerModalProps = {
  * The widget picker: everything available, what is on the board, and what you are about to
  * change.
  *
- * It used to list only what was *missing* and add one card per click, which asked the reader to
- * hold their current dashboard in their head to make sense of the list — "have I got that one
- * already?" is not a question a picker should raise. Showing the whole catalog with the placed
- * ones ticked answers it by being the answer.
+ * Showing the whole catalog with the placed ones ticked means nobody has to hold their current
+ * dashboard in their head to read the list.
  *
  * **Deliberately the one place in this feature with a save button.** Everything else in edit
  * mode writes through immediately, because each change is one small thing the user is looking

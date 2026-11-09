@@ -89,9 +89,9 @@ export function ItemKindIcon({
 }
 
 /**
- * What an item is, drawn so the two kinds never look alike: a step sits in a circle, a question in a
- * violet diamond. The state rides along as a small badge in the corner instead of replacing the icon,
- * which is what used to make a locked question look exactly like a locked step.
+ * What an item is, drawn so the two kinds never look alike: a step sits in a circle, a question in
+ * a violet diamond. The state rides along as a small badge in the corner instead of replacing the
+ * icon, so a locked question never looks like a locked step.
  */
 export function ItemGlyph({
   item,
@@ -181,8 +181,8 @@ export function UpdateDot({ className = "bg-white" }: { className?: string }) {
 }
 
 /**
- * What a step carries beyond its state -- a skip request, the member's feedback -- as small pills on
- * the card's top edge, so they can be seen without opening anything.
+ * What a step carries beyond its state -- a skip request, the member's feedback -- as small pills
+ * on the card's top edge, so they can be seen without opening anything.
  */
 export function ItemFlags({
   item,

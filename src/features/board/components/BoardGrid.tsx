@@ -83,8 +83,8 @@ const PILE_DWELL_MS = 350;
 /**
  * How long a dragged card rests over the edge of another before the two trade places.
  *
- * Reordering used to be instant, which made the middle of a card unreachable: the card moved aside
- * the moment its edge was touched. A beat is enough to tell "passing through" from "this is the
+ * An instant swap would make the middle of a card unreachable: the card would move aside the moment
+ * its edge was touched. A beat is enough to tell "passing through" from "this is the
  * place" — as long as the beat only counts while the pointer is still (see {@link STILL_PX}).
  */
 const REORDER_DWELL_MS = 150;
@@ -291,12 +291,10 @@ type GridBlockProps = {
 /**
  * One block in the board's grid: as wide as it was told, and as tall as it turns out to be.
  *
- * **Measured, not estimated.** The board used to guess every card's height from its content and deal
- * the blocks into two balanced columns — good enough while the only question was which column a
- * card starts in, and useless the moment a card can be one column, two, or four: a grid places
- * things in rows, and a row is only as honest as the height it was given. So the block asks the
- * browser how tall it actually is and claims that many of the grid's small rows. A wrong answer
- * here is not a slightly uneven column any more, it is cards overlapping.
+ * **Measured, not estimated.** A card can be one column, two, or four, and a grid places things in
+ * rows, so a row is only as honest as the height it was given: the block asks the browser how tall
+ * it actually is and claims that many of the grid's small rows. A wrong answer here is cards
+ * overlapping.
  *
  * The `ResizeObserver` is what keeps it right afterwards: a checklist that is ticked, a card that
  * is folded, a band that opens — all of them change a height without changing anything this
@@ -322,8 +320,9 @@ function GridBlock({ span, gap, reduceMotion, children }: GridBlockProps) {
       // block keeps a row count taken from a frame it was mid-animation in.
       //
       // Which is exactly the shape of the bug people saw — cards overlapping *sometimes*, depending
-      // on how wide the board was and how much else was arriving at the same moment. `borderBoxSize`
-      // is the geometry the grid actually places against, and it is blind to transforms.
+      // on how wide the board was and how much else was arriving at the same moment.
+      // `borderBoxSize` is the geometry the grid actually places against, and it is blind to
+      // transforms.
       const height =
         entry?.borderBoxSize?.[0]?.blockSize ??
         (element as HTMLElement).offsetHeight ??
@@ -710,9 +709,9 @@ export function BoardGrid({
   /** Whether piling onto the lit card moves the dragged one into or out of an area — on the label. */
   const [pileAreaMove, setPileAreaMove] = useState<PileAreaMove>(null);
   /**
-   * Lights the pile target once the dragged card has rested long enough, even when the pointer holds
-   * perfectly still: drag events only arrive while it moves, so counting on them alone left a hire
-   * who stopped and waited with nothing happening.
+   * Lights the pile target once the dragged card has rested long enough, even when the pointer
+   * holds perfectly still: drag events only arrive while it moves, so counting on them alone left a
+   * hire who stopped and waited with nothing happening.
    */
   const pileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** The card and the part of it the dragged card is resting on, and where the rest began. */
@@ -735,15 +734,11 @@ export function BoardGrid({
   /**
    * The whole board's order, filtered cards included.
    *
-   * A reorder replaces the board's order outright, so it has to be expressed over *all* of it. It
-   * used to be built from what was on screen, which is why arranging began by clearing the filter
-   * and the section: a drag on a narrowed board would have told the server about a fraction of it
-   * and let the rest fall to the end.
-   *
-   * The narrowing was never the problem, though — computing a *position* from a narrowed list was.
-   * Every move here is expressed as "put this card where that one is", and the card it names is one
-   * the hire can see and point at. {@link moveTo} then does the insertion in the full order, so
-   * twenty hidden cards between the two change nothing about where the moved one lands.
+   * A reorder replaces the board's order outright, so it has to be expressed over *all* of it:
+   * built from what is on screen, a drag on a narrowed board would tell the server about a fraction
+   * of it. Every move here is expressed as "put this card where that one is", and the card it names
+   * is one the hire can see and point at. {@link moveTo} then does the insertion in the full order,
+   * so twenty hidden cards between the two change nothing about where the moved one lands.
    */
   const ids = useMemo(() => boardOrder ?? shownIds, [boardOrder, shownIds]);
 
@@ -816,8 +811,7 @@ export function BoardGrid({
     function handlePointerDown(event: PointerEvent) {
       const target = event.target instanceof Element ? event.target : null;
       // Floating controls acting on what is in the pile — the highlighter's toolbar, the colour
-      // popover, a menu or dialog — are not looking elsewhere. Pressing "Highlight" on a sentence in
-      // an open pile used to fold the pile away under the sentence being marked.
+      // popover, a menu or dialog — are not looking elsewhere.
       if (target?.closest(KEEPS_PILES_OPEN)) return;
       const openedFrame = target?.closest("[data-stack-root]");
       const insideRoot = openedFrame?.getAttribute("data-stack-root") ?? null;
@@ -1110,10 +1104,9 @@ export function BoardGrid({
   /**
    * The areas with nothing drawn in them.
    *
-   * They have no box in the grid — the grid is built by walking the cards — which used to be fine,
-   * because an area could not exist without one. It can now: the tool rail makes an empty one on
-   * purpose. So while the board is being arranged they are given a box of their own to be dropped
-   * into, which is the only way a first card gets into one now that the per-card picker is gone.
+   * They have no box in the grid, which is built by walking the cards, so while the board is being
+   * arranged they are given a box of their own to be dropped into: the only way a first card gets
+   * into an empty area.
    */
   const emptyGroups = useMemo(
     () =>
@@ -1127,11 +1120,11 @@ export function BoardGrid({
    * The areas that carry stages of their own: a named set of cards that is not all due at once.
    *
    * These are not filed into a band, they are banded *inside*. A team's blueprints are the case
-   * this exists for — one set somebody wrote in one sitting, deliberately spread across the
-   * stages. Filing it under "Now" because its earliest card is due now would put a heading saying
-   * "Now" around cards already behind the hire, and splitting it across the bands would take a thing with a
-   * name and scatter it. So it keeps its name, keeps its cards, and folds by stage within itself —
-   * the same fold, one level in.
+   * this exists for — one set somebody wrote in one sitting, deliberately spread across the stages.
+   * Filing it under "Now" because its earliest card is due now would put a heading saying "Now"
+   * around cards already behind the hire, and splitting it across the bands would take a thing with
+   * a name and scatter it. So it keeps its name, keeps its cards, and folds by stage within itself
+   * — the same fold, one level in.
    *
    * They lead, above the bands. An area is a decision somebody made about what belongs together,
    * and the bands are the board's own answer to when; the named thing goes first.
@@ -1235,11 +1228,13 @@ export function BoardGrid({
     moveBlockTo(blockIndex, direction === "up" ? blockIndex - 1 : blockIndex + 1);
 
   /**
-   * Opens a pile because somebody clicked one of the cards behind the top one, and takes them to it.
+   * Opens a pile because somebody clicked one of the cards behind the top one, and takes them to
+   * it.
    *
    * Opening alone would be technically right and quietly wrong: a run of five unfolds into five
    * cards, and the one they actually asked about is somewhere in the middle of them. The scroll is
-   * what makes clicking a named strip feel like following a link rather than like pressing "expand".
+   * what makes clicking a named strip feel like following a link rather than like pressing
+   * "expand".
    *
    * The card is not on the board yet when this runs — the pile opens through the page's state, so
    * the members mount on the render this click causes. `revealId` carries the intention across to
@@ -1399,8 +1394,7 @@ export function BoardGrid({
     }
 
     // The area's cards in the area's own grid. This is what "things inside an area can sit next to
-    // each other" comes down to: an area two columns wide is two columns inside, so filing a card
-    // into an area no longer means dropping it into a single-file queue.
+    // each other" comes down to: an area two columns wide is two columns inside.
     const inner = renderBlocks(block.items, span);
 
     return (
@@ -1468,11 +1462,11 @@ export function BoardGrid({
   );
 
   return (
-    // `space-y-12` between the bands, against `space-y-4` between the cards inside one. A heading is
-    // only a heading if the gap above it is clearly wider than the gaps it presides over — at the
-    // same 24px as everything else, "Later" read as one more thing in the list above rather than as
-    // the start of the next one. It is also the room a fanned pile in the last row needs, so the
-    // sheets of a card at the bottom of "Now" do not reach into the heading under it.
+    // `space-y-12` between the bands, against `space-y-4` between the cards inside one. A heading
+    // is only a heading if the gap above it is clearly wider than the gaps it presides over — at
+    // the same 24px as everything else, "Later" read as one more thing in the list above rather
+    // than as the start of the next one. It is also the room a fanned pile in the last row needs,
+    // so the sheets of a card at the bottom of "Now" do not reach into the heading under it.
     <div className="space-y-12" data-arranging={isArranging || undefined}>
       {/* Only while arranging: an empty area is a destination, and a row of empty boxes over a
           board somebody is only reading would be the page advertising work to do. */}
@@ -1686,8 +1680,7 @@ type BoardCardCellProps = {
  * The grip is also how the board is arranged without a pointer. It is a real button, so Tab reaches
  * it, and the arrow keys move the card while it has focus — no pick-up gesture to discover, and the
  * label says so. A board you can only arrange with a mouse is a board some people cannot arrange at
- * all, which is why the arrows that used to sit in every header were replaced *by this* rather than
- * simply removed.
+ * all.
  */
 function BoardCardCell({
   card,
@@ -1872,8 +1865,8 @@ function BoardCardCell({
         onResize && !isArranging ? (
           <button
             type="button"
-            // Pointer capture, so a drag that leaves the little handle — which it does immediately —
-            // keeps being this handle's drag rather than the page's.
+            // Pointer capture, so a drag that leaves the little handle — which it does immediately
+            // — keeps being this handle's drag rather than the page's.
             onPointerDown={(event) => {
               event.currentTarget.setPointerCapture(event.pointerId);
               resizeStart.current = { x: event.clientX, y: event.clientY, size };
@@ -1954,14 +1947,9 @@ function BoardCardCell({
   );
 
   // The room a fanned pile needs, and where it has to live: *inside* the box the grid measures.
-  //
-  // It used to be a margin on the card itself, and a margin is the one part of a block's size the
-  // grid never sees. `ResizeObserver` reports the border box, so the sheets hanging below a pile
-  // were room the row count had not been told about, and whatever came next was placed straight
-  // through them. Hover made it worse in a way nothing could correct: the fan doubles its reach
-  // there, and changing a margin resizes nothing, so the observer never fired again. As padding on
-  // a wrapper the room is part of the measured height, and the observer follows it as it eases
-  // open.
+  // `ResizeObserver` reports the border box, so a margin would be room the row count is never told
+  // about, and the fan doubling its reach on hover would resize nothing. As padding on a wrapper
+  // the room is part of the measured height, and the observer follows it as it eases open.
   //
   // `group/stack` moved out here with it, so the hover that fans the sheets and the hover that buys
   // them the room are one element's: the sheets are drawn in this padding, and pointing at one of

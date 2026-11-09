@@ -1,10 +1,6 @@
-// ============================================================
-// features/onboarding/graph/graphLayouts.ts
-// ============================================================
 // Where the nodes of a path's two graphs go. One place, because
 // the journey map draws a small picture of every phase's graph,
 // and that picture has to be the graph one zooms into.
-// ============================================================
 
 import { phaseItems } from "../journey";
 import type { OnboardingPhaseEndpoint } from "../types";

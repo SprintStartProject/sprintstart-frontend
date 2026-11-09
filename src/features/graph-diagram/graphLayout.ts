@@ -20,16 +20,9 @@ import dagre from "dagre";
  * Fixed rather than measured because dagre needs a size before anything has been drawn,
  * and because two cards of different heights in one rank make a tidy layout look untidy.
  *
- * The height used to be an estimate the card was free to exceed: a title over two lines, a line of
- * context, a requirements line and a row of chips came to about 180px against an assumed 116, so
- * every gap the layout left was too small and cards sat on top of each other. Both the geometry and
- * the card now read this, so they cannot drift apart again.
- *
- * It has come down twice since, both times because the card was made to say less rather than
- * because the box was squeezed. What is on it now is a title, what kind of thing it is, and two
- * numbers — everything else was either prose a glance cannot read or a badge that appeared on every
- * card and so distinguished nothing. A canvas of half-empty boxes fits fewer of them on screen for
- * nothing, and on a graph the number that fit *is* the feature.
+ * Both the geometry and the card read this, so they cannot drift apart. The card says only a title,
+ * what kind of thing it is and two numbers: on a graph, how many cards fit on screen *is* the
+ * feature.
  */
 export const GRAPH_NODE_WIDTH = 224;
 export const GRAPH_NODE_HEIGHT = 108;
@@ -291,7 +284,8 @@ export function autoLayoutPositions(nodes: readonly GraphRuleNode[]): GraphPosit
 
     dagre.layout(graph);
 
-    // Dagre centres its nodes; positions here are top-left corners, which is what callers draw from.
+    // Dagre centres its nodes; positions here are top-left corners, which is what callers draw
+    // from.
     const laidOut = connected.map((node) => {
       const placed = graph.node(node.id) as { x?: number; y?: number } | undefined;
       return {
@@ -359,7 +353,8 @@ export function compactTitlePx(zoom: number): number {
 export type ChainPosition = { index: number; total: number };
 
 /**
- * A position for every node that is actually part of a chain, and nothing for every node that is not.
+ * A position for every node that is actually part of a chain, and nothing for every node that is
+ * not.
  *
  * This is the honest half of "what order do I do these in". A prerequisite graph does not have one
  * order — that is why it is a graph — so numbering all sixteen phases 1..16 would invent a sequence
@@ -482,10 +477,10 @@ export function edgeSides(source: GraphPoint, target: GraphPoint): GraphEdgeSide
 /**
  * The shape of an edge: one cubic curve from the source handle to the target handle.
  *
- * The usual library edge types are a staircase (`smoothstep`) or a bezier whose control points reach
- * out by a quarter of the gap — enough to round a corner, not enough to read as a curve. Two cards
- * on the same row got a dead straight dash, and several of those running parallel are hard to tell
- * apart at a glance. So the geometry is ours:
+ * The usual library edge types are a staircase (`smoothstep`) or a bezier whose control points
+ * reach out by a quarter of the gap — enough to round a corner, not enough to read as a curve. Two
+ * cards on the same row got a dead straight dash, and several of those running parallel are hard to
+ * tell apart at a glance. So the geometry is ours:
  *
  * - **Each end leaves along the direction its side faces**, so the curve grows out of the card
  *   rather than cutting across its corner.

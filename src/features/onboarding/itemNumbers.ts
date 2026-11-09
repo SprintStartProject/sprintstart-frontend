@@ -1,9 +1,5 @@
-// ============================================================
-// features/onboarding/itemNumbers.ts
-// ============================================================
 // The number a phase's steps and questions carry on screen, so
 // a hire can say "let's do 3" to their buddy and mean this one.
-// ============================================================
 
 import type { OnboardingPhaseEndpoint } from "./types";
 

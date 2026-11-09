@@ -436,8 +436,7 @@ export function BlueprintPathDetailPage() {
    *
    * All three are one-way -- publishing swaps what new hires are handed, reverting does the same,
    * and a deleted draft has no undo endpoint -- so each is asked about first, and the dialog holds
-   * the answer while the request is in flight. A second click used to send a second request and
-   * land its failure on a page that had just succeeded.
+   * the answer while the request is in flight, so a second click cannot send a second request.
    */
   async function runLifecycleAction() {
     const pending = pendingLifecycle;
@@ -696,9 +695,7 @@ export function BlueprintPathDetailPage() {
   /**
    * Takes one requirement off a phase.
    *
-   * One at a time, from the chip itself. There used to be a second modal with a multi-select
-   * mirroring the add one, which is a lot of ceremony for "not that one" — and the thing being
-   * removed was already on screen with nothing to click.
+   * One at a time, from the chip itself: the thing being removed is already on screen.
    */
   async function removeRequirement(phaseId: string, requirementId: string) {
     const phase = path?.blueprintPhases.find((item) => item.id === phaseId);
@@ -863,8 +860,8 @@ export function BlueprintPathDetailPage() {
       if (target.kind === "question") {
         const question = await blueprintService.createQuestion(blueprintScope, target.parentId, {
           position: target.position,
-          // The overlay asks for a node title separately; it used to send the question text as
-          // both, so every new question was named after its own wording.
+          // The overlay asks for a node title separately, so a new question is not named after its
+          // own wording.
           title: questionTitle || title,
           type: questionType as "MULTIPLE_CHOICE" | "SHORT_TEXT",
           question: title,
@@ -1226,9 +1223,9 @@ export function BlueprintPathDetailPage() {
    * **Not until the path on screen is the one the address names.** Navigating to the draft changes
    * the URL immediately; the draft itself arrives a request later, and until it does `path` is
    * still the *published* version this request came from. Its phases carry the same titles — a
-   * draft is a copy — so a title match against it succeeds and reopens a phase whose id exists
-   * only in the version that was just left. The page it opened then vanished the moment the draft
-   * landed, leaving the author looking at the graph and pressing the phase a second time.
+   * draft is a copy — so a title match against it succeeds and reopens a phase whose id exists only
+   * in the version that was just left, and the page it opened would vanish the moment the draft
+   * lands.
    *
    * The state is cleared as soon as it is acted on: a reload or a step back through history must
    * not open the same thing again, and a title that no longer matches anything is not a reason to
@@ -1793,9 +1790,8 @@ export function BlueprintPathDetailPage() {
       </MainContent>
     );
 
-  // What the overlay is about, whichever way it was opened. The field conditions below used to ask
-  // `target?.kind`, which is only set while *creating* — so editing anything but a task, resource or
-  // option showed a title box and nothing else.
+  // What the overlay is about, whichever way it was opened: `target?.kind` is only set while
+  // creating.
   const formKind = editTarget?.kind ?? target?.kind ?? null;
 
   const orderedPhases = [...path.blueprintPhases].sort((a, b) => a.position - b.position);

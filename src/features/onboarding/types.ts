@@ -1,14 +1,4 @@
-// ============================================================
-// features/onboarding/types.ts
-// ============================================================
 // All types of the onboarding area.
-// ============================================================
-
-// ============================================================
-//  Backend
-// ============================================================
-
-// ─── Onboarding Path List (GET /onboarding/paths) ───────────────────────────
 
 export interface OnboardingPathSummaryEndpoint {
   id: string;
@@ -18,8 +8,6 @@ export interface OnboardingPathSummaryEndpoint {
   stepCount: number;
   finishedStepCount: number;
 }
-
-// ─── Full Path (GET /onboarding/{userId}/path) ───────────────────────────────
 
 export type StepStatus = "WAITING" | "IN_PROGRESS" | "FINISHED" | "SKIPPED";
 export type StepType = "VIDEO" | "DOCUMENT" | "TASK" | "LINK";
@@ -117,8 +105,6 @@ export interface OnboardingPathEndpoint {
   generationIssues?: OnboardingGenerationIssueEndpoint[];
 }
 
-// ─── Step Detail (GET /onboarding/steps/{stepId}) ────────────────────────────
-
 export interface OnboardingTaskEndpoint {
   id: string;
   stepId: string;
@@ -151,8 +137,6 @@ export interface OnboardingStepDetail extends OnboardingStepEndpoint {
   tasks: OnboardingTaskEndpoint[];
   resources: OnboardingResourceEndpoint[];
 }
-
-// ─── Knowledge-Check Questions (first-class onboarding nodes) ──────────────
 
 export type CheckQuestionType = "MULTIPLE_CHOICE" | "SHORT_TEXT";
 
@@ -202,8 +186,6 @@ export interface QuestionAttemptResult {
   // True when this attempt completed the entire onboarding journey.
   onboardingCompleted: boolean;
 }
-
-// ─── Question Admin (GET/PUT /onboarding/phases/{phaseId}/questions) ───────
 
 export interface AdminQuestionOptionEndpoint {
   id: string;
@@ -264,8 +246,6 @@ export interface QuestionAttemptsReviewEndpoint {
     textAnswer: string | null;
   }[];
 }
-
-// ─── AI Path Generation (POST /onboarding/me/path/personalize, SSE) ──────────
 
 export interface OnboardingPersonalizeEvent {
   type: "stage" | "path" | "done" | "error";

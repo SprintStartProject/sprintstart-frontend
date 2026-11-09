@@ -14,8 +14,7 @@ export type DinoCompletionProps = {
 /**
  * Maps a finished turn onto the dino game's completion badge.
  *
- * Why: the game used to say "Reply ready" whenever the busy flags dropped, so a
- * Stop or a failed stream was announced as a successful reply. The label (not
+ * A Stop or a failed stream must not be announced as a successful reply. The label (not
  * just the badge colour) carries the outcome so it also reads correctly for
  * colour-blind and screen-reader users.
  *

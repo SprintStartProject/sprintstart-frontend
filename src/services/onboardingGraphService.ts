@@ -30,8 +30,6 @@ export type ConnectedStepRequest = {
  * Every call replaces a whole set: a batch of positions, or the complete blocker list of one node.
  */
 export const onboardingGraphService = {
-  // ── The hire's own path ─────────────────────────────────
-
   /** Stores where the phases of the caller's own path sit on the journey map. */
   async arrangeMyPath(nodes: GraphNodePosition[]): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/me/path/graph`, {
@@ -47,8 +45,6 @@ export const onboardingGraphService = {
       body: JSON.stringify({ nodes }),
     });
   },
-
-  // ── Somebody else's path (PM, HR, admin) ─────────────────
 
   /** Stores where the phases of another user's path sit on the journey map. */
   async arrangeUserPath(userId: string, nodes: GraphNodePosition[]): Promise<void> {

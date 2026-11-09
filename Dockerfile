@@ -8,6 +8,15 @@ FROM node:${NODE_VERSION} AS builder
 
 LABEL org.opencontainers.image.source=https://github.com/SprintStartProject/sprintstart-frontend
 
+# Node 24 can deadlock in process.exit() (nodejs/node#64274), which leaves `npm ci` or the build
+# hanging after it finished. Every `node` here, npm included, runs without the two background
+# compilers that trigger it; /usr/local/sbin comes before /usr/local/bin on the image's PATH, but
+# the Alpine image does not create it.
+RUN mkdir -p /usr/local/sbin \
+    && printf '#!/bin/sh\nexec /usr/local/bin/node --no-maglev --no-concurrent-sparkplug "$@"\n' > /usr/local/sbin/node \
+    && chmod +x /usr/local/sbin/node \
+    && node -e 'process.exitCode = process.execArgv.includes("--no-maglev") ? 0 : 1'
+
 # Set the working directory inside the container
 WORKDIR /app
 

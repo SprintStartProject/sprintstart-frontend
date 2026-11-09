@@ -62,8 +62,8 @@ const RAIL_OPEN_KEY = "buddyRailOpen";
 /** `null` when the hire has never said either way — the rail then starts closed. */
 function readRailOpen(): boolean | null {
   try {
-    // Read through the pre-rename key once: the rail used to be the PM-replies panel
-    // (`buddyPmRepliesOpen`), and a rename must not throw away a choice already made.
+    // Read through the pre-rename key `buddyPmRepliesOpen` once, so a rename does not throw away a
+    // choice already made.
     const stored =
       localStorage.getItem(RAIL_OPEN_KEY) ?? localStorage.getItem("buddyPmRepliesOpen");
 
@@ -121,7 +121,7 @@ function writeSeenReplyIds(userId: string, ids: string[]): void {
  * frame owns the viewport and the page header. What is left here is the conversation, the rail
  * beside it, and the handful of controls that only mean anything on this page.
  *
- * It still never grows past that panel, for the reason it used to set its own fixed height:
+ * It never grows past that panel:
  * the composer has to stay on screen. A conversation whose input scrolls away is one you have
  * to scroll back to in order to answer.
  */
@@ -146,10 +146,9 @@ function BuddyPageShell({
   isRailOpen?: boolean;
   children: ReactNode;
 }) {
-  // Tells the dock's hand-off that the page is really on screen, so it can stop standing in
-  // for it. No entrance animation of its own any more: arriving from the dock, the page is
-  // revealed by that window fading away, and a second fade underneath it only ever showed the
-  // background through both.
+  // Tells the dock's hand-off that the page is really on screen, so it can stop standing in for it.
+  // No entrance animation of its own: arriving from the dock, the page is revealed by that window
+  // fading away, and a second fade underneath would show the background through both.
   useEffect(() => {
     announceBuddyPageReady();
   }, []);
@@ -243,8 +242,8 @@ function BuddyMentorHome() {
     markGreetingPresented,
   });
 
-  // The same conversation the dock shows, brought on screen the same way. It used to open a
-  // *new* visit here, which is what threw away whatever the hire had already asked.
+  // The same conversation the dock shows, brought on screen the same way. Opening a *new* visit
+  // here would throw away whatever the hire had already asked.
   useEffect(() => {
     void ensureOpened();
   }, [ensureOpened]);
@@ -541,8 +540,7 @@ function BuddyMentorHome() {
 
   // The keyboard half of the buttons that start a conversation, gated the same way they are:
   // a conversation nobody has spoken in is already the new one, so the chord would only replay
-  // the greeting. (There used to be a second gate on being the visible half of the assistant;
-  // one surface later, the page is only ever mounted at its own addresses.)
+  // the greeting.
   useNewConversationShortcut(startConversation, canStartConversation);
 
   // `/` puts the caret in the composer — the chord the shortcut help lists for this page. It
@@ -643,9 +641,8 @@ function BuddyMentorHome() {
                     onNew={startConversation}
                     newDisabled={!canStartConversation}
                     newShortcut={NEW_CONVERSATION_CHORD}
-                    // The rail's one cross, at its top: the replies panel used to carry one
-                    // mid-rail, which read as closing that section alone — and a conversations-only
-                    // rail had no way out at all. See the list's own `onClose`.
+                    // The rail's one cross, at its top: a mid-rail cross would read as closing one
+                    // section alone. See the list's own `onClose`.
                     onClose={() => setRailOpen(false)}
                     // The cap only ever existed to leave the PM replies their share of the rail;
                     // they have their own drawer now, so the conversations are the whole rail.
@@ -668,8 +665,7 @@ function BuddyMentorHome() {
             railToggle={
               // Whenever the rail is shut, in either mode and with any number of conversations —
               // a way back that comes and goes with the list's length or the mode reads as broken.
-              // No count: what a count on this toggle used to say was "your PM answered", and that
-              // signal lives on the header button now.
+              // No count: "your PM answered" lives on the header button.
               !rail.open ? (
                 <RailToggle
                   label={RAIL_LABEL}
@@ -724,8 +720,8 @@ function BuddyMentorHome() {
               // corners, and both are there exactly while the rail is shut — so that is the one
               // fact the room is reserved from, never the controls' own enabled state.
               hasFloatingControl={!rail.open}
-              // Built above, in one identity — the conversation is memoised, and the chips' own reasons
-              // are written where they are built.
+              // Built above, in one identity — the conversation is memoised, and the chips' own
+              // reasons are written where they are built.
               aboveComposer={aboveComposer}
               focusComposerOnMount
             />
@@ -780,23 +776,18 @@ function BuddyMentorHome() {
  * from the docs *and* from the hire's own state, and renders what it opens (like a task's
  * orientation packet) in the thread rather than navigating away.
  *
- * **It is a conversation with somebody, and it is built to feel like one.** Earlier passes at
- * this page tried to make it look like the rest of the app by putting the chat in a card and
- * standing a column of widgets next to it — "Ask about", "Not getting anywhere?" — and what
- * came out was a dashboard about a conversation rather than a conversation. Everything those
- * boxes held has moved to where a person would expect it: the things worth asking sit above the
- * box they fill, sending a question to a person hangs off that question, and the record of what
+ * **It is a conversation with somebody, and it is built to feel like one**, not a dashboard about a
+ * conversation. Everything sits where a person would expect it: the things worth asking sit above
+ * the box they fill, sending a question to a person hangs off that question, and the record of what
  * was sent stands in a rail beside the conversation rather than on top of it.
  *
  * The dock (`BuddyWidget`, mounted app-wide) shares the same one buddy session, so a hire can
  * pick the conversation up from anywhere and grow it into this page when it needs room.
  *
- * Bound to `/buddy` — and `/buddy/:id` for one named conversation — open to every permission
- * group, and drawn as its own page now that the two-surface shell is gone. The header and frame
- * that used to belong to the chat-and-buddy pair live in `BuddyMentorHome` with the rest of the
- * page. A user without a selected project gets the conversation anyway: the hire's buddy is not
- * one project's, and a dead end for everyone redirected here from `/chat` is exactly what the
- * merge of the two surfaces is not allowed to leave behind.
+ * Bound to `/buddy` — and `/buddy/:id` for one named conversation — open to every permission group,
+ * and drawn as its own page, with its header and frame in `BuddyMentorHome` and the rest of the
+ * page. A user without a selected project gets the conversation anyway: the hire's buddy is not one
+ * project's, and everyone redirected here from `/chat` must not reach a dead end.
  */
 export function BuddyPage() {
   return <BuddyMentorHome />;

@@ -1,8 +1,6 @@
 import { apiClient } from "../apiClient.ts";
 import type { ScheduleSpec } from "./syncSchedule.ts";
 
-// ---- Credentials ----
-
 /**
  * A stored Notion credential as returned by the backend. Credentials belong to
  * the authenticated user and are keyed by `name` alone; the token is never
@@ -40,8 +38,6 @@ export type DeleteNotionCredentialRequest = {
   name: string;
 };
 
-// ---- Discovery ----
-
 /**
  * A page the Notion credential can see, as shown in the connect preview. The
  * list is read-only: nothing is stored, and connecting indexes every page the
@@ -53,8 +49,6 @@ export type NotionPageDto = {
   url: string;
   lastEditedTime: string;
 };
-
-// ---- Connections ----
 
 export type CreateNotionConnectionRequest = {
   /**

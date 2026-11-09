@@ -1,9 +1,5 @@
-// ============================================================
-// features/dashboard/layout/sizes.ts
-// ============================================================
 // The grid: three sizes that tile a four-column row exactly,
 // however they are ordered.
-// ============================================================
 
 import type { DashboardWidgetDefinition, DashboardWidgetSize } from "./types";
 
@@ -41,11 +37,9 @@ export const DASHBOARD_GRID_CLASS =
 /**
  * The element the grid measures itself against, wrapped around {@link DASHBOARD_GRID_CLASS}.
  *
- * **The column count follows the board, not the screen.** It used to switch on `sm` and `lg`,
- * which only say how wide the *window* is. The board is that minus a sidebar and two page
- * gutters, so at 1280px the four "desktop" columns were 151px each — a quarter-row card had
- * about 100px for its content, and titles, links and figures ran out of it. A named container
- * query asks the question that matters: is there room for two columns, or for four?
+ * **The column count follows the board, not the screen.** `sm` and `lg` only say how wide the
+ * *window* is, and the board is that minus a sidebar and two page gutters. A named container query
+ * asks the question that matters: is there room for two columns, or for four?
  *
  * Named so a widget's own `@container` further down cannot answer for it by accident.
  */
@@ -80,10 +74,10 @@ const PHONE_CELL = "col-span-1 min-h-[18.25rem] @min-[36rem]/dashboard:min-h-0";
  * reads top to bottom on a small screen.
  *
  * **On a single-column board every card is at least the full-height cell**, whatever the reduced
- * band its wide form gets on a wider screen. The bands are shallow because they are wide: 136px is a comfortable
- * strip across four columns and a clipped box in one. Paired with
- * {@link dashboardRenderSize}, which stops the wide *content* being rendered into that one
- * column in the first place.
+ * band its wide form gets on a wider screen. The bands are shallow because they are wide: 136px is
+ * a comfortable strip across four columns and a clipped box in one. Paired with {@link
+ * dashboardRenderSize}, which stops the wide *content* being rendered into that one column in the
+ * first place.
  */
 const SIZE_CLASSES: Record<DashboardWidgetSize, string> = {
   small: `${PHONE_CELL} @min-[36rem]/dashboard:row-span-6`,
@@ -130,9 +124,9 @@ export function dashboardCellClass(
 /**
  * The size a widget should actually *render* at, which is not always the size it was given.
  *
- * The board runs as a single column when it is narrow, so the three sizes stop meaning three widths:
- * a card given `wide` and a card given `small` are both exactly the width of the page. Handing
- * the placed size to `render` there is what produced the reported breakage — a `wide` form
+ * The board runs as a single column when it is narrow, so the three sizes stop meaning three
+ * widths: a card given `wide` and a card given `small` are both exactly the width of the page.
+ * Handing the placed size to `render` there is what produced the reported breakage — a `wide` form
  * laid out for a four-column band, squeezed into a phone-width column and cut off by the
  * fixed-height cell.
  *

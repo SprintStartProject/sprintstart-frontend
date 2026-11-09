@@ -5,9 +5,7 @@
  * computed over the only thing that matters. Expressed over the cards on screen it silently drops
  * everything the current view is hiding; expressed over all of them it is always complete.
  *
- * That used to force a mode: arranging began by clearing the filter and the section so that the
- * shown order and the whole order were the same list. The narrowing was never the problem, though —
- * computing a *position* from a narrowed list was. Naming the card to land next to costs nothing
+ * Naming the card to land next to costs nothing
  * and is exact, so this takes a target id rather than an index and can be handed the full order
  * whatever the hire happens to be looking at.
  */

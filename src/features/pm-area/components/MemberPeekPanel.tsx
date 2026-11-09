@@ -107,7 +107,7 @@ function MemberPeekContent({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* The member's onboarding at a glance — the card the full profile used to open on. A phase
+      {/* The member's onboarding at a glance — the summary card from the full profile. A phase
           in it leads to the full profile with that phase shown in the path. */}
       <MemberSummary
         member={member}

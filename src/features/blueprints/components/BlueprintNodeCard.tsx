@@ -95,7 +95,8 @@ export type BlueprintNodeCardProps = BlueprintGraphCanvasNodeProps & {
   /** Where the node stands, on the surfaces that have a state to show (the hire's read-only view). */
   status?: { label: string; variant: BadgeVariant; icon?: LucideIcon };
   /**
-   * The two or three numbers this node is worth comparing by, each with the word for what it counts.
+   * The two or three numbers this node is worth comparing by, each with the word for what it
+   * counts.
    *
    * Counts rather than prose: "4 steps · 2 checks" is read at a glance and a sentence saying the
    * same is not, and on a canvas the glance is the whole interaction.
@@ -104,9 +105,9 @@ export type BlueprintNodeCardProps = BlueprintGraphCanvasNodeProps & {
   /**
    * Skill or project-role gates on this node, named.
    *
-   * The second kind of lock in this model, and the one the canvas used to draw nothing for: a phase
-   * gated behind "has Docker" looked exactly like one anybody can start. An arrow says *when*
-   * something opens; a requirement says *for whom* — both close a node, so both belong on it.
+   * The second kind of lock in this model: a phase gated behind "has Docker" must not look like one
+   * anybody can start. An arrow says *when* something opens; a requirement says *for whom* — both
+   * close a node, so both belong on it.
    */
   requirements?: { label: string; type: "SKILL" | "PROJECT_ROLE" }[];
 };
@@ -114,16 +115,15 @@ export type BlueprintNodeCardProps = BlueprintGraphCanvasNodeProps & {
 /**
  * The one card every Blueprint graph draws its nodes with.
  *
- * There were three of these — one in the path editor, one in the sub-graph editor, one in the
- * hire's read-only viewer — that had drifted into three different paddings, two icon sizes and
- * three ideas of what a badge says. They are the same object seen from three places, so they are
- * one component with a `kind`, an `accent` and an optional `status`.
+ * The path editor, the sub-graph editor and the hire's read-only viewer all draw it. They are the
+ * same object seen from three places, so they are one component with a `kind`, an `accent` and an
+ * optional `status`.
  *
  * **A picture, not a control.** The canvas around it is one widget: it owns the click that selects,
  * the keys that move between nodes and the drag that places one, and a node is a `role="button"`
- * inside it. So this is a plain element. It used to be a `<button>`, which put a button inside a
- * button the moment the card grew a control of its own — and left the card and the canvas each
- * with their own idea of what a click meant.
+ * inside it. So this is a plain element: a `<button>` would put a button inside a button once the
+ * card has a control of its own, and give the card and the canvas each their own idea of what a
+ * click means.
  *
  * **Two states, not one shrunk.** A card that is simply scaled down is unreadable at the zoom
  * where a whole blueprint fits, which is the zoom most people look at one from — the seeded
@@ -131,7 +131,7 @@ export type BlueprintNodeCardProps = BlueprintGraphCanvasNodeProps & {
  * card *says* changes with the distance it is read at:
  *
  * - **near** — the title, what kind of thing it is, and the two or three numbers worth comparing
- *   two nodes by. Prose that was here went to the panel: a sentence on a card is a sentence
+ *   two nodes by. Prose belongs in the panel: a sentence on a card is a sentence
  *   nobody reads at a glance and everybody scrolls past.
  * - **far** — a map label: the icon, and the title sized against the zoom so it stays legible on
  *   screen however far out the reader is. The card gives the context line's room to the title at

@@ -1,10 +1,6 @@
-// ============================================================
-// features/onboarding/buddyDrafts.ts
-// ============================================================
 // The first sentence of a conversation about something on the
 // hire's path. Pre-filled into the buddy's composer, never sent
 // for them.
-// ============================================================
 
 import type {
   OnboardingPhaseEndpoint,

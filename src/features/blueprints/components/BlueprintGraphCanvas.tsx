@@ -313,8 +313,6 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
 
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
-  // ── Where the cards go ─────────────────────────────────────
-
   /**
    * Stored positions when every node has one, and a layered layout otherwise.
    *
@@ -363,8 +361,6 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
     Object.entries(preview ?? overrides).forEach(([id, point]) => merged.set(id, point));
     return merged;
   }, [layout, overrides, preview]);
-
-  // ── What is lit, and what is quiet ─────────────────────────
 
   const entryPoints = useMemo(() => entryPointIds(nodes), [nodes]);
   const chainPositionById = useMemo(() => chainPositions(nodes), [nodes]);
@@ -444,8 +440,6 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
     if (drawnNodes.length === nodes.length) return positions;
     return new Map(drawnNodes.map((node) => [node.id, positions.get(node.id)!]));
   }, [drawnNodes, nodes.length, positions]);
-
-  // ── Mutations ──────────────────────────────────────────────
 
   /** Runs one graph mutation, holding the canvas still and surfacing the reason if it fails. */
   const runMutation = useCallback(

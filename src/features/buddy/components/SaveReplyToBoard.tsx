@@ -67,8 +67,6 @@ export function SaveReplyToBoard({ content }: SaveReplyToBoardProps) {
       // the same button where it was, rather than having to make the buddy say it again.
       icon={<ListPlus className="h-3.5 w-3.5" aria-hidden="true" />}
     >
-      {/* Says *what* it keeps. It used to say "Keep this on my board", right next to "Keep this
-          answer" — two buttons whose words could not tell you which one made the checklist. */}
       {saved ? "Checklist on your board" : "Keep as checklist"}
     </Button>
   );

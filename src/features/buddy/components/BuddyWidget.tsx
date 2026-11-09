@@ -175,8 +175,8 @@ export function BuddyWidget() {
   // The switcher (and the composer, and everything else) waits: a turn in flight cannot be
   // called back into a thread that a switch would clear. Same rule as the new-conversation
   // control.
-  // `isGreeting` closes the hole where the first token had already released `isOpening` while
-  // the greeting was still streaming.
+  // `isGreeting` covers the stretch where the first token released `isOpening` but the greeting is
+  // still streaming.
   const isTurnInFlight = isThinking || isStreaming || isOpening || isGreeting || isDeciding;
 
   // The greeting is usually written before the dock is ever opened; this is what still lets the
@@ -301,7 +301,7 @@ export function BuddyWidget() {
    * inline here would hand it a new prop on every render of the widget and put them all back.
    */
   const hasUserMessage = messages.some((message) => message.role === "USER");
-  // The greeting's one suggested next step, which only `/buddy` used to offer.
+  // The greeting's one suggested next step.
   const lastMessageFooter = useMemo(
     () =>
       openerAction && !greeting.isRevealing && !hasUserMessage ? (
@@ -435,8 +435,8 @@ export function BuddyWidget() {
             dragX={dragX}
             dragY={dragY}
             messages={greeting.messages}
-            // `isOpening` too, the way `/buddy` passes it: a dock opened while the greeting is
-            // still being written showed an empty window instead of the buddy typing.
+            // `isOpening` too, as `/buddy` passes it, so a dock opened mid-greeting shows the buddy
+            // typing.
             isThinking={isThinking || isOpening || greeting.isThinking}
             // Held in one identity above, with the reason written there — the thread's memo
             // compares it.
@@ -478,10 +478,9 @@ export function BuddyWidget() {
             onOpenFull={openFull}
             suggestionsHidden={suggestionsHidden}
             onHideSuggestions={hideSuggestions}
-            // Hire conversation ↔ team conversations, in the header beside the title. The
-            // switcher only *offers* the switch; the restore audit lives in the session
-            // (`useBuddyConversation` / `BuddyProvider`). Memoised above, like the props around
-            // it: the dock is a memoised component now.
+            // Hire conversation ↔ team conversations, beside the title. The switcher only offers
+            // the switch; the restore audit lives in the session (`useBuddyConversation` /
+            // `BuddyProvider`).
             headerControl={headerControl}
             isExpanding={handoff !== "idle"}
             isRevealing={handoff === "revealing"}

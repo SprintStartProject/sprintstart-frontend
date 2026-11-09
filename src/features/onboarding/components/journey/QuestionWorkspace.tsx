@@ -34,8 +34,8 @@ type Props = {
 /**
  * A knowledge question, answered where it is -- inside its list row, or zoomed into on the graph.
  *
- * The same grading as before, without the dialog: a wrong answer is offered again right there, and a
- * correct one moves on the way a finished step does.
+ * The same grading as before, without the dialog: a wrong answer is offered again right there, and
+ * a correct one moves on the way a finished step does.
  */
 export function QuestionWorkspace({
   question,
@@ -141,8 +141,8 @@ export function QuestionWorkspace({
             <span className="block text-xs font-normal text-app-text-muted">
               The correct answer is marked below.
             </span>
-            {/* Where another guess used to be the only thing on offer. The buddy is not given the
-                answer, so this is help with the material -- what a wrong answer calls for. */}
+            {/* The buddy is not given the answer, so this is help with the material -- what a wrong
+                answer calls for. */}
             <AskTheBuddy
               question={askAboutWrongAnswer(question, phaseTitle)}
               label="Go through it with your buddy"

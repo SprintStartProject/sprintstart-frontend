@@ -5,7 +5,7 @@ import { PasswordForm } from "../../../features/profile/components/PasswordForm"
 
 /**
  * Profile section of the settings page. Reuses the existing account and
- * password forms (per story: reuse, no rebuild) and the shared `useProfile`
+ * password forms and the shared `useProfile`
  * hook so profile loading and update behaviour match the legacy profile page.
  */
 export function ProfileSection() {

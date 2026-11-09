@@ -102,24 +102,41 @@ async function loadManagerProjects(): Promise<SelectableProject[]> {
 
   const memberProjects = memberships
     .filter((project) => !managedIds.has(project.id))
-    .map((project) =>
-      toSelectableProject(
-        {
-          id: project.id,
-          name: project.name,
-          description: "",
-          manager: null,
-          sources: [],
-          users: [],
-          industry: "",
-          industryConfidence: null,
-          industryCustom: false,
-        },
-        false,
-      ),
-    );
+    .map(memberProject);
 
   return [...managedProjects, ...memberProjects];
+}
+
+/** A project the user is a member of, as the switcher lists it: known by id and name only. */
+function memberProject(project: { id: string; name: string }): SelectableProject {
+  return toSelectableProject(
+    {
+      id: project.id,
+      name: project.name,
+      description: "",
+      manager: null,
+      sources: [],
+      users: [],
+      industry: "",
+      industryConfidence: null,
+      industryCustom: false,
+    },
+    false,
+  );
+}
+
+/** The projects a user may select, by permission group: all for admin and HR, managed and joined ones for a PM. */
+async function fetchSelectableProjects(
+  permissionGroup: PermissionGroup,
+  userId: string,
+): Promise<SelectableProject[]> {
+  if (permissionGroup === PermissionGroup.ADMIN || permissionGroup === PermissionGroup.HR) {
+    return loadAdminProjects(userId);
+  }
+  if (permissionGroup === PermissionGroup.PM) {
+    return loadManagerProjects();
+  }
+  return (await userService.getMyProjects()).map(memberProject);
 }
 
 /**
@@ -147,6 +164,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   */
   const [selectedProjectId, setSelectedProjectIdState] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  // Whose projects `projects` holds. Until it names the signed-in user the list is not theirs,
+  // whatever `isLoading` last said — see `isLoadingForUser` below.
+  const [loadedForUserId, setLoadedForUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   /*
@@ -201,6 +221,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       // A parked request belongs to the session that made it; without a session it must not
       // wait to be confirmed by the next person who signs in.
       requestedProjectIdRef.current = "";
+      setLoadedForUserId(null);
       setIsLoading(false);
       setErrorMessage(null);
       return;
@@ -210,36 +231,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setErrorMessage(null);
 
     try {
-      const isAdmin = permissionGroup === PermissionGroup.ADMIN;
-      const isHr = permissionGroup === PermissionGroup.HR;
-      const isManager = permissionGroup === PermissionGroup.PM;
-
-      let nextProjects: SelectableProject[];
-      if (isAdmin || isHr) {
-        nextProjects = await loadAdminProjects(userId);
-      } else if (isManager) {
-        nextProjects = await loadManagerProjects();
-      } else {
-        const memberships = await userService.getMyProjects();
-        nextProjects = memberships.map((project) =>
-          toSelectableProject(
-            {
-              id: project.id,
-              name: project.name,
-              description: "",
-              manager: null,
-              sources: [],
-              users: [],
-              industry: "",
-              industryConfidence: null,
-              industryCustom: false,
-            },
-            false,
-          ),
-        );
-      }
-
-      const sortedProjects = sortProjects(nextProjects);
+      const sortedProjects = sortProjects(await fetchSelectableProjects(permissionGroup, userId));
       setProjects(sortedProjects);
 
       // A deep link that landed while the list was still loading is the strongest expression
@@ -276,6 +268,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Projects could not be loaded.");
     } finally {
+      setLoadedForUserId(userId);
       setIsLoading(false);
     }
   }, [isAuthenticated, permissionGroup, userId]);
@@ -296,6 +289,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   // exactly while nothing is selected: the list is still loading, or the user has none.
   const hasSelectedProject = selectedProject !== null;
 
+  // The render right after sign-in still carries the signed-out "nothing to load" state: the load
+  // for the new user only starts in the next microtask. Reporting that render as loaded let
+  // ManagerAreaGuard bounce a manager's deep link to /pm-dashboard before their projects arrived.
+  // The same holds while the session is signed in but /users/me has not answered: no profile means
+  // no list could be loaded yet, not that the user has none.
+  const isLoadingForUser =
+    isLoading || (isAuthenticated && (userId === null || loadedForUserId !== userId));
+
   const value = useMemo(
     () => ({
       projects,
@@ -305,7 +306,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       canManageSelected: selectedProject?.isManaged ?? false,
       isSwitcherEnabled:
         permissionGroup !== null && PROJECT_SWITCHER_ROLES.includes(permissionGroup),
-      isLoading,
+      isLoading: isLoadingForUser,
       errorMessage,
       setSelectedProjectId,
       reloadProjects: loadProjects,
@@ -316,7 +317,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       selectedProjectId,
       hasSelectedProject,
       permissionGroup,
-      isLoading,
+      isLoadingForUser,
       errorMessage,
       setSelectedProjectId,
       loadProjects,

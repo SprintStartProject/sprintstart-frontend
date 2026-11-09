@@ -60,7 +60,7 @@ export type MenuPosition = {
  * card below it and its options could not be clicked. A portal is the only way
  * out, and it also stops an ancestor's `overflow: hidden` clipping the menu.
  *
- * The cost is that the menu no longer moves with the trigger for free, so its
+ * The cost is that the menu does not move with the trigger for free, so its
  * position is measured on open and re-measured on scroll and resize. That
  * measurement, and the three ways it can go wrong, lives here once rather than
  * in every control that wants a menu.
@@ -155,7 +155,7 @@ export function usePopoverMenu<TMenu extends HTMLElement = HTMLDivElement>() {
   // arrives as an emulated event after the tap, or not at all.
   //
   // The menu has to be tested separately from the container: it is portaled into
-  // `<body>`, so `containerRef` no longer contains it, and checking the container
+  // `<body>`, so `containerRef` does not contain it, and checking the container
   // alone would treat a press on an option as an outside click — unmounting the
   // option before the click that selects it could land.
   useEffect(() => {

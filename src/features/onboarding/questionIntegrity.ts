@@ -1,10 +1,6 @@
-// ============================================================
-// questionIntegrity.ts
-// ============================================================
 // Keeps a knowledge check a check: multiple-choice options are
 // shown in a shuffled order, and a short-text answer may not be
 // what a wrong attempt just revealed, handed back.
-// ============================================================
 
 import type { OnboardingQuestionOptionEndpoint } from "./types";
 

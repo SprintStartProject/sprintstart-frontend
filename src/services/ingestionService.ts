@@ -188,7 +188,7 @@ function mapSourceInstanceStatus(
   const failedItems = (status.failedItems ?? []).map(mapFailedArtifact);
 
   return {
-    // The backend now labels every row (GitHub and Jira); the fallback only
+    // The backend labels every row (GitHub and Jira); the fallback only
     // covers legacy rows that predate the field, never a mislabel of Jira.
     sourceSystem: status.sourceSystem ?? "GITHUB",
     sourceId: status.sourceId,

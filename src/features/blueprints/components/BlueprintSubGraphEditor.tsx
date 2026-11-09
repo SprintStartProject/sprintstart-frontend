@@ -632,8 +632,7 @@ function StepDetails({
   onEditTask: (task: BlueprintStep["blueprintTasks"][number]) => void;
   onEditResource: (resource: BlueprintStep["blueprintResources"][number]) => void;
 }) {
-  // Fields and lists both, always. They used to be two branches of an edit mode, so on a draft —
-  // where the form is what you get — there was no way to reach the tasks or the resources at all.
+  // Fields and lists both, always: on a draft the tasks and the resources must stay reachable.
   const form = (
     <form id="edit-blueprint-step" className="space-y-5" onSubmit={(event) => void onSubmit(event)}>
       <Field label="Title" required>

@@ -182,8 +182,6 @@ export function JourneyGraph({
 
   const canArrange = !!saveLayout || !!editing;
 
-  // ── Navigation ─────────────────────────────────────────────
-
   const [divingIntoItem, setDivingIntoItem] = useState<string | null>(null);
   const entersItems = !!onOpenItemChange && !!renderItemFocus;
 
@@ -232,8 +230,6 @@ export function JourneyGraph({
     onSelectItem(null);
     onOpenPhaseChange(null);
   };
-
-  // ── Editing ────────────────────────────────────────────────
 
   const persist = async (next: Map<string, GraphPoint>, changedIds: string[]) => {
     const previous = overrides[graphKey];
@@ -365,8 +361,6 @@ export function JourneyGraph({
     </>
   ) : null;
 
-  // ── The journey map ────────────────────────────────────────
-
   if (!openPhase) {
     return (
       <JourneyCanvas
@@ -430,8 +424,6 @@ export function JourneyGraph({
       />
     );
   }
-
-  // ── Inside a phase ─────────────────────────────────────────
 
   const index = phases.indexOf(openPhase);
   const state = phaseState(openPhase);

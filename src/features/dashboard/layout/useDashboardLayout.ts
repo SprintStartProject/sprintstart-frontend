@@ -27,10 +27,6 @@ export type DashboardLayoutController = {
   isCustomized: boolean;
   /**
    * Takes one widget off the board — the card's own remove control in edit mode.
-   *
-   * The only single-widget placement move left. Adding used to have a twin here, back when the
-   * picker added one card per click; the picker applies a whole selection now, so the twin had
-   * no caller and went with it.
    */
   removeWidget: (id: DashboardWidgetId) => void;
   /**

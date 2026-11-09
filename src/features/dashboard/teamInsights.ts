@@ -1,9 +1,5 @@
-// ============================================================
-// features/dashboard/teamInsights.ts
-// ============================================================
 // Who gets the team-insights widget on the shared dashboard,
-// and the two figures it puts in front of them (#288).
-// ============================================================
+// and the two figures it puts in front of them.
 
 import { canAccessRoute } from "../../auth/accessPolicy";
 import type { UserProfile } from "../../services/types";

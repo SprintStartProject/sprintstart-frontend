@@ -4,17 +4,17 @@ import type { BoardCard } from "../types";
 /**
  * The order a board's cards are meant to be worked in, and what has to happen first.
  *
- * The board answers *what is on my plate*; it did not answer *what do I do first*. On a board of a
- * dozen cards that gap is survivable — the hire reads all of them. On a board of forty it is the
- * whole problem: every card is equally loud, so none of them is a next step, and the surface that
- * was supposed to make onboarding legible becomes the thing to get through.
+ * The board answers *what is on my plate*; on its own it does not answer *what do I do first*. On a
+ * board of a dozen cards that gap is survivable — the hire reads all of them. On a board of forty
+ * it is the whole problem: every card is equally loud, so none of them is a next step, and the
+ * surface that was supposed to make onboarding legible becomes the thing to get through.
  *
  * So a card carries two more facts here: which **stage** of the ramp it belongs to, and which cards
  * have to be finished before it is worth opening. Both are the hire's or their PM's to set, and
  * both are *display* facts — like folding, pinning and areas, they never touch the board's own
  * order, so turning the structure off puts every card back exactly where it was.
  *
- * Local storage, and no longer only local storage: `sync/useBoardStructureSync.ts` sends this layer
+ * Local storage first, then synced: `sync/useBoardStructureSync.ts` sends this layer
  * and the other five up to `PUT /me/board/structure` after every change and reads them back on
  * arrival, so a hire who opens their board on a second machine does not find their process
  * flattened. This is still where the client writes first and reads from — the sync is a copy that
@@ -34,32 +34,28 @@ const STORAGE_VERSION = 1;
  * four days waiting for a laptop, still knows what "now" means, where "week 2" is already a lie by
  * the time they read it.
  *
- * **Two, not three.** There used to be a `NEXT` between these, and nobody could defend the line: a
- * PM writing a blueprint and a hire filing a card both had to decide whether something was "next"
- * or "later", and both were guessing at a distinction that meant the same thing — not now. Two
- * buckets carry the whole point of the ramp with half the vocabulary, and what order things come in
- * *within* a bucket is what the dependencies and the stacks are for. That is the division of labour
- * here: the stage is the board's coarse answer for the cards nobody has sequenced, and a chain is a
- * hard claim about the few that somebody has.
+ * **Two, not three.** "Next" and "later" mean the same thing — not now. Two buckets carry the whole
+ * point of the ramp with half the vocabulary, and what order things come in *within* a bucket is
+ * what the dependencies and the stacks are for. That is the division of labour here: the stage is
+ * the board's coarse answer for the cards nobody has sequenced, and a chain is a hard claim about
+ * the few that somebody has.
  *
- * **Read off the path, no longer set by hand.** Since the onboarding path became the one plan, a
- * card's stage is where it sits on that path — see `pathStages.ts`. A stage stored by an older
- * version is still read and still synced, so nothing about a board is lost, but the board does not
- * draw from it any more.
+ * **Read off the path, not set by hand.** A card's stage is where it sits on the onboarding path —
+ * see `pathStages.ts`. A stored stage is still read and synced, so nothing about a board is lost,
+ * but the board does not draw from it.
  */
 export type StoredStage = "NOW" | "LATER";
 
 /**
  * A stage as the board draws it: **Now**, and **Behind you**.
  *
- * Later is gone from the drawing: the path is the one plan, and a phase not reached yet is the
- * path's to show, not the board's (#311). A stored `LATER` is still read and synced — it just no
- * longer decides anything. Behind you only exists because the path decides now: cards from a phase
- * the hire has finished.
- * Left in Now they kept the current phase's band full of things already dealt with; hidden, they
- * would be gone exactly when somebody wants to look something up. So they get a band of their own
- * that arrives folded. Never stored and never sent — it is a fact about the path, not about the
- * board — which is why it sits outside {@link StoredStage}.
+ * Later is not drawn: a phase not reached yet is the path's to show, not the board's. A stored
+ * `LATER` is still read and synced but decides nothing. Behind you only exists because the path
+ * decides now: cards from a phase the hire has finished. Left in Now they would keep the current
+ * phase's band full of things already dealt with; hidden, they would be gone exactly when somebody
+ * wants to look something up. So they get a band of their own that arrives folded. Never stored and
+ * never sent — it is a fact about the path, not about the board — which is why it sits outside
+ * {@link StoredStage}.
  */
 export type BoardStage = "NOW" | "BEHIND";
 
@@ -106,10 +102,10 @@ export function stageOrder(stage: BoardStage): number {
 /**
  * Who put a card behind another one.
  *
- * Two different claims used to be written into the same list. "The team says you cannot touch
+ * Two different claims share this list. "The team says you cannot touch
  * deploys before you have read the runbook" is a rule about the work; "I want to do these three in
- * this order" is one person's plan for their afternoon. Stored as bare ids they were
- * indistinguishable, so the hire's picker could quietly clear a rule the PM had written into a
+ * this order" is one person's plan for their afternoon. Stored as bare ids they would be
+ * indistinguishable, and the hire's picker could quietly clear a rule the PM had written into a
  * blueprint, and nobody — not the PM, not the buddy — would ever know it had gone.
  *
  * - `TEAM` — from a card blueprint. The PM's, and the hire may not take it off.
@@ -117,9 +113,7 @@ export function stageOrder(stage: BoardStage): number {
  *   doing, but still theirs to clear: the buddy is an assistant, not an authority.
  * - `HIRE` — theirs, and the only kind their own controls write.
  *
- * Nothing writes `TEAM` or `BUDDY` any more: card blueprints and the generator that copied the path
- * onto the board were retired when the onboarding path became the one plan (#311). Boards arranged
- * before then still hold such edges, and they keep their meaning.
+ * Nothing writes `TEAM` or `BUDDY`; boards that hold such edges keep their meaning.
  */
 export type DependencySource = "TEAM" | "BUDDY" | "HIRE";
 
@@ -290,9 +284,10 @@ export function isSelfReporting(card: BoardCard): boolean {
     case "PATH_STEP":
       // A degraded card (`reason` set) or a live step that simply has no tasks would otherwise be
       // permanently `OPEN` — zero of zero never reaches `total > 0` in `isCardDone` — which blocks
-      // whatever the hire put behind it with no control anywhere to override it. Unlike `CHECKLIST`,
-      // the hire cannot add items to fix that themselves: the tasks belong to the path. So a card
-      // with nothing to report falls back to the hand-set tick instead of staying stuck.
+      // whatever the hire put behind it with no control anywhere to override it. Unlike
+      // `CHECKLIST`, the hire cannot add items to fix that themselves: the tasks belong to the
+      // path. So a card with nothing to report falls back to the hand-set tick instead of staying
+      // stuck.
       return card.content.tasks.length > 0;
     default:
       return false;
@@ -382,7 +377,7 @@ export type CardState = {
  * not as one where everything has been deferred.
  *
  * `stageOf` decides the stage when given — the board passes the path's answer (`pathStages.ts`).
- * Without it everything is Now: a stored stage is kept for sync but no longer drawn.
+ * Without it everything is Now: a stored stage is kept for sync but not drawn.
  */
 export function deriveCardStates(
   cards: BoardCard[],
@@ -417,7 +412,7 @@ export function deriveCardStates(
       continue;
     }
 
-    // Nothing blocks any more: a stored "comes after" is a card's place in a pile, not a lock on it.
+    // Nothing blocks: a stored "comes after" is a card's place in a pile, not a lock on it.
     // See `restack`. `BLOCKED` stays in the type only for boards drawn from older data in tests.
     states.set(card.id, {
       status: "OPEN",
@@ -509,18 +504,18 @@ export function setDependency(
 /**
  * Puts a card on a pile, or takes it off one — what the board's "Pile" control does.
  *
- * A pile is stored the way a sequence used to be: each card after the first names the one before
- * it (`dependsOn`), and `cardStacks.ts` folds such a run into one pile. Storing it that way keeps it
- * in the arrangement that already syncs, with no new field on the wire. What it no longer means is
- * "wait for": a card in a pile is just a card lying under another one.
+ * A pile is stored as a sequence: each card after the first names the one before it (`dependsOn`),
+ * and `cardStacks.ts` folds such a run into one pile. Storing it that way keeps it in the
+ * arrangement that already syncs, with no new field on the wire. It does not mean "wait for": a
+ * card in a pile is just a card lying under another one.
  *
  * - **Off its pile:** whatever lay after it now lies after whatever was before it, so taking out the
  *   middle card closes the gap instead of splitting the pile in two.
  * - **Under a card:** it goes directly under the target, and whatever lay under the target now lies
  *   under it. The pile's top card stays on top, and "under X" means exactly that.
  *
- * Every "comes after" on the card is replaced, including one a team blueprint once wrote: it used
- * to be a rule, and nothing enforces it any more.
+ * Every "comes after" on the card is replaced, including one a team blueprint wrote: nothing
+ * enforces it.
  */
 export function restack(
   structure: BoardStructure,

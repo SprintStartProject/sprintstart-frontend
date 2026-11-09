@@ -394,8 +394,7 @@ export const knowledgeService = {
    *
    * Delegates to {@link knowledgeService.deleteUploads} so the single and bulk
    * paths cannot drift, and throws when the backend reports this id as failed —
-   * the batch endpoint answers 200 for per-item failures, which used to make a
-   * failed single delete look like a success.
+   * the batch endpoint answers 200 for per-item failures.
    *
    * Sends a multipart DELETE to `/api/v1/uploads` with a `request`
    * JSON part containing the artifactIds batch, the removerId (authenticated user)

@@ -13,11 +13,10 @@ type NewAreaFormProps = {
 /**
  * Naming a new area, in the same slot the card forms open in.
  *
- * An area used to be a by-product: the only way to make one was to file a card into "New area…"
- * from that card's own header, so areas got made by accident and named "Area 3". Making one on
- * purpose needs somewhere to type, and an empty area is drawn nowhere except as a tab — which is
- * not a place to type. So it is a form over the board, like a note or a link, and for the same
- * reason: this is the smallest thing on the page and it should take one decision and one sentence.
+ * Making an area on purpose needs somewhere to type, and an empty area is drawn nowhere except as a
+ * tab — which is not a place to type. So it is a form over the board, like a note or a link, and
+ * for the same reason: this is the smallest thing on the page and it should take one decision and
+ * one sentence.
  *
  * The submit button waits for a name. An area called nothing is a tab nobody can aim at, and the
  * board has no way to tell one from another once there are two.

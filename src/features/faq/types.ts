@@ -1,15 +1,11 @@
 // features/faq/types.ts
 
-// ── SHARED ──────────────────────────────────────────────────
-
 /**
  * How a group's or category's volume is moving, comparing the current trend
  * window against the one before it. A count alone can't tell a topic that is
  * picking up from one that was asked constantly a year ago and never since.
  */
 export type FAQTrend = "RISING" | "STEADY" | "FADING";
-
-// ── FAQ OVERVIEW ────────────────────────────────────────────
 
 /**
  * One recurring question — the same thing asked in different words.
@@ -72,8 +68,6 @@ export interface FAQRebuildPreview {
   rebuildQuestionLimit: number;
   windows: FAQRebuildWindow[];
 }
-
-// ── FAQ DETAIL ──────────────────────────────────────────────
 
 /** One distinct phrasing an entry was asked in. */
 export interface FAQQuestion {

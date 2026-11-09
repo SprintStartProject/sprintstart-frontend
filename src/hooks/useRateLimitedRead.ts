@@ -29,19 +29,16 @@ type RateLimitedReadOptions = {
  * A small read whose answer decorates the shell of the app — a badge, a count,
  * a dot — kept fresh without a subscription and without hammering the backend.
  *
- * Backed by the shared query cache, with `staleTime` doing the rate limiting
- * that this hook used to hand-roll. What is left to do by hand is asking for a
- * recheck in the first place: the sidebar that calls this never unmounts, so
- * react-query's own refetch-on-mount and refetch-on-window-focus have nothing
- * to attach to. A route change (`refreshKey`) or the tab regaining focus both
- * ask, by reading the query's cache entry straight from the client rather than
- * from this render's `useQuery` result -- a raw `focus` listener fires as soon
- * as the event dispatches, which can be before React has re-rendered to catch
- * up with a fetch that already resolved a moment earlier, and the client's own
- * cache entry (unlike this render's snapshot) is always current.
+ * Backed by the shared query cache, with `staleTime` doing the rate limiting. What is left to do by
+ * hand is asking for a recheck in the first place: the sidebar that calls this never unmounts, so
+ * react-query's own refetch-on-mount and refetch-on-window-focus have nothing to attach to. A route
+ * change (`refreshKey`) or the tab regaining focus both ask, by reading the query's cache entry
+ * straight from the client rather than from this render's `useQuery` result -- a raw `focus`
+ * listener fires as soon as the event dispatches, which can be before React has re-rendered to
+ * catch up with a fetch that already resolved a moment earlier, and the client's own cache entry
+ * (unlike this render's snapshot) is always current.
  *
- * `queryKey` is the caller's own — unlike the single shared `key` this hook
- * used to take, a bare project id would collide between two different badges
+ * `queryKey` is the caller's own: a bare project id would collide between two different badges
  * reading the same project. Use the central `queryKeys` factory.
  *
  * Errors are swallowed to `fallback`: a badge is not worth surfacing an error

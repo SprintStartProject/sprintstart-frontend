@@ -1,0 +1,57 @@
+name: End-to-end journeys
+
+# The journeys in docs/testing/e2e-journeys.md against a real stack — Keycloak, backend
+# and database from the images published on `dev`, with the AI replaced by e2e/ai-stub.
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out sprintstart-backend (its compose file defines the stack)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/sprintstart-backend
+          ref: ${{ github.base_ref || github.ref_name }}
+          path: .backend
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - uses: ./.github/actions/node-exit-safe
+
+      - run: npm ci
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Start the stack
+        run: BACKEND_DIR=.backend bash e2e/stack.sh up
+
+      - name: Run the journeys
+        run: npx playwright test
+
+      - name: Stack logs on failure
+        if: failure()
+        run: BACKEND_DIR=.backend bash e2e/stack.sh dump
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore

@@ -1,10 +1,6 @@
-// ============================================================
-// features/onboarding/activePhase.ts
-// ============================================================
 // Works out which phase someone is currently sitting in.
 // Shared by the member's own onboarding view and the PM member
 // view so both land on the same phase.
-// ============================================================
 
 import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "./types";
 

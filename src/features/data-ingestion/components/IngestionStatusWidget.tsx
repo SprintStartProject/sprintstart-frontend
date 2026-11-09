@@ -1,11 +1,9 @@
-// ============================================================
 // IngestionStatusWidget.tsx
 // PM overview card — surfaces ingestion sync health (synced
 // sources, ingested artifacts, errors) using the same
 // `/api/v1/ingestion-status` endpoint and merge logic as the
 // Data Ingestion page, so the PM area never re-implements
 // ingestion status handling.
-// ============================================================
 
 import { AlertTriangle, CheckCircle2, Database, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -49,8 +47,7 @@ function Figure({ value, label }: { value: string; label: string }) {
  * PM overview card: what the buddy, the questions and the gaps are built from, and whether it
  * is fresh.
  *
- * It used to be three inline numbers — synced, ingested, errors — which said that something had
- * run but not *what* the project knows or where it is going wrong. Now it names the sources, each
+ * It names the sources, each
  * with its own status and age, troubled ones first, over the three figures a PM actually weighs:
  * how much is in there, how much the last runs brought, and how much failed. Same endpoint and
  * merge logic as the Data Ingestion page, so the two never disagree.

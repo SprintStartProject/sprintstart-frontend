@@ -1,8 +1,4 @@
-// ============================================================
-// features/dashboard/layout/storage.ts
-// ============================================================
 // Where a user's dashboard arrangement lives between visits.
-// ============================================================
 
 import { isDashboardWidgetSize } from "./sizes";
 import type { DashboardLayout, DashboardWidgetId } from "./types";
@@ -23,7 +19,7 @@ export const LAYOUT_VERSION = 2;
 /**
  * Keyed per user, because two people share a browser more often than a dashboard.
  *
- * Local storage, and no longer only local storage: `useDashboardLayoutSync.ts` sends the layout to
+ * Local storage first, then synced: `useDashboardLayoutSync.ts` sends the layout to
  * `PUT /users/me/dashboard/layout` after every change and reads it back on arrival, so the
  * arrangement follows the user to another machine. This is still where the client writes first and
  * reads from, which keeps every gesture instant and a failed request free.

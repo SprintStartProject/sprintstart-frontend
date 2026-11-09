@@ -14,9 +14,8 @@ export { MIN_REFRESH_INTERVAL_MS };
  * How many onboarding items wait on the project manager in the selected project: pending skip
  * requests and unread feedback, for the number on the sidebar's PM Dashboard entry.
  *
- * This used to be a boolean -- "there is something" -- because the only source was the team
- * overview, whose read falls back to mock users when it fails. The count comes from
- * {@link getPmAttentionCount} instead, which only ever answers from the backend.
+ * The count comes from {@link getPmAttentionCount}, which only ever answers from the backend; the
+ * team overview's read falls back to mock users when it fails.
  *
  * `null` means "no number to show": while the first read is in flight, after a read failed,
  * while disabled, and with no project. A badge that says 0 while loading, or keeps the last

@@ -151,7 +151,6 @@ export function BuddyFiltersButton({ filters, onFiltersChange }: BuddyFiltersBut
     selectedProjectId || null,
   );
 
-  // Close the floating popover on Escape or a click outside it.
   useEffect(() => {
     if (!showFilters) return;
 
@@ -253,12 +252,8 @@ export function BuddyFiltersButton({ filters, onFiltersChange }: BuddyFiltersBut
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
             transition={centralSpringToken}
             onKeyDown={(e) => {
-              // Single guard for implicit form submission: Enter inside an
-              // input of the popover (e.g. the date fields) is cancelled
-              // before it bubbles further, while Enter on buttons keeps
-              // its keyboard activation. This one handler covers every
-              // input the popover contains — individual inputs must not
-              // add their own copy.
+              // One guard for implicit form submission: Enter in any input of the popover is
+              // cancelled, Enter on a button keeps its activation.
               if (e.key === "Enter" && (e.target as HTMLElement)?.tagName === "INPUT") {
                 e.preventDefault();
                 e.stopPropagation();

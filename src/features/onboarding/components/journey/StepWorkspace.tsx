@@ -295,7 +295,6 @@ export function StepWorkspace({
 
   return (
     <div className={isFocus ? "space-y-5" : "space-y-4"}>
-      {/* ── What it is ── */}
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2 text-xs text-app-text-muted">
           <StepOriginBadge step={step} />
@@ -335,7 +334,6 @@ export function StepWorkspace({
         ) : null}
       </div>
 
-      {/* ── Where a skip request or feedback stands -- said up front, in colour ── */}
       {skipPending ? (
         <div className="flex items-start gap-2.5 rounded-2xl border border-app-warning-border bg-app-warning-bg px-3 py-2.5 text-sm text-app-warning-text">
           <SkipForward className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -404,7 +402,6 @@ export function StepWorkspace({
       <div
         className={`grid gap-4 ${resources.length > 0 || outcomes.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_18rem]" : ""}`}
       >
-        {/* ── Tasks ── */}
         <div className="min-w-0 space-y-3">
           {tasks.length > 0 ? (
             <>
@@ -442,7 +439,6 @@ export function StepWorkspace({
           )}
         </div>
 
-        {/* ── What it leads to, and what helps ── */}
         {outcomes.length > 0 || resources.length > 0 ? (
           <div className="space-y-3">
             {outcomes.length > 0 ? (
@@ -499,7 +495,6 @@ export function StepWorkspace({
         ) : null}
       </div>
 
-      {/* ── Drawers ── */}
       {drawer === "skip" ? (
         <div className="space-y-2 rounded-2xl border border-app-warning-border bg-app-warning-bg/50 p-3">
           <p className="text-xs text-app-text-muted">
@@ -583,7 +578,6 @@ export function StepWorkspace({
         </div>
       ) : null}
 
-      {/* ── The one thing to do ── */}
       <div className="flex flex-col gap-3 border-t border-app-border pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-1">
           {!isBehind ? (

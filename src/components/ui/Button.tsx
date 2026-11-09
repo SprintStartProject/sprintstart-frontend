@@ -147,8 +147,7 @@ const spinnerClasses: Record<ButtonSize, string> = {
  *
  * Every `<button>` that carries an action should be this component. It exists
  * so that height, radius, type scale, hover, focus ring and disabled treatment
- * are decided once instead of re-derived at ~250 call sites — the drift that
- * produced 28 different "primary button" spellings before it was introduced.
+ * are decided once instead of re-derived at ~250 call sites.
  *
  * Choose `variant` by intent and `size` by density; everything else follows.
  * `className` is appended last for genuine one-offs (layout, `flex-1`, a
@@ -156,9 +155,7 @@ const spinnerClasses: Record<ButtonSize, string> = {
  * add it here rather than patching it at the call site.
  *
  * **Press motion is not opt-in.** Every button sinks on press through the
- * shared `buttonHoverMotion` token. It used to be applied by hand at 18 call
- * sites, which is why the same "Refresh" icon button reacted on one page header
- * and sat dead on another. Hover is a colour change per variant, not a scale —
+ * shared `buttonHoverMotion` token. Hover is a colour change per variant, not a scale —
  * see the token for why nothing here may grow past its resting size. A disabled
  * or loading button gets `buttonHoverMotionDisabled` so it also *feels* dead,
  * and `prefers-reduced-motion` removes the movement entirely.

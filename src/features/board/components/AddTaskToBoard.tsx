@@ -26,20 +26,17 @@ type AddTaskToBoardProps = TaskForChecklist & {
 /**
  * Turning a task into steps the hire can tick off — by copying them, or by going and getting them.
  *
- * **It does not "add the task to the board" — the task is already there.** That was the first
- * wording and it was wrong in the one place it matters most: on the current-task card, which is on
- * the board by definition, it offered to do something that looked already done. What this makes is
- * a *checklist*, which is the thing the task card cannot be: the task cards are live reads the hire
- * may not touch, and the steps somebody thinks up while reading a task have to go somewhere.
+ * **It does not "add the task to the board" — the task is already there.** What this makes is a
+ * *checklist*, which the task card cannot be: task cards are live reads the hire may not touch, and
+ * the steps somebody thinks up while reading a task have to go somewhere.
  *
- * **Two tasks, two different offers, and the split is the honest part.** A task that states its
- * steps — checkboxes, acceptance criteria — gets a button that copies them, and every line on the
- * resulting card is a line the hire can find in the task. A task that states none has nothing to
- * copy, and the button that used to appear there produced a checklist of one item named after the
- * task: the title handed back with a checkbox beside it, which teaches a new hire nothing. So that
- * case asks the mentor instead. The steps come back as words the hire reads, and the offer to keep
- * them as a card is already sitting under the reply (`buddy/SaveReplyToBoard`) — so it still ends
- * in a checklist, one press later, and the press is the hire saying those are the steps.
+ * **Two tasks, two different offers.** A task that states its steps — checkboxes, acceptance
+ * criteria — gets a button that copies them, and every line on the resulting card is a line the
+ * hire can find in the task. A task that states none has nothing to copy, and a checklist of one
+ * item named after the task teaches a new hire nothing, so that case asks the mentor instead. The
+ * steps come back as words the hire reads, and the offer to keep them as a card is already sitting
+ * under the reply (`buddy/SaveReplyToBoard`) — so it still ends in a checklist, one press later,
+ * and the press is the hire saying those are the steps.
  *
  * Neither is a claim or a status change. Claiming a task aims the hire's whole plan at it and stays
  * behind the mentor's confirm button; this only makes a working copy, which is why it can be a

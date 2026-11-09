@@ -1,7 +1,3 @@
-// ============================================================
-// OnBoardingPage.tsx
-// ============================================================
-
 import { MainContent } from "../components/layout/MainContent";
 import {
   AlertCircle,
@@ -320,8 +316,6 @@ export function OnBoardingPage() {
     [focusItemId, openPhaseId, queryClient],
   );
 
-  // ── Loading ─────────────────────────────────────────────────
-
   const hasLoadedRef = useRef(false);
   useEffect(() => {
     if (hasLoadedRef.current) return;
@@ -587,8 +581,6 @@ export function OnBoardingPage() {
     enabled: loadingState === "success" && expandedItemId === null && graphItemId === null,
   });
 
-  // ── Derived ─────────────────────────────────────────────────
-
   const nextAction = useMemo(
     () => (path ? resolveNextAction(path, { preferPhaseId: chosenPhaseId }) : null),
     [chosenPhaseId, path],
@@ -636,8 +628,6 @@ export function OnBoardingPage() {
   const generationIssueSummary = generationIssues
     .map((issue) => `${issue.title} — ${issueStatusLabel(issue.status)}`)
     .join("\n");
-
-  // ── Actions ─────────────────────────────────────────────────
 
   const phaseOf = (item: PhaseItem) =>
     phases.find(
@@ -871,8 +861,6 @@ export function OnBoardingPage() {
     [refreshPath],
   );
 
-  // ── Render: generating ──────────────────────────────────────
-
   // A failed generation never keeps this screen up, game or not: its failure (the retry below, or
   // the toast beside an existing path) has to be what the member sees.
   if (
@@ -895,8 +883,6 @@ export function OnBoardingPage() {
       />
     );
   }
-
-  // ── Render: loading ─────────────────────────────────────────
 
   if (loadingState === "loading" || (loadingState === "empty" && isProjectLoading)) {
     return (
@@ -921,8 +907,6 @@ export function OnBoardingPage() {
       </CenteredState>
     );
   }
-
-  // ── Render: no path yet ─────────────────────────────────────
 
   if (loadingState === "empty" || !path) {
     return (
@@ -1006,8 +990,6 @@ export function OnBoardingPage() {
       </CenteredState>
     );
   }
-
-  // ── Render: the journey ─────────────────────────────────────
 
   const isFinished = nextAction?.kind === "done";
 
@@ -1157,10 +1139,6 @@ export function OnBoardingPage() {
     </div>
   );
 }
-
-// ─────────────────────────────────────────────────────────────
-// Pieces
-// ─────────────────────────────────────────────────────────────
 
 /** Loading, error and empty states: inside the page's own chrome, so the header never blinks away. */
 function CenteredState({ children }: { children: ReactNode }) {

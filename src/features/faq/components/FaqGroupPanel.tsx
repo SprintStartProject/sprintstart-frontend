@@ -128,8 +128,7 @@ type FaqGroupPanelProps = {
  * One recurring question in a side panel over the list: every wording it was asked in, and the
  * documents that answer it.
  *
- * Used to be a page of its own, so reading three questions meant three round trips back to the
- * list and losing the scroll position each time.
+ * A panel rather than a page, so reading three questions keeps the list and its scroll position.
  */
 export function FaqGroupPanel({ groupId, group, onClose }: FaqGroupPanelProps) {
   return (

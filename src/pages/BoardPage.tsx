@@ -119,16 +119,15 @@ import {
  * remembers. The project switcher is the same one the rest of the app uses, so the choice is
  * remembered across pages rather than being a setting of this one.
  *
- * **Not the onboarding.** That is the path on the Onboarding page, which a PM's blueprint prescribes
- * and the buddy tutors along. The board used to carry a second one -- a rail from joining to a first
- * accepted contribution, and a button that copied the path's steps into checklists -- and two plans
- * that drift apart are worse than one.
+ * **Not the onboarding.** That is the path on the Onboarding page, which a PM's blueprint
+ * prescribes and the buddy tutors along. The board does not carry a second plan: two plans that
+ * drift apart are worse than one.
  *
  * The shell is the app's page shell — banner header over `app-page-frame`, `PageHeader` for the
  * title block, shared primitives for the actions and for every empty, loading and error state — so
  * the board sits at the same gutter and reads with the same weight as Starter Work beside it.
  *
- * **The board is now a process, not a pile.** Three things carry that, and none of them changes the
+ * **The board is a process, not a pile.** Three things carry that, and none of them changes the
  * board's own order:
  *
  * - a *stage* per card — now or behind you, read off the onboarding path (`pathStages.ts`) — so the
@@ -409,10 +408,8 @@ export function BoardPage() {
   /**
    * Puts a card in an area, or takes it out of one.
    *
-   * One caller now: letting a card go while arranging. The picker that used to sit in every card's
-   * header is gone — an area is made from the tool rail and filled by dropping cards into it, and
-   * a select repeating that on forty cards was forty copies of a decision that is better made by
-   * putting the card where it goes.
+   * One caller: letting a card go while arranging. An area is made from the tool rail and filled by
+   * dropping cards into it.
    */
   function handleAssignGroup(cardId: string, groupId: string | null) {
     saveGroups(assignToGroup(groups, cardId, groupId));
@@ -580,8 +577,8 @@ export function BoardPage() {
   }
 
   /**
-   * Now and Behind you, read off the onboarding path — see `pathStages.ts`. Nothing on this page sets a
-   * stage any more: the path is the one plan, and the board files its cards against it.
+   * Now and Behind you, read off the onboarding path — see `pathStages.ts`. Nothing on this page
+   * sets a stage: the path is the one plan, and the board files its cards against it.
    */
   const { path, settled: pathSettled } = useOnboardingPath();
   const phases = useMemo(() => (path ? pathPhases(path) : null), [path]);
@@ -729,8 +726,8 @@ export function BoardPage() {
    *
    * A closed pile shows only its top card, so filtering by a colour that sits on the second card
    * showed nothing at all — the filter's count said there was one, and the board said there was
-   * none. Such a pile is spread out for as long as the colour is picked; the filter then leaves only
-   * the cards that carry it.
+   * none. Such a pile is spread out for as long as the colour is picked; the filter then leaves
+   * only the cards that carry it.
    */
   const heldOpenByMarks = useMemo(() => {
     const color = markSectionColor(shownSectionId);
@@ -789,13 +786,11 @@ export function BoardPage() {
   /**
    * Which stage bands are open.
    *
-   * This is what used to be the focus view, turned from a mode into a fold. Focus took the cards
-   * that were not due *off the board* and left a count behind; a hire looking at six of thirty-four
-   * had to take the other twenty-eight on trust. The bands put all of it on the page — named,
-   * counted, and one click from being read — which is the same reduction in what you have to look
-   * at without the part that made the board feel unreliable.
+   * A fold, not a mode: taking the cards that are not due *off the board* would leave the hire
+   * taking the rest on trust. The bands put all of it on the page, named, counted and one click
+   * from being read.
    *
-   * Decided once per board rather than remembered, for the reason focus was: which shape is right
+   * Decided once per board rather than remembered: which shape is right
    * is a question about how big *this* board is, and a hire who opened everything on a six-card
    * board last month should not meet a forty-card one wide open. A small board arrives with every
    * band open, because folding four cards into three headings is ceremony, not help.
@@ -897,7 +892,8 @@ export function BoardPage() {
   }
 
   /**
-   * Undoes every cut at once: the step it was opened for, the filter, the section and the focus view.
+   * Undoes every cut at once: the step it was opened for, the filter, the section and the focus
+   * view.
    *
    * One function because the line that offers it counts *all* the cards the board is holding back,
    * and an offer that cleared some of them would be a button that does not do what the sentence
@@ -1024,12 +1020,9 @@ export function BoardPage() {
   /**
    * Opens the planning mode, with nothing folded away.
    *
-   * **It no longer clears the filter and the section.** It used to have to: a reorder replaces the
-   * board's order outright, and the grid built that order from what was on screen, so a drag on a
-   * narrowed board told the server about a fraction of it. The narrowing was never the problem —
-   * computing a *position* from a narrowed list was. The grid is now given the whole order and
-   * every move names the card it is going next to, so a hire can plan one area without the board
-   * jumping to everything first.
+   * **It keeps the filter and the section.** A reorder replaces the board's order outright, so the
+   * grid is given the whole order and every move names the card it is going next to; a hire can
+   * plan one area without the board jumping to everything first.
    *
    * What is still opened is what is *folded*: planning is about what comes after what, and a
    * dependency you cannot see is one you cannot set.
@@ -1162,8 +1155,8 @@ export function BoardPage() {
             <div
               className={
                 // Centred on the viewport once the page is the whole screen. With the header gone
-                // there is nothing at the top for it to hang under, and a rail pinned to a corner of
-                // a screen this wide is a long way from wherever the pointer is.
+                // there is nothing at the top for it to hang under, and a rail pinned to a corner
+                // of a screen this wide is a long way from wherever the pointer is.
                 //
                 // Below `lg` there is no margin to park it in, so it is the same rail lying flat in
                 // the page above the cards -- not a second, smaller set of controls.
@@ -1173,8 +1166,8 @@ export function BoardPage() {
               }
             >
               <div
-                // A group, not a toolbar: `toolbar` promises one tab stop with arrow keys between the
-                // buttons, and every button here is its own tab stop.
+                // A group, not a toolbar: `toolbar` promises one tab stop with arrow keys between
+                // the buttons, and every button here is its own tab stop.
                 role="group"
                 aria-label="Board tools"
                 className={[
@@ -1373,8 +1366,8 @@ export function BoardPage() {
                     <BoardSectionTabs
                       sections={tabSections}
                       selectedId={shownSectionId}
-                      // A colour is not one of the tabs, but it is still what is being shown, so its
-                      // line of counts is handed over rather than the bar falling back to
+                      // A colour is not one of the tabs, but it is still what is being shown, so
+                      // its line of counts is handed over rather than the bar falling back to
                       // "Everything" and reporting a number that belongs to a different view.
                       selected={sections.find((section) => section.id === shownSectionId)}
                       onSelect={setSectionId}

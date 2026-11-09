@@ -654,7 +654,6 @@ export function DinoGame({
         ctx.translate((Math.random() - 0.5) * intensity, (Math.random() - 0.5) * intensity);
       }
 
-      // --- Clouds (slow parallax, always drifting a little) ---
       const cloudSpeed = w.phase === "play" ? w.speed * 0.14 : 12;
       for (const c of w.clouds) {
         c.x -= cloudSpeed * c.scale * 0.6 * dt;
@@ -666,7 +665,6 @@ export function DinoGame({
         drawCloud(c, palette);
       }
 
-      // --- Ground line + moving dashes ---
       ctx.strokeStyle = palette.border;
       ctx.lineCap = "butt";
       ctx.lineWidth = 2;
@@ -686,7 +684,6 @@ export function DinoGame({
         ctx.stroke();
       }
 
-      // --- Physics ---
       const wasAirborne = !w.player.onGround;
 
       if (w.phase === "intro") {
@@ -801,7 +798,6 @@ export function DinoGame({
         }
       }
 
-      // --- Dust particles ---
       ctx.fillStyle = palette.textMuted;
       for (const pt of w.particles) {
         pt.life -= dt;
@@ -817,7 +813,6 @@ export function DinoGame({
       ctx.globalAlpha = 1;
       w.particles = w.particles.filter((pt) => pt.life > 0);
 
-      // --- Milestone toasts (float up and fade) ---
       ctx.font = "bold 13px system-ui, sans-serif";
       ctx.fillStyle = palette.brandText;
       for (const t of w.toasts) {
@@ -830,7 +825,6 @@ export function DinoGame({
       ctx.globalAlpha = 1;
       w.toasts = w.toasts.filter((t) => t.life > 0);
 
-      // --- Obstacles ---
       for (const o of w.obstacles) {
         if (o.kind === "drone") {
           drawDrone(o, playerBottom, w.time, palette);
@@ -839,7 +833,6 @@ export function DinoGame({
         }
       }
 
-      // --- Player ---
       drawPlayer(w, palette);
 
       raf = requestAnimationFrame(loop);

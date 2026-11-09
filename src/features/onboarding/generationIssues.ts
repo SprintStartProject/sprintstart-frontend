@@ -6,10 +6,9 @@ export type IssueStatus = OnboardingGenerationIssueEndpoint["status"];
 /**
  * What each outcome means, and whether trying again can change it.
  *
- * The four were previously collapsed into one sentence — "empty, could not be assembled, or timed
- * out" — followed by every phase name and its status in a single comma-separated line. That reads
- * as one undifferentiated failure, and it hides the distinction that matters: two of these are
- * worth retrying and two are not, because nothing about the project has changed in between.
+ * Collapsed into one sentence, the four would read as one undifferentiated failure and hide the
+ * distinction that matters: two of these are worth retrying and two are not, because nothing about
+ * the project has changed in between.
  */
 export const ISSUE_EXPLANATIONS: Record<
   IssueStatus,

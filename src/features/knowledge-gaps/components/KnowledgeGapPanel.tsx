@@ -266,7 +266,7 @@ type KnowledgeGapPanelProps = {
 
 /**
  * One knowledge gap in a side panel over the list: what is missing, who owns it, and where to
- * go to fix the source. Used to be a page of its own.
+ * go to fix the source.
  */
 export function KnowledgeGapPanel({ gapId, gap, onClose }: KnowledgeGapPanelProps) {
   return (

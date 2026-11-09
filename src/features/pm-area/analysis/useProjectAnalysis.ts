@@ -134,11 +134,9 @@ function errorNote(error: unknown): string {
  * on the overview update in the same moment the analysis finishes — the analysis does not keep a
  * private copy that could disagree with them.
  *
- * It only reads. It used to offer to rescan the knowledge gaps, re-evaluate the industry and
- * regroup the questions with the AI, but the backend redoes the first two on its own after every
- * import and the knowledge gaps and FAQ pages have their own buttons for the rare manual case — so
- * the options cost an AI call per run and bought, as a rule, the same answer again. Gaps that are
- * behind the newest import show up as a finding instead (see `buildFindings`).
+ * It only reads: the backend redoes the gap scan and the industry evaluation after every import,
+ * and the knowledge gaps and FAQ pages have their own buttons for the rare manual case. Gaps that
+ * are behind the newest import show up as a finding instead (see `buildFindings`).
  *
  * Every finished run is kept per project on the backend (see `projectAnalysisService`): the last
  * one's results can be opened again later, on any device and by any PM of the project, and the

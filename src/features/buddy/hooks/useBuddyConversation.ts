@@ -206,24 +206,20 @@ export function useBuddyConversation(
   // in place of a generic spinner. Cleared as soon as the answer starts streaming.
   const [activeTool, setActiveTool] = useState<string | null>(null);
 
-  // Dino waiting-game: unlocked users may press Space while the buddy thinks
-  // to play the runner until the answer arrives — the same deal the AI chat
-  // offers. Closing is handled inside the hook: on exit, when the turn ends,
-  // or when the cogwheel unlock flag flips off.
+  // Dino waiting game: an unlocked user may press Space while the buddy thinks, as in the AI chat.
+  // The hook closes it on exit, at the end of the turn, or when the unlock flag flips off.
   const dinoUnlocked = useDinoUnlocked();
-  // How many surfaces currently show this thread (the open dock, the mounted `/buddy` page).
-  // The session lives app-wide in BuddyProvider, so arming on `isThinking` alone let Space open
-  // a game inside a minimised dock nobody could see — and with `keepActiveUntilExit` that
-  // invisible game held the shared slot for good. Surfaces register via `registerDinoSurface`.
+  // How many surfaces show this thread (the open dock, the mounted `/buddy` page). The game only
+  // arms while one is visible, so it can never run, or hold the shared slot, inside a minimised
+  // dock.
   const [dinoSurfaceCount, setDinoSurfaceCount] = useState(0);
   const dinoSurfaceVisible = dinoSurfaceCount > 0;
   const [dinoGameActive, closeDinoGame] = useSpaceOpensDino(
     isThinking && dinoSurfaceVisible,
     dinoUnlocked,
     {
-      // Parity with the chat and the drawer: the game outlives the turn it was armed for
-      // and stays open until the player leaves it — the reply's arrival only flips its
-      // completion badge. Without this the first token unmounted the game mid-run.
+      // The game outlives the turn it was armed for and stays open until the player leaves it; the
+      // reply only flips its completion badge.
       keepActiveUntilExit: true,
     },
   );
@@ -288,10 +284,8 @@ export function useBuddyConversation(
    */
   const resolvingRef = useRef<Promise<string> | null>(null);
 
-  // The dashboard's "Recent conversations" card reads the same list from the query cache. Every
-  // change made here — a create, a bin, a title the refresh brought back — is written through to
-  // it, so the card never lists a conversation the page no longer has (or misses one it does)
-  // for the length of a `staleTime`.
+  // The dashboard's "Recent conversations" card reads the same list from the query cache, so every
+  // change here is written through to it.
   const queryClient = useQueryClient();
   const applySessions = useCallback(
     (next: BuddySessionSummary[]) => {
@@ -340,13 +334,11 @@ export function useBuddyConversation(
   const teamTargetRef = useRef<string | null>(null);
   useEffect(() => {
     userIdRef.current = userId;
-    // A signed-in-user change drops the old user's project binding here, not just the visible
-    // mode: a stale target would make the adopt effect compare the next user's selection against
-    // it and overwrite their restored preference with a bogus exit.
+    // A user change drops the old user's project binding, not just the visible mode, so the adopt
+    // effect cannot compare the next user's selection against it.
     teamTargetRef.current = null;
-    // Re-read on every subject change: a logout or an account switch must not inherit the
-    // previous user's preference. Nothing persisted while there is no user to own it.
-    // Deferred to a microtask so the setState never runs synchronously in the effect body.
+    // Re-read on every subject change, so a logout or account switch inherits nothing. Deferred to
+    // a microtask so setState never runs synchronously in the effect body.
     void (async () => {
       await Promise.resolve();
       setIsTeamMode(userId === null ? false : readStoredTeamMode(userId));
@@ -563,11 +555,9 @@ export function useBuddyConversation(
   const greet = useCallback(async (target: { sessionId?: string; teamProjectId?: string }) => {
     const id = crypto.randomUUID();
 
-    // Its place in the thread is claimed *before* the stream is awaited, not on the first
-    // token. The composer is live while the greeting is being written, so a hire who types
-    // straight away would otherwise have their question appended first and the greeting land
-    // underneath it — answering nothing. An empty assistant turn renders nothing (see
-    // `BuddyThread`), so the placeholder is invisible until the first word arrives.
+    // The greeting claims its place in the thread before the stream is awaited: the composer is
+    // live while it is written, and a question typed straight away must not land above it. An empty
+    // assistant turn renders nothing (see `BuddyThread`).
     setMessages((prev) => [
       ...prev,
       {
@@ -580,10 +570,8 @@ export function useBuddyConversation(
       },
     ]);
 
-    // Read back after the stream, which is why it is a bag rather than two `let`s: the compiler
-    // narrows a local to its initial value when the only writes are inside callbacks, so the
-    // reason would type as `null` at the point it is used. A property's narrowing is dropped at
-    // the call, which is exactly the behaviour wanted here.
+    // A bag rather than two `let`s: a local written only inside callbacks narrows to its initial
+    // value at the read below, a property does not.
     const stream = { wroteSomething: false, failure: null as string | null };
 
     // The switch gate holds for the whole greeting, not just the empty-screen part — see
@@ -622,23 +610,16 @@ export function useBuddyConversation(
       setMessages((prev) => {
         const withoutPlaceholder = prev.filter((message) => message.id !== id);
 
-        // Nothing came, and nothing went wrong: the placeholder held the greeting's *place*
-        // while it was being written, and once it is established that no words are coming, an
-        // empty assistant turn would sit in the conversation for the rest of the session. It
-        // renders as nothing, which is worse than useless -- invisible state every reader of
-        // `messages` still has to account for, starting with "which turn is streaming".
+        // Nothing came and nothing went wrong: the placeholder only held the greeting's place, and
+        // an empty assistant turn must not stay in `messages`.
         if (!reason) return stream.wroteSomething ? prev : withoutPlaceholder;
 
-        // A greeting that failed under a conversation the hire can already read is not worth
-        // saying. They did not ask for it -- it is a visit opening behind them -- and a red
-        // banner under their own thread reports a problem they do not have. If they ask
-        // something and *that* fails, the reply says so.
+        // A greeting that failed under a thread the hire can already read is not worth reporting;
+        // if their own question then fails, the reply says so.
         if (!stream.wroteSomething && withoutPlaceholder.length > 0) return withoutPlaceholder;
 
-        // Otherwise it is worth saying, and for opposite reasons. Either this is all there is,
-        // and an empty thread would read as "there is no buddy here" rather than as a buddy
-        // that could not be reached; or words did arrive and then stopped, and a greeting
-        // ending mid-sentence needs the explanation more than a missing one does.
+        // Otherwise it is worth saying: an empty thread would read as "no buddy here", and a
+        // greeting cut off mid-sentence needs the explanation.
         return prev.map((message) => (message.id === id ? { ...message, error: reason } : message));
       });
 
@@ -740,10 +721,8 @@ export function useBuddyConversation(
       // moment — so the tombstone wins over the row (see `binnedSessionIdsRef`).
       const fetched = read.filter((session) => !binnedSessionIdsRef.current.has(session.id));
 
-      // ...and a conversation created while it was in flight is newer than that moment: it
-      // stays, in front, rather than being replaced away. Without the merge, a slow refresh
-      // landing after a create dropped the new row from the rail until a reload — and the
-      // reuse pick then read a list that no longer held it.
+      // ...and a conversation created while it was in flight is newer than that moment, so it stays
+      // in front rather than being replaced away.
       const fetchedIds = new Set(fetched.map((session) => session.id));
       const createdMeanwhile = sessionsRef.current.filter((session) => !fetchedIds.has(session.id));
 
@@ -779,10 +758,8 @@ export function useBuddyConversation(
       try {
         const history = await getMessages(sessionId);
 
-        // The read is for the conversation the caller asked for; if that stopped being the
-        // one on screen while it was in flight, its history is not this thread's to show.
-        // (Every way of switching refuses while an open is running, so this is the invariant
-        // rather than the plan — kept structural for the next caller that forgets.)
+        // A read for a conversation that has left the screen is not this thread's to show. Every
+        // switch refuses while an open runs, so this guards the invariant for the next caller.
         if (currentSessionIdRef.current !== sessionId) return;
 
         mergeHistory(history);
@@ -861,11 +838,8 @@ export function useBuddyConversation(
       console.error(e);
       // This failure owns the banner: a retry must redo *this* read, not a stale move.
       retryRef.current = null;
-      // The latch goes back, or one blip is permanent. This runs as the app root mounts, so the
-      // request most likely to fail is the first one there will ever be -- and the widget never
-      // unmounts, so the mount effect that called this will not call it again. Without the
-      // release the hire has an empty thread, no history, no greeting, and no way back short of
-      // a reload. `retryOpen` is what actually offers them one.
+      // The latch goes back, or one blip is permanent: this runs as the app root mounts, the widget
+      // never unmounts, and `retryOpen` is the only way back.
       loadedRef.current = false;
       setOpenError(HISTORY_FAILED);
     } finally {
@@ -916,9 +890,8 @@ export function useBuddyConversation(
 
       if (streamingRef.current) {
         await stopRunningTurn();
-        // The wait is a moment in which anything may have moved: another switch that got in
-        // first, a message sent into the conversation being left (it queued behind the closing
-        // turn and started as the turn ended). Whoever is ahead keeps the thread.
+        // Anything may have moved during the wait (another switch, a queued message that started as
+        // the turn ended); whoever is ahead keeps the thread.
         if (blocked() || streamingRef.current || teamProjectIdRef.current !== null) return false;
         if (sessionId === currentSessionIdRef.current) return true;
       }
@@ -928,11 +901,8 @@ export function useBuddyConversation(
       setMessages([]);
       setOpenerAction(null);
       setOpenError(null);
-      // The composer's words follow the session by themselves: `BuddyDraftProvider` keys each
-      // draft on the conversation, so the one written about the conversation being left stays
-      // with it, and this conversation's own comes back.
-      // Anything queued was written for the conversation being left, like the draft — it has
-      // no thread to speak into any more.
+      // The composer's words follow the session by themselves (`BuddyDraftProvider` keys drafts on
+      // it); anything queued was written for the conversation being left.
       commitQueued([]);
       setQueuePaused(false);
       // Bound to the offers of the conversation being left, not to the tab: a switch starts
@@ -1010,12 +980,8 @@ export function useBuddyConversation(
       if (blocked() || streamingRef.current || teamProjectIdRef.current !== null) return;
     }
 
-    // Bringing back a conversation nobody has spoken in beats stacking a second empty one:
-    // the backend names a conversation from its first message, so an untitled newest row is
-    // one nobody has written into — and the next reload would open it anyway. Without this,
-    // leaving, switching back and pressing again piled up identical "New conversation" rows.
-    // (A title that failed to generate server-side leaves a used row untitled too — rare,
-    // and the reload this mirrors would open that same row.)
+    // An untitled newest conversation is one nobody has written into (the backend titles from the
+    // first message), so it is brought back instead of stacking a second empty one.
     const newest = sessionsRef.current[0];
     if (newest && newest.id !== currentSessionIdRef.current && newest.title.trim() === "") {
       await selectSession(newest.id);
@@ -1023,10 +989,9 @@ export function useBuddyConversation(
     }
 
     greetingRef.current = true;
-    // What this click saw, for the re-check after the create: the create is a round trip, and
-    // a send that begins during it reads the session ref synchronously — it would land in the
-    // conversation being left, and the clears below would wipe its optimistic turn while the
-    // answer streamed into a thread nobody is looking at.
+    // What this click saw, for the re-check after the create: a send that begins during the round
+    // trip would otherwise land in the conversation being left and lose its optimistic turn to the
+    // clears below.
     const sessionAtEntry = currentSessionIdRef.current;
     const sendsAtEntry = sendCountRef.current;
 
@@ -1039,10 +1004,8 @@ export function useBuddyConversation(
         teamProjectIdRef.current !== null ||
         currentSessionIdRef.current !== sessionAtEntry
       ) {
-        // Something moved while the create was in flight — a send, a decision, a mode
-        // switch — and the click no longer describes the thread on screen. The new
-        // conversation stays unadopted (a later refresh lists it) and the move the user
-        // actually made keeps its turn.
+        // Something moved while the create was in flight; the new conversation stays unadopted (a
+        // later refresh lists it) and the user's actual move keeps its turn.
         return;
       }
 
@@ -1059,10 +1022,8 @@ export function useBuddyConversation(
       setMessages([]);
       setOpenerAction(null);
       setOpenError(null);
-      // The box follows the conversation by itself: a question typed about the conversation
-      // being left stays with it — `BuddyDraftProvider` keys each draft on the session.
-      // Same rule for anything queued behind a running answer: it was written for the
-      // conversation being left.
+      // The composer's words follow the session by themselves, and anything queued was written for
+      // the conversation being left.
       commitQueued([]);
       setQueuePaused(false);
       // Wording the hire had half-edited belonged to the offers that are going with the
@@ -1142,9 +1103,8 @@ export function useBuddyConversation(
 
       if (currentSessionIdRef.current !== sessionId) return;
 
-      // The answer being written belongs to the conversation just binned; the move below would
-      // find it still running and wait on it either way, but saying so once, here, keeps the
-      // two paths from toasting twice.
+      // The answer being written belongs to the binned conversation; stopping it once here keeps
+      // the two paths from toasting twice.
       if (streamingRef.current) await stopRunningTurn();
 
       const next = remaining[0];
@@ -1154,9 +1114,8 @@ export function useBuddyConversation(
         await newConversation();
       }
 
-      // The move can fail and still resolve (see `newConversation`'s catch, which surfaces the
-      // failure through `openError`): if the hire is still on the conversation they just binned,
-      // the caller must hear it — its success toast would otherwise lie about the screen.
+      // The move can fail and still resolve (see `newConversation`'s catch); if the hire is still
+      // on the binned conversation, the caller must hear it.
       if (currentSessionIdRef.current === sessionId) throw new Error(BIN_MOVE_FAILED);
     },
     [applySessions, isOpening, isDeciding, stopRunningTurn, selectSession, newConversation, userId],
@@ -1182,9 +1141,8 @@ export function useBuddyConversation(
    */
   const retryOpen = useCallback(async () => {
     setOpenError(null);
-    // Redo what actually failed: a failed "new conversation" retries as itself, because
-    // `ensureOpened` would no-op out of it — the conversation is already loaded, and the
-    // banner would clear while nothing else happened.
+    // A failed "new conversation" retries as itself: `ensureOpened` would no-op out of a loaded
+    // conversation.
     if (retryRef.current === "newConversation") {
       retryRef.current = null;
       await newConversation();
@@ -1218,9 +1176,8 @@ export function useBuddyConversation(
    */
   const stopStreaming = useCallback(() => {
     if (!abortRef.current) return;
-    // Stop means "stop doing things", so it holds the queue too: the messages stay visible in
-    // the strip with a "Send queued" button. Dropping them would throw away text the hire
-    // deliberately wrote; letting them keep firing would make Stop a lie.
+    // Stop holds the queue too: the messages stay in the strip with a "Send queued" button rather
+    // than being dropped or sent.
     setQueuePaused(true);
     abortRef.current.abort();
   }, [setQueuePaused]);
@@ -1322,11 +1279,8 @@ export function useBuddyConversation(
           // "new conversation" marker must not outvote the move that actually failed.
           retryRef.current = null;
           setOpenError(HISTORY_FAILED);
-          // The turn never got off the ground, but this send already claimed the in-flight
-          // markers. Without releasing them every later submit queues behind a turn that will
-          // never end, and the drain — which only fires when a turn closes — never runs. (A
-          // queued turn failing here has messages behind it; the drain hands the next one its
-          // turn.)
+          // The turn never started, but this send already claimed the in-flight markers; without
+          // releasing them every later submit would queue behind a turn that never ends.
           if (abortRef.current === controller) abortRef.current = null;
           streamingRef.current = false;
           drainRef.current();
@@ -1378,13 +1332,9 @@ export function useBuddyConversation(
        * refused. So the board is marked stale when the turn ends — the failing paths included.
        * See `useInvalidateBoard` for why the mark is what makes this visible.
        */
-      //
-      // Any tool, not only `place_card`: the backend grows tools faster than this list follows,
-      // and a board that changed mid-answer and then waited for a manual refresh is the one thing
-      // the hire notices. A re-read after a turn that only *read* something costs one request; a
-      // missed one costs the hire's trust in what the board shows. The board only — the path's
-      // "changed" signal stays for confirmed path actions, because the pages that listen to it
-      // refetch whole steps and say so when that fails.
+      // Any tool, not only `place_card`: the backend adds tools faster than this list follows, and
+      // a re-read costs one request where a stale board costs the hire's trust. Path pages keep
+      // their own signal for confirmed actions.
       const syncBoardIfTouched = () => {
         if (touched.board || touched.any) invalidateBoard();
       };
@@ -1448,14 +1398,10 @@ export function useBuddyConversation(
 
             onReasoning: (reasoningText) => {
               armWatchdog();
-              // The model's visible thinking, kept on the message so the ported panel can render
-              // it. `isThinking` stays true here — the typing row keeps the turn's place until
-              // the first real token arrives — but the turn counts as streaming, so the thread
-              // marks it live from the first thought and the panel follows it (see `BuddyThread`).
-              //
-              // Each event is a delta of the thought being written, like a token — appended as it
-              // comes. The paragraph breaks between thoughts are part of the text the stream
-              // carries; adding one per event would cut every sentence into its own paragraph.
+              // The model's visible thinking, appended per delta like a token (the breaks between
+              // thoughts are in the text). `isThinking` stays true until the first real token, but
+              // the turn counts as streaming, so the panel follows it from the first thought (see
+              // `BuddyThread`).
               setIsStreaming(true);
               draft.reasoning += reasoningText;
               scheduleFlush();
@@ -1478,10 +1424,8 @@ export function useBuddyConversation(
 
             onReset: () => {
               armWatchdog();
-              // The backend is asking again and what streamed so far will not be part of the
-              // answer — a reply it wrote out as a tool call, say. The words go; the thoughts and
-              // the citations stay, since they were not retracted. The typing row takes the
-              // reply's place until the new words arrive.
+              // The backend is asking again and the streamed words will not be part of the answer;
+              // thoughts and citations stay, and the typing row takes the reply's place.
               draft.content = "";
               flushDraft();
               contentShown = false;
@@ -1504,10 +1448,9 @@ export function useBuddyConversation(
 
             onActionProposal: (proposal) => {
               armWatchdog();
-              // The buddy is offering to do something. Nothing has changed yet and nothing will
-              // until the hire confirms — so this is only recorded here, and attached to the reply
-              // once the reply exists. The confirm payloads ride along so the action runs against
-              // what the buddy actually proposed.
+              // An offer to do something: nothing changes until the hire confirms, so it is
+              // recorded and attached to the reply once that exists, with the confirm payloads the
+              // buddy proposed.
               setActiveTool(null);
               proposed.push({
                 id: crypto.randomUUID(),
@@ -1598,10 +1541,8 @@ export function useBuddyConversation(
           // Read at call time: a turn speaks to whichever conversation is current when it starts.
           sessionId,
           teamProjectIdRef.current ?? undefined,
-          // The page the dock is floating over, for the buddy's app guide. Read from the window at
-          // send time rather than through `useLocation`, which would re-render the one app-wide
-          // conversation on every navigation to learn something only a send needs. The pathname
-          // is all the guide matches on, so the query string stays on this side.
+          // The page the dock floats over, for the buddy's app guide; read from the window at send
+          // time so the app-wide conversation does not re-render on every navigation.
           window.location.pathname,
           controller.signal,
           {
@@ -1791,10 +1732,8 @@ export function useBuddyConversation(
     );
   }, []);
 
-  // The one proposal currently on its way to the backend, per message and action id. A stored
-  // proposal survives a reload server-side and the card disables its buttons while a confirm is
-  // in flight — but two clicks inside one React frame both read the same pre-re-render state, so
-  // the honest guard is here, where the second click is refused rather than re-sent.
+  // The proposal currently on its way to the backend, per message and action id: two clicks inside
+  // one React frame both see the pre-render state, so the second is refused here.
   const inFlightRef = useRef<Set<string>>(new Set());
 
   /**
@@ -1844,18 +1783,15 @@ export function useBuddyConversation(
 
   const confirmAction = useCallback(
     (messageId: string, action: ProposedAction) => {
-      // Retryable after a transport error, and after a hire offer came back a legible "couldn't" —
-      // that refusal is not always permanent, and the card offers it again. A stored team proposal
-      // is never re-confirmable: resolved means the backend has already spoken for it. Anything on
-      // its way, succeeded or declined is spent — confirming a success twice is how somebody
-      // claims the same task twice.
+      // Retryable after a transport error or a hire offer's legible "couldn't"; a stored team
+      // proposal that resolved is spent, because confirming a success twice claims the same task
+      // twice.
       const isRetryableRefusal =
         action.status === "resolved" && action.ok === false && !("proposalId" in action);
       if (action.status !== "idle" && action.status !== "error" && !isRetryableRefusal) return;
 
-      // One lock per proposal card, shared by both decisions: confirm and dismiss are the two
-      // halves of one question, and letting both run would let the slower response overwrite
-      // the truth the faster one already told.
+      // One lock per proposal card, shared by confirm and dismiss, so the slower response cannot
+      // overwrite the faster one.
       const flightKey = `${messageId}:${action.id}`;
       if (inFlightRef.current.has(flightKey)) return;
       inFlightRef.current.add(flightKey);
@@ -1919,10 +1855,8 @@ export function useBuddyConversation(
           }
         } catch (e) {
           console.error(e);
-          // A settled proposal does NOT come back 404 — the backend answers 200 with ok: false
-          // and the exact sentence for what happened (already confirmed, expired, beaten to it).
-          // All of that is handled above. A 404 here means no such proposal exists for this
-          // caller at all: retrying cannot help, so the card resolves legibly instead.
+          // A settled proposal answers 200 with ok: false, handled above; a 404 means no such
+          // proposal for this caller, so the card resolves instead of offering a retry.
           patchAction(
             messageId,
             action.id,
@@ -1981,10 +1915,8 @@ export function useBuddyConversation(
       patchAction(messageId, actionId, { status: "confirming" });
       void (async () => {
         try {
-          // The backend owns the truth here: a 200 with ok: false means the proposal was
-          // already confirmed (or expired, or beaten to it) and its message says exactly what
-          // happened — surfacing that beats claiming "Dismissed — nothing changed" over a
-          // change that may already have happened.
+          // A 200 with ok: false means the proposal was already confirmed, expired or beaten to it,
+          // and its message says which; that beats claiming nothing changed.
           const result = await dismissStoredProposal(action.proposalId);
           patchAction(
             messageId,
@@ -1995,10 +1927,8 @@ export function useBuddyConversation(
           );
         } catch (e) {
           console.error(e);
-          // 404: no such proposal for this caller. Retrying cannot help, so the card resolves
-          // legibly instead. Any other failure keeps the offer on the table: the card's own
-          // error note would read as if the dismissal had half-happened, so it goes back to
-          // idle and stays retryable.
+          // 404: no such proposal for this caller, so the card resolves. Any other failure keeps
+          // the offer on the table and retryable.
           patchAction(
             messageId,
             actionId,
@@ -2135,10 +2065,9 @@ export function useBuddyConversation(
     isDeciding,
     switchTeamProject,
 
-    // The composer's words live in `BuddyDraftProvider`, below this provider — keyed there on
-    // the conversation below (`currentSessionId`/`teamProjectId`), so each thread keeps its own.
-    // The same idea for the fields a proposal carries: a flag's question is the hire's to word,
-    // and the session is what keeps that wording across a closed dock and a handed-over page.
+    // The composer's words live in `BuddyDraftProvider`, keyed on
+    // `currentSessionId`/`teamProjectId`; the wording of a proposal's fields lives here so it
+    // survives a closed dock.
     actionDrafts,
     setActionDraft,
     sendMessage,

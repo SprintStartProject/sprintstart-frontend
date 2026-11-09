@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   isFilterRangeInvalid,
   localDayEnd,
@@ -9,18 +9,8 @@ import {
 const none = { sourceSystems: [], from: "", to: "" };
 
 describe("filterRange", () => {
-  const originalTz = process.env.TZ;
-
-  // A fixed zone with daylight saving, so the offset is known and differs between seasons.
-  beforeEach(() => {
-    process.env.TZ = "Europe/Berlin";
-  });
-
-  afterEach(() => {
-    if (originalTz === undefined) delete process.env.TZ;
-    else process.env.TZ = originalTz;
-  });
-
+  // vite.config.ts pins the zone to Europe/Berlin, so the offset is known and differs between
+  // seasons.
   describe("toWireFilters", () => {
     it("sends nothing when no filter is set", () => {
       expect(toWireFilters(none)).toBeUndefined();

@@ -1,10 +1,6 @@
-// ============================================================
-// features/dashboard/layout/layoutOperations.ts
-// ============================================================
 // Every change the edit mode can make to a layout, as pure
 // functions over the array. The hook owns the state; these own
 // the rules.
-// ============================================================
 
 import type {
   DashboardLayout,

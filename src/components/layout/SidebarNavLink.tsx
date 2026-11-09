@@ -96,11 +96,8 @@ const DOCK_NUDGE_PX = 4;
  * How much of the row's hover tint is showing, at full influence.
  *
  * Full strength, because the curve above already guarantees the sidebar shows
- * one row's worth of tint in total. It used to be held back to 0.9 so the row
- * under the pointer could stay brighter than the four others the wide radius
- * lit up; with the tint spanning two adjacent rows that share a single row's
- * worth between them, there is nothing left to out-rank, and holding it back
- * would only mean the highlight is never quite fully on.
+ * one row's worth of tint in total, shared by the two adjacent rows it spans;
+ * holding it back would only mean the highlight is never quite fully on.
  */
 const DOCK_TINT_OPACITY = 1;
 

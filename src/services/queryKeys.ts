@@ -48,9 +48,6 @@ export const queryKeys = {
     myStatus: (userId: string) => ["onboarding", "my-status", userId] as const,
     unseenSkipAnswers: (userId: string) => ["onboarding", "unseen-skip-answers", userId] as const,
   },
-  projectInsights: {
-    byProjectIds: (projectIds: string) => ["project-insights", projectIds] as const,
-  },
   atlassianCredentials: {
     // Not scoped by user id: `queryClient.clear()` on logout already keeps a
     // session change from serving the previous user's list, and threading

@@ -113,8 +113,7 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
       <div
         // The wide form is always a row. It only renders on a board of two columns or more (see
         // `dashboardRenderSize`), where its cell is the 136px band -- and stacked, the bot, the
-        // input and the suggestions need twice that. It used to switch on the *window* (`lg`),
-        // so a band narrower than the window implied was stacked into a box it could not fit.
+        // input and the suggestions need twice that.
         className={`relative flex gap-5 ${isWide ? "flex-row items-center" : "flex-col"}`}
       >
         {/* Stacked and centred rather than a row: at this size the bot

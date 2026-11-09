@@ -8,13 +8,11 @@ import type { BoardStage } from "./boardStructure";
 /**
  * A card's stage, read off the onboarding path instead of set by hand.
  *
- * Now and Later used to be a second timeline the hire (or, through card blueprints, their PM) kept
- * next to the path — and since the path became the one plan (#311) it was a timeline nobody else
- * looked at. The path already knows where somebody stands: which phase is open, which ones come
+ * The path already knows where somebody stands: which phase is open, which ones come
  * after it. So the board asks the path instead of asking the hire.
  *
- * **Behind you means "belongs to a phase you have finished"**; everything else is Now. Later is
- * gone: a phase not reached yet is the path's to show, and a card about it is simply on the board.
+ * **Behind you means "belongs to a phase you have finished"**; everything else is Now. There is no
+ * Later: a phase not reached yet is the path's to show, and a card about it is simply on the board.
  * "Finished" is the Onboarding page's own reading of a phase (`phaseState` in `journey.ts`): phases
  * are not a queue, and several can be open at once. A card is tied to a phase through its origin
  * (the live step card names its step; a card kept on the Onboarding page carries the step or phase
@@ -114,10 +112,10 @@ export type PathPlace = { kind: "step" | "question" | "phase"; id: string };
 /**
  * Which piece of the path an in-app address points at, if it points at one.
  *
- * Every way the app writes a link into the path: `/onboarding/<stepId>` (the old step page, and what
- * a selection on it recorded), and `/onboarding?step=`, `?question=` or `?phase=` (what the buddy
- * writes, and what `onboardingOrigin.ts` records now). Anything else — a chat, the knowledge base —
- * points at nothing on the path.
+ * Every way the app writes a link into the path: `/onboarding/<stepId>` (the old step page, and
+ * what a selection on it recorded), and `/onboarding?step=`, `?question=` or `?phase=` (what the
+ * buddy writes, and what `onboardingOrigin.ts` records now). Anything else — a chat, the knowledge
+ * base — points at nothing on the path.
  */
 export function placeOfUrl(url: string): PathPlace | null {
   let parsed: URL;
@@ -189,15 +187,15 @@ export type ResolvedLink = { phaseId: string; stepId: string | null; task: strin
 /**
  * Resolves the inside of a `[[…]]` against the path.
  *
- * `[[Phase]]`, `[[Phase#Step]]` and `[[Phase#Step#Task]]` — the path's own nesting, the way Obsidian
- * nests headings in a note. A link written before phases came first, `[[Step]]` or `[[Step#Task]]`,
- * still resolves by the step's title. Null when it names nothing on the path, or names a step the
- * phase does not have.
+ * `[[Phase]]`, `[[Phase#Step]]` and `[[Phase#Step#Task]]` — the path's own nesting, the way
+ * Obsidian nests headings in a note. A link written before phases came first, `[[Step]]` or
+ * `[[Step#Task]]`, still resolves by the step's title. Null when it names nothing on the path, or
+ * names a step the phase does not have.
  */
 export function resolveLink(text: string, phases: PathPhases): ResolvedLink | null {
   const trimmed = text.trim();
-  // Titles may contain `#` themselves ("C# basics"), so every `#` is only a candidate separator: try
-  // the splits from the left and take the first one whose parts are all on the path.
+  // Titles may contain `#` themselves ("C# basics"), so every `#` is only a candidate separator:
+  // try the splits from the left and take the first one whose parts are all on the path.
   const cuts = [...trimmed.matchAll(/#/g)].map((match) => match.index);
   const head = (end: number) => trimmed.slice(0, end).trim();
 
@@ -308,10 +306,11 @@ export function phaseOfCard(
 /**
  * Whether a card belongs to one phase — what "cards on your board from this phase" counts.
  *
- * A phase holds what was kept from any of its steps as well as what was kept about the phase itself.
- * Without the path a phase can only be matched by name — a card kept while the phase was open — and
- * a card kept from one of its steps is not counted, which undercounts rather than guessing. The live
- * step card is never counted: it is the path itself, not something the hire kept from it.
+ * A phase holds what was kept from any of its steps as well as what was kept about the phase
+ * itself. Without the path a phase can only be matched by name — a card kept while the phase was
+ * open — and a card kept from one of its steps is not counted, which undercounts rather than
+ * guessing. The live step card is never counted: it is the path itself, not something the hire kept
+ * from it.
  */
 export function isCardAt(
   card: BoardCard,

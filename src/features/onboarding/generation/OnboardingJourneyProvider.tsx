@@ -50,18 +50,17 @@ function phaseStateOf(detail: string): GenerationPhaseProgress["state"] {
  * Owns the onboarding journey above the router: the path generation, and whether onboarding has
  * anything to show.
  *
- * **The generation belongs to the app, not to the page.** It used to live in the onboarding page's
- * state, so switching to another page unmounted it, closed the stream and -- because the backend
- * collected the generation straight into that stream -- threw away minutes of work. Here the stream
- * survives navigation, the sidebar can show that something is being built, and a toast says when it
- * is ready. The backend now also runs the generation detached from the stream, so a reload re-attaches
- * to the same run instead of starting over (see `fetchGenerationStatus`).
+ * **The generation belongs to the app, not to the page.** On the page, navigating away would
+ * unmount it and close the stream. Here the stream survives navigation, the sidebar can show that
+ * something is being built, and a toast says when it is ready. The backend also runs the generation
+ * detached from the stream, so a reload re-attaches to the same run instead of starting over (see
+ * `fetchGenerationStatus`).
  *
- * **The sidebar entry exists while there is something to do.** A path that exists, or one that can be
- * built: a selected project with a published blueprint and ingested content. Without those the page
- * could only ever end in an empty or failed generation, so the entry is left out -- like it was before
- * paths were built by hand. Anything that cannot be answered keeps the entry (fails open): hiding
- * navigation because a request blipped looks like the feature was taken away.
+ * **The sidebar entry exists while there is something to do.** A path that exists, or one that can
+ * be built: a selected project with a published blueprint and ingested content. Without those the
+ * page could only ever end in an empty or failed generation, so the entry is left out. Anything
+ * that cannot be answered keeps the entry (fails open): hiding navigation because a request blipped
+ * looks like the feature was taken away.
  */
 export function OnboardingJourneyProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
@@ -159,7 +158,8 @@ export function OnboardingJourneyProvider({ children }: { children: ReactNode })
                 detail: detail ?? "",
                 state: phaseStateOf(detail ?? ""),
               };
-              // A finished phase stays finished: late progress lines from its stream do not reopen it.
+              // A finished phase stays finished: late progress lines from its stream do not reopen
+              // it.
               if (index >= 0) {
                 if (phases[index].state === "done") return current;
                 phases[index] = entry;
@@ -199,7 +199,7 @@ export function OnboardingJourneyProvider({ children }: { children: ReactNode })
                   watchRef.current(projectId, attempt + 1);
                   return;
                 }
-                // Not running any more: it either finished while we were away, or it never got
+                // Not running: it either finished while we were away, or it never got
                 // there. The path is the only honest answer.
                 try {
                   succeed(await onboardingService.fetchPath());

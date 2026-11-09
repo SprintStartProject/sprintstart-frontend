@@ -24,10 +24,6 @@ import {
   type LayoutNode,
 } from "./layout";
 
-// ─────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────
-
 type Viewport = { x: number; y: number; zoom: number };
 
 /** Camera moves a caller can ask for -- the zoom into a phase, the view centre for "add here". */
@@ -94,7 +90,6 @@ type Props<TNode extends LayoutNode> = {
   focusId?: string | null;
   /** The view is refitted whenever this changes -- a different phase, a different graph. */
   fitKey: string;
-  // ── Editing ──
   /** Nodes can be dragged. The canvas shows the move straight away; the caller persists it. */
   canMove?: boolean;
   onMove?: (id: string, position: GraphPoint) => void;
@@ -347,8 +342,6 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     [dragOverride, positions],
   );
 
-  // ── Size & fit ─────────────────────────────────────────────
-
   useLayoutEffect(() => {
     const element = containerRef.current;
     if (!element) return;
@@ -412,8 +405,6 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     },
     [fitTarget],
   );
-
-  // ── Camera flights ─────────────────────────────────────────
 
   const viewportRef = useRef(viewport);
   useLayoutEffect(() => {
@@ -580,8 +571,6 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     });
   }, []);
 
-  // ── Wheel: two-finger pan, pinch zoom ──────────────────────
-
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
@@ -609,8 +598,6 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     element.addEventListener("wheel", handleWheel, { passive: false });
     return () => element.removeEventListener("wheel", handleWheel);
   }, [cancelFlight, expanded, size.height, zoomAround]);
-
-  // ── Pointer gestures ───────────────────────────────────────
 
   const toWorld = (clientX: number, clientY: number): GraphPoint => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -801,8 +788,6 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     return () => window.removeEventListener("keydown", onKey);
   }, [expanded]);
 
-  // ── Emphasis ───────────────────────────────────────────────
-
   const emphasisSourceId = dragOverride ? null : (hoveredId ?? selectedId);
   const related = useMemo(() => {
     if (!emphasisSourceId) return null;
@@ -818,8 +803,6 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     if (id === emphasisSourceId) return "focus";
     return related.has(id) ? "related" : "dimmed";
   };
-
-  // ── Edges ──────────────────────────────────────────────────
 
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const effectivePositions = useMemo(() => {
@@ -903,8 +886,6 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     : undefined;
 
   const connectionSource = connection ? positionOf(connection.sourceId) : undefined;
-
-  // ── Minimap ────────────────────────────────────────────────
 
   const minimap = useMemo(() => {
     if (!bounds || nodes.length < 4) return null;

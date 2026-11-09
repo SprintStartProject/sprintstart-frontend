@@ -19,12 +19,9 @@ const LEVEL_DOTS: Record<string, number> = {
 };
 
 /**
- * The member's skill assessment and the knowledge gaps in components they own, rendered as the
- * two cards under the journey on the member detail page. Read-only apart from opening a knowledge gap,
+ * The member's skill assessment and the knowledge gaps in components they own, rendered as the two
+ * cards under the journey on the member detail page. Read-only apart from opening a knowledge gap,
  * which hands off to the knowledge-gaps detail view via `onOpenKnowledgeGap`.
- *
- * The skill gaps that used to sit above the knowledge gaps are gone: they were the assessment's
- * beginner and intermediate rows again, one card to the left.
  *
  * The "Knowledge gaps" explainer is an `InfoHint` in its `"top-end"` placement: the enclosing
  * `SpotlightCard` clips overflow, so the tooltip has to open upward and right-aligned to stay

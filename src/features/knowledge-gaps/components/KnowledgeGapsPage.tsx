@@ -70,8 +70,7 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
   const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
 
-  // The severities chosen to narrow the list; none chosen shows them all. It used to start with all
-  // four chosen, which drew four brand-filled chips on every visit for a list nobody had narrowed.
+  // The severities chosen to narrow the list; none chosen shows them all.
   const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([]);
   const [sortBy, setSortBy] = useState<GapSortOption>("severity");
   const [query, setQuery] = useState("");

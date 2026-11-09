@@ -83,8 +83,6 @@ async function streamPathGeneration(
  * failures. Questions are answered one at a time and own their attempt history.
  */
 export const onboardingService = {
-  // ── PATH ─────────────────────────────────────────────────
-
   /**
    * Fetches the personalized onboarding path for the current authenticated user from the backend.
    */
@@ -148,8 +146,6 @@ export const onboardingService = {
     );
   },
 
-  // ── STEP ─────────────────────────────────────────────────
-
   /**
    * One step with its details. Failures propagate: the step view shows its own error state, and a
    * stand-in step would offer to complete or skip something that does not exist.
@@ -203,8 +199,6 @@ export const onboardingService = {
   async markSkipAnswerSeen(skipId: string): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/me/skips/${skipId}/seen`, { method: "POST" });
   },
-
-  // ── KNOWLEDGE-CHECK QUESTIONS ───────────────────────────
 
   /**
    * Submits the user's answer to one question. The result says whether it was correct
@@ -262,8 +256,6 @@ export const onboardingService = {
     );
   },
 
-  // ── FEEDBACK ──────────────────────────────────────────────
-
   /** Sends the caller's feedback on one step: whether it helped, plus a free-text message. */
   async submitFeedback(stepId: string, helpful: boolean, message: string): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/me/feedback`, {
@@ -271,8 +263,6 @@ export const onboardingService = {
       body: JSON.stringify({ stepId, helpful, message }),
     });
   },
-
-  // ── TASKS ─────────────────────────────────────────────────
 
   /** Loads the tasks of one step on the caller's own path. */
   async fetchTasks(stepId: string): Promise<OnboardingTaskEndpoint[]> {
@@ -296,8 +286,6 @@ export const onboardingService = {
       }),
     });
   },
-
-  // ── RESOURCES ─────────────────────────────────────────────
 
   /** Loads the reference resources of one step on the caller's own path. */
   async fetchResources(stepId: string): Promise<OnboardingResourceEndpoint[]> {

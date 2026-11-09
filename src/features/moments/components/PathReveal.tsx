@@ -172,13 +172,10 @@ export function PathReveal({ onLaunch, onDone }: PathRevealProps) {
 
     const handleKeyDown = () => advance();
 
-    // Presses on the overlay drive the sequence; presses outside it are
-    // ignored outright. Closing on an outside press is what used to flash
-    // the path on the way out — the router keeps the old view up while a
-    // navigation is pending, so the overlay went away well before the new
-    // one arrived. Leaving is the page's business now: whoever put this up
-    // takes it down when their page unmounts, which is the same instant
-    // the new view appears.
+    // Presses on the overlay drive the sequence; presses outside it are ignored outright. Closing
+    // on an outside press would flash the path on the way out, because the router keeps the old
+    // view up while a navigation is pending. Leaving is the page's business: whoever put this up
+    // takes it down when their page unmounts, as the new view appears.
     const handlePointerDown = (event: PointerEvent) => {
       const root = rootRef.current;
       const isOutside = !!root && event.target instanceof Node && !root.contains(event.target);

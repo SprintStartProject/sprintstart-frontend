@@ -110,13 +110,11 @@ type BoardCardFrameProps = {
  * card the pool, the source list and the dashboard widgets sit on.
  *
  * **The controls float in on approach and take no room at rest.** Four icon buttons on eleven cards
- * is more chrome than content, and none of them is what the hire came to the board to read. They
- * used to fade but keep their width, which is the arrangement that squeezed the title on a narrow
- * card down to an ellipsis: reserved space is reserved whether or not anything is drawn in it. Now
- * the cluster is lifted out of the header's flow, so the title has the whole row until somebody
- * comes near, and `focus-within` brings the cluster back for a keyboard user. While the board is
- * being arranged it sits in the flow again — there it holds the "Pile" picker on every card and
- * *is* what somebody came for.
+ * is more chrome than content, and reserved space would squeeze the title on a narrow card down to
+ * an ellipsis. So the cluster is lifted out of the header's flow, the title has the whole row until
+ * somebody comes near, and `focus-within` brings the cluster back for a keyboard user. While the
+ * board is being arranged it sits in the flow again — there it holds the "Pile" picker on every
+ * card and *is* what somebody came for.
  *
  * The body stops taking clicks while the board is being arranged, so a card that is a drag target
  * does not also tick a checkbox on the way past. That is driven by `data-arranging` on the grid
@@ -300,21 +298,13 @@ export function BoardCardFrame({
           <div
             // Keeps a press on a control from also grabbing the card underneath while arranging.
             onPointerDownCapture={(event) => event.stopPropagation()}
-            // Lifted out of the flow until somebody comes near the card.
-            //
-            // The cluster used to sit in the header row and hold its width whether or not it was
-            // showing anything — four icon buttons' worth of reserved space on every card, all the
-            // time. On a wide card that is a gap; on a card one column of four wide it was most of
-            // the header, and the title — the one thing on a card that cannot be guessed from
-            // anything else — was squeezed down to an ellipsis. Floated, the header is the title's
-            // for as long as nobody is doing anything, which is nearly always.
-            //
-            // The states it used to keep visible are not lost with it: "Pinned" and "Done" are
-            // badges next to the title, and they are the ones that say so.
+            // Lifted out of the flow until somebody comes near the card, so the title — the one
+            // thing on a card that cannot be guessed from anything else — has the whole header.
+            // "Pinned" and "Done" stay visible as badges next to the title.
             //
             // Not floated while the board is being arranged: there the cluster carries the "Pile"
-            // picker on every card at once, and a panel of selects hovering over each title would be
-            // the mode fighting itself.
+            // picker on every card at once, and a panel of selects hovering over each title would
+            // be the mode fighting itself.
             className={`absolute top-0 right-0 z-10 flex items-center gap-1 rounded-xl bg-app-surface/90 px-1 opacity-0 shadow-sm backdrop-blur transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 [[data-arranging]_&]:pointer-events-auto [[data-arranging]_&]:static [[data-arranging]_&]:bg-transparent [[data-arranging]_&]:opacity-100 [[data-arranging]_&]:shadow-none [[data-arranging]_&]:backdrop-blur-none ${
               dismissing ? "" : "pointer-events-none"
             }`}

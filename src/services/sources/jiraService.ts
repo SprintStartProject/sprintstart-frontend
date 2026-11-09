@@ -1,12 +1,8 @@
 import { apiClient } from "../apiClient.ts";
 import type { SyncScheduleConfig, SyncScheduleRequest } from "./syncSchedule.ts";
 
-// ---- Enums / shared ----
-
 /** Connection state the backend reports for a connected Jira instance. */
 export type JiraInstanceStatus = "UPDATING" | "UP_TO_DATE" | "OUT_OF_DATE" | "FAILED";
-
-// ---- Instances ----
 
 export type ConnectJiraInstanceRequest = {
   displayName: string;
@@ -41,8 +37,6 @@ export type JiraInstanceDto = {
   updateCredentialUserEmail: string;
 };
 
-// ---- Config ----
-
 export type ConfigureJiraInstanceRequest = SyncScheduleRequest & {
   instanceUrl: string;
 };
@@ -52,8 +46,6 @@ export type GetJiraInstanceConfigResponse = SyncScheduleConfig & {
   /** String representation of the schedule (cron or similar). */
   schedule: string;
 };
-
-// ---- Instances ----
 
 /**
  * Lists the connected Jira instances, optionally filtered to a single project.
@@ -123,8 +115,6 @@ export async function updateJiraInstance(
     body: JSON.stringify(request),
   });
 }
-
-// ---- Config ----
 
 /**
  * Loads the schedule and auto-update policy of one connected Jira instance.

@@ -24,9 +24,8 @@ export const SEVERITIES: KnowledgeGapSeverity[] = ["high", "medium", "low", "cov
  * `covered` fills completely — a full green bar reads as "fully covered",
  * where a near-empty one would read as a component barely holding on.
  *
- * A lookup rather than a ternary chain: the chain that used to live in the
- * detail page had no branch for a fourth step, so `covered` silently inherited
- * the `low` width.
+ * A lookup rather than a ternary chain: every step needs its own entry, so none silently inherits
+ * another step's width.
  */
 export const SEVERITY_FILL: Record<KnowledgeGapSeverity, string> = {
   high: "100%",
@@ -53,8 +52,9 @@ export interface SeverityStyle {
   /** Short label, e.g. "High". */
   label: string;
   /**
-   * The step's own shape, drawn wherever the colour alone used to stand for it. The four differ in
-   * outline (octagon, triangle, circle with an `i`, circle with a tick), so they tell apart in grey.
+   * The step's own shape, drawn next to the colour so the colour never stands alone. The four
+   * differ in outline (octagon, triangle, circle with an `i`, circle with a tick), so they tell
+   * apart in grey.
    */
   icon: LucideIcon;
   /** Text colour of the step, for the icon next to its label. */

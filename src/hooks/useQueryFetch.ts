@@ -27,21 +27,17 @@ export type UseQueryFetchOptions = {
 };
 
 /**
- * `useFetch`, backed by the shared query cache instead of a private
- * `useState`/`useEffect` pair — same return shape (plus `refetch`, for the
- * couple of call sites that used to force a reload through a `refreshKey` in
- * `deps`), so a call site swaps one import and adds the `queryKey` its data
- * was missing.
+ * `useFetch`, backed by the shared query cache instead of a private `useState`/`useEffect` pair —
+ * same return shape (plus `refetch`, for call sites that force a reload), so a call site swaps one
+ * import and adds the `queryKey` its data was missing.
  *
- * `useFetch` never had a cache key, only `deps` that re-ran the effect, so a
- * revisit re-fetched even data that was on screen seconds ago. A real key is
+ * `useFetch` has no cache key, only `deps` that re-run the effect. A real key is
  * what lets a widget and the page it summarizes (or two mounts of the same
  * page) share one request instead of each running their own.
  *
  * `loading` maps to `isLoading` (react-query's "nothing to show yet, and a
  * fetch is in flight" flag) rather than `isFetching`, so a cached revisit
- * renders immediately instead of behind a spinner — the whole point of this
- * migration.
+ * renders immediately instead of behind a spinner.
  */
 export function useQueryFetch<T>(
   queryKey: QueryKey,

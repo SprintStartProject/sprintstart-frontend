@@ -253,13 +253,9 @@ export function BotGlyph({
               ? { duration: 0.55, repeat: Infinity, ease: "easeInOut" }
               : { duration: 0.6, ease: "easeOut" }
       }
-      // Percentages, not px. On SVG *children* a px transform-origin is
-      // read in viewBox units, but on the root <svg> it is read in real
-      // CSS pixels — so a fixed "12px 18px" pivots the head somewhere
-      // different at every size the bot is rendered at. 87% is where the
-      // old value landed in user space, once the shifted viewBox is
-      // accounted for: the base of the head, which is what it should
-      // pivot around.
+      // Percentages, not px: on the root <svg> a px transform-origin is read in CSS pixels rather
+      // than viewBox units, so the pivot would move with the rendered size. 87% is the base of the
+      // head.
       style={{ transformOrigin: "50% 87%" }}
     >
       {/* Antenna. Droops with the head rather than staying at attention. */}

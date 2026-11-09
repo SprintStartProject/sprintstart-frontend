@@ -35,11 +35,7 @@ export type TextareaProps = TextareaOwnProps &
  *
  * **It grows as you type.** That is the default and, in almost every case, the
  * right answer: the alternative is a box that hides the beginning of what the
- * user just wrote behind an internal scrollbar. The app used to have both
- * behaviours — a hand-rolled auto-growing textarea in one dialog and a fixed
- * box with a drag handle everywhere else — which was only tolerable while the
- * two also looked different. Once they shared a border, the split read as a
- * bug: same control, same styling, different behaviour depending on the screen.
+ * user just wrote behind an internal scrollbar.
  *
  * Growth is bounded by `maxRows`, so a pasted wall of text cannot push a dialog
  * footer off screen; beyond that it scrolls.

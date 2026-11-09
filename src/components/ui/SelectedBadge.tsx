@@ -3,8 +3,8 @@ import { Check } from "lucide-react";
 /**
  * A small tick in the corner of a card or tile that is the current choice.
  *
- * "Selected" used to be a tint and a slightly different border, which is a colour and nothing else
- * (WCAG 1.4.1). The tick is a shape, so the chosen card is the one with the tick on any screen and
+ * A tint alone would say "selected" with colour and nothing else (WCAG 1.4.1). The tick is a
+ * shape, so the chosen card is the one with the tick on any screen and
  * for anybody. Decorative: the state itself is carried by `aria-pressed` / `aria-checked` on the
  * card, where assistive tech reads it. Put it inside the card, which has to be `relative` and must
  * not clip its overflow (the tick sits half outside the corner).

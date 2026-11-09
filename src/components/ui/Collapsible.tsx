@@ -21,10 +21,9 @@ type CollapsibleProps = {
 /**
  * Content that folds away to nothing and back, on the app's one fold curve.
  *
- * Everything on the board that folds — a card, an area, a stage band — used to do it by rendering
- * its contents or not, so a fold was a jump: the page reflowed in a single frame and everything
- * below it teleported. The information was right and the reading was gone; you could not tell
- * whether something had collapsed, moved, or disappeared.
+ * Rendering contents or not would make a fold a jump: the page reflows in a single frame and
+ * everything below it teleports, so nobody can tell whether something collapsed, moved, or
+ * disappeared.
  *
  * **The clip is only on while the height is moving.** `overflow-hidden` is what makes a height
  * animation look like a fold rather than a squash, and it is also what would cut the corner off

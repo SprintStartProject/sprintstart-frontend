@@ -1,6 +1,3 @@
-// ============================================================
-// features/graph-diagram/edgeStyles.ts
-// ============================================================
 // How the shared graph canvas draws an arrow, and how the two
 // board surfaces that have something else to say about an arrow
 // map what they mean onto those styles.
@@ -10,7 +7,6 @@
 // where nothing outside can read them, and a legend that
 // restates a style from memory is a legend that goes quietly
 // wrong.
-// ============================================================
 
 import type { JourneyEdgeTone } from "../onboarding/graph/JourneyCanvas.tsx";
 import type { GraphEdgeTone } from "./graphLayout.ts";

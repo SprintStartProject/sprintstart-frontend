@@ -28,3 +28,11 @@ src/keycloak-theme/**
 # Keycloak files, not ours to format.
 public/keycloak-theme
 public/keycloakify-dev-resources
+
+# Written by `eslint --prune-suppressions`; formatting it by hand would be undone on every prune.
+eslint-suppressions.json
+
+# Copies of the backend's contracts; they must stay byte-identical to the owner (contracts-sync.sh).
+contracts/
+# Written by `npm run arch:baseline`.
+.dependency-cruiser-known-violations.json

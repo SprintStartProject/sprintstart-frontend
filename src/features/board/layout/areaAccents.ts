@@ -8,12 +8,12 @@
  * person wrote themselves; a colour per card would be a paint chart, and would drown out the kinds.
  *
  * **Four, and none of them green or red.** `success`, `warning` and `danger` carry a fixed meaning
- * everywhere else in the app (FRONTEND_CODING_STANDARDS.md §4), and an area somebody tinted green because they like
- * green would read as an area that is *going well* — a claim the board cannot make and did not
- * mean. The same reasoning keeps them out of {@link cardAccent}.
+ * everywhere else in the app (FRONTEND_CODING_STANDARDS.md §4), and an area somebody tinted green
+ * because they like green would read as an area that is *going well* — a claim the board cannot
+ * make and did not mean. The same reasoning keeps them out of {@link cardAccent}.
  *
- * Stored on the group, so it survives with the rest of the area. An area written before there were
- * colours has none and gets the default, which is the blue every area used to be.
+ * Stored on the group, so it survives with the rest of the area. An area without one gets the
+ * default blue.
  */
 export type AreaAccent = "blue" | "purple" | "amber" | "grey";
 

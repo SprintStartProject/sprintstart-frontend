@@ -1,9 +1,5 @@
-// ============================================================
-// features/dashboard/organizationOverview.ts
-// ============================================================
 // Org-wide figures for the admin widgets, derived from the
 // project listing the switcher already holds.
-// ============================================================
 
 import type { SelectableProject } from "../projects/ProjectContext";
 

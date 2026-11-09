@@ -8,10 +8,9 @@ type DinoPlayHintProps = {
 };
 
 /**
- * The "pass the time" invitation for waits that run long enough to play in —
- * minutes, not seconds. It is a real button on purpose: a hardware keyboard
- * used to be the only way in (Space), which left every touch user looking at
- * a hint they could not act on.
+ * The "pass the time" invitation for waits that run long enough to play in — minutes, not seconds.
+ * It is a real button on purpose: with Space as the only way in, a touch user would look at a hint
+ * they cannot act on.
  *
  * Shown where there is no keyboard to press Space on — below `sm`, or on any
  * coarse pointer at any width, so landscape phones and tablets are covered

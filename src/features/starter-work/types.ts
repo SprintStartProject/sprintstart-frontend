@@ -11,7 +11,7 @@ export type ProposalStatus = "LIVE" | "REJECTED" | "STALE";
 /**
  * An AI-mined starter task (a GitHub issue) a hire can be pointed at.
  *
- * It is claimable on arrival — review is not a gate any more. What review buys is rank: fit-ranking
+ * It is claimable on arrival — review is not a gate. What review buys is rank: fit-ranking
  * demotes an unreviewed task, capped below the smallest positive signal, so one that fits a hire
  * perfectly still beats a reviewed one that does not.
  */

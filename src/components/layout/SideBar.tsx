@@ -77,9 +77,9 @@ type SidebarContentProps = {
 };
 
 /**
- * The escalation inbox's route. It has no entry of its own any more -- it is a section of the PM
- * dashboard -- but the access check that decides whether to read the open count is still the
- * inbox's own, and the count now rides on the PM dashboard's entry.
+ * The escalation inbox's route. It is a section of the PM dashboard, but the access check that
+ * decides whether to read the open count is still the inbox's own; the count rides on the PM
+ * dashboard's entry.
  */
 const ESCALATION_INBOX_PATH = "/insights/knowledge-requests" as const;
 
@@ -584,7 +584,7 @@ export function SideBar() {
 
   /**
    * Alt+S toggles whichever sidebar is on screen: below `lg` the drawer, as the header's
-   * button does; from `lg` up the desktop sidebar's fold to icons, as its logo does (#244).
+   * button does; from `lg` up the desktop sidebar's fold to icons, as its logo does.
    *
    * Never the drawer on a wide screen: it is not on screen there, so the chord would flip
    * state nobody can see -- and leave it flipped, opening the drawer uninvited the next time

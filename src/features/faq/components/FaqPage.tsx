@@ -110,7 +110,7 @@ function FaqListSkeleton() {
  * The recurring questions, as one ranked list with the detail in a side panel.
  *
  * `/insights/faq/:groupId` renders this same page with that group's panel open, so a link to a
- * single question still works — it just no longer costs the reader the list.
+ * single question still works without costing the reader the list.
  */
 export function FaqPage({ groupId }: { groupId?: string }) {
   const { selectedProjectId } = useProjectContext();

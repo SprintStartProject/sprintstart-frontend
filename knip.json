@@ -1,0 +1,7 @@
+{
+  "$schema": "https://unpkg.com/knip@6.39.0/schema.json",
+  "entry": ["src/main.tsx", "src/main-app.tsx"],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignore": ["src/keycloak-theme/**", "src/**/*.stories.tsx"],
+  "ignoreExportsUsedInFile": true
+}

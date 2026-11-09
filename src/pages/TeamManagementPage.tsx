@@ -50,14 +50,11 @@ import { getProjectRoles } from "../services/teamManagementService";
  * feedback, a review), drifting is a conversation to have — the people a manager would go and
  * talk to.
  *
- * "Waiting on you" used to be a chip of its own beside "Needs you", but it was only the first
- * half of it (skips and feedback), and two chips that mostly list the same people read as one
- * too many. The reasons column in every row says which kind of "needs you" it is. The stage
- * chips (not started / underway / done) went too — the progress column and the sort answer
- * that — and so did "Long on a step": everyone on a step too long is in "Needs you" already, and
- * the roster opens sorted by time on step, longest first.
+ * There is no "Waiting on you" chip (it would mostly list the same people as "Needs you"; the
+ * reasons column says which kind it is), and no stage or "Long on a step" chip: the progress column
+ * and the sort answer those, and the roster opens sorted by time on step, longest first.
  *
- * The sort has no select of its own any more: the "Time on step" and "Progress" column headers
+ * The sort has no select of its own: the "Time on step" and "Progress" column headers
  * sort, and a select beside them saying "Longest on step" was the same control twice.
  */
 type StatusFilter = "all" | "attention" | "drifting";
@@ -140,8 +137,7 @@ const STATUS_DOT: Partial<Record<StatusFilter, string>> = {
 
 /**
  * Reads `?filter=` into a chip. Links from before the chips were merged still land somewhere
- * sensible: "waiting" and "stuck" were parts of "needs you", and the stage filters have no chip
- * any more.
+ * sensible: "waiting" and "stuck" were parts of "needs you", and the stage filters have no chip.
  */
 function parseStatusFilter(value: string | null): StatusFilter {
   if (value === "waiting" || value === "stuck") return "attention";
@@ -188,10 +184,8 @@ function RosterSkeleton() {
 /**
  * The team: everybody on the selected project as one scannable roster, and the roles tab.
  *
- * The roster used to be a grid of cards, each a link to a separate profile page — looking at
- * three people meant three page loads and three trips back. Rows now open the member side
- * panel over the list, so a manager can go down the team without losing their place; the full
- * profile is still one press away inside the panel.
+ * Rows open the member side panel over the list, so a manager can go down the team without losing
+ * their place; the full profile is one press away inside the panel.
  *
  * The status filter lives in the URL (`?filter=`), which is what lets the overview's figures
  * link straight to "who is waiting on you" instead of to the unfiltered team.

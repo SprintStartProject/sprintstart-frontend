@@ -25,11 +25,10 @@ type BoardPathWindowProps = {
  * next thing in it. Pressing the card opens that phase on the Onboarding page; pressing the next
  * step opens the step.
  *
- * **The phase they are in, not the lowest open one.** This used to be a strip of the graph around
- * the first unfinished phase by position — and phases are not a queue: a hire who took another way
- * through stood in phase 7 while the board pointed at phase 2. It now asks `resolveNextAction`, the
- * same answer the Onboarding page gives to "continue": the phase being worked in, most recently
- * touched first.
+ * **The phase they are in, not the lowest open one.** Phases are not a queue: a hire who took
+ * another way through can stand in phase 7 while phase 2 is still open. It asks
+ * `resolveNextAction`, the same answer the Onboarding page gives to "continue": the phase being
+ * worked in, most recently touched first.
  *
  * **A card, not a map.** The whole path has a page of its own; on the board the question is "where
  * am I and what is next", and that is one line of each.

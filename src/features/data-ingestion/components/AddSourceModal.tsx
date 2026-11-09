@@ -118,8 +118,6 @@ export function AddSourceModal({
     setSources((current) => addDraftSources(current, drafts));
   };
 
-  // --- Connect + retry ---
-
   /**
    * Connects a list of staged sources against the existing project with live
    * per-row status; shared by the list screen's "Connect" and the detail
@@ -199,8 +197,6 @@ export function AddSourceModal({
     }
   };
 
-  // --- Close handling ---
-
   // Every dismissal path routes through here so a list with unconnected staged
   // sources asks before discarding them. Nothing is discarded once connecting
   // has started (those sources are already connected or attempted).
@@ -214,8 +210,6 @@ export function AddSourceModal({
 
     onClose();
   };
-
-  // --- Rendering ---
 
   const modalTitle = isConnecting
     ? "Connecting sources"

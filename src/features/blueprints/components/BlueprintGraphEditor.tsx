@@ -159,9 +159,8 @@ export function BlueprintGraphEditor({
   /**
    * Deletes the phase the details panel is showing, once somebody has said so twice.
    *
-   * The panel is closed only after the request succeeds. Closing first — which is what this used to
-   * do — told the author the phase was gone before anybody knew whether it was, and a failure then
-   * had nowhere left to be shown.
+   * The panel is closed only after the request succeeds, so a failure still has somewhere to be
+   * shown.
    */
   async function deletePhase() {
     if (!detailsPhase) return;
@@ -412,9 +411,7 @@ function GraphNodeCard({
  * Everything the panel says about one phase: its fields, and the things about it that are not
  * fields.
  *
- * The fields and the facts used to be two branches of an edit mode, so a draft showed the form and
- * nothing else — the step and check counts, and who the phase is for, were only visible on a
- * version you could not change. They are the context somebody needs *while* editing.
+ * They are the context somebody needs *while* editing.
  */
 function PhaseDetails({
   phase,

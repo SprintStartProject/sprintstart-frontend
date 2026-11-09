@@ -78,10 +78,10 @@ function ItemBody({
 /**
  * The things a member is waiting on the manager for, each on one line with its answer beside it.
  *
- * One line per item: the kind as an icon, the step it is about, the member's words truncated
- * after that. A pending skip or a thumbs-down is a short thing to decide, and the tall rows this
- * list used to draw gave two items a quarter of the profile. Pressing the text opens the step
- * (see `onOpenStep`), where the whole message and everything else about the step is.
+ * One line per item: the kind as an icon, the step it is about, the member's words truncated after
+ * that. A pending skip or a thumbs-down is a short thing to decide, so one line each is enough.
+ * Pressing the text opens the step (see `onOpenStep`), where the whole message and everything else
+ * about the step is.
  */
 export function MemberOpenItems({
   member,

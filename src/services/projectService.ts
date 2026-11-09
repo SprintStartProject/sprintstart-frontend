@@ -1,7 +1,3 @@
-// ============================================================
-// projectService.ts
-// ============================================================
-
 import { ApiError, apiClient } from "./apiClient";
 
 export type GlobalUserRole = "ADMIN" | "HR" | "PM" | "USER" | (string & {});

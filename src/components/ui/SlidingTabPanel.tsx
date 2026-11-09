@@ -23,7 +23,7 @@ type SlidingTabPanelProps = {
  * How long one panel takes to slide out, in seconds and in milliseconds.
  *
  * Exported because a caller that scrolls to something inside the panel it just switched to has to
- * wait for the switch -- the number used to be repeated there as a guess.
+ * wait for the switch.
  */
 export const SLIDING_PANEL_SECONDS = 0.18;
 export const SLIDING_PANEL_EXIT_MS = SLIDING_PANEL_SECONDS * 1000;

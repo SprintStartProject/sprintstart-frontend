@@ -1,11 +1,7 @@
-// ============================================================
-// ConfettiBurst.tsx
-// ============================================================
 // One-shot confetti explosion from the middle of the screen,
 // used to mark a passed knowledge check. Sits above the modal
 // layer and removes itself once the animation is over, so it
 // never traps clicks or lingers in the DOM.
-// ============================================================
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";

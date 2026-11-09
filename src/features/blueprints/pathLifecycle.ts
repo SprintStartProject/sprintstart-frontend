@@ -58,8 +58,7 @@ export function lifecycleOf(latest: BlueprintPathOverview): BlueprintLifecycle {
  *
  * Not the three statuses. "Archived" is a status and also a real state — the blueprint is finished
  * with. "Draft" is a status and *not* a state: a draft of a live blueprint and a draft of one that
- * was never published are two completely different situations, and the old page filed them
- * together while filing the live blueprint they belong to somewhere else entirely.
+ * was never published are two completely different situations.
  */
 export type LifecycleGroupKey = "live" | "unpublished" | "retired";
 

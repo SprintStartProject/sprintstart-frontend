@@ -287,16 +287,12 @@ export function CreateProjectWizard({
     [users, selectedUserIds, managerId],
   );
 
-  // --- Add-source sub-flow ---
-
   const commitAddSource = () => {
     if (!addForm.canAdd) return;
 
     const drafts = addForm.commit();
     setSources((current) => addDraftSources(current, drafts));
   };
-
-  // --- Commit + provisioning ---
 
   /** Creates the project and assigns its people. Guarded so a retry never
    * creates a second project. */
@@ -419,8 +415,6 @@ export function CreateProjectWizard({
       setIsSubmitting(false);
     }
   };
-
-  // --- Rendering ---
 
   const isProvisioning = phase === "provisioning";
   const stepIndex = isProvisioning ? STEP_INDEX.review : STEP_INDEX[phase];

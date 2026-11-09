@@ -126,13 +126,10 @@ type MemberSummaryProps = {
 /**
  * A member's onboarding at a glance — the first thing on the full profile, before the path.
  *
- * The profile used to open on the path itself: a graph of every step, with the numbers a manager
- * actually came for (how far, where, is anything off) scattered across the page. This card
- * answers those in one read: overall progress as a ring, the phases (the current one up close,
- * the rest as a strip and a line each). The steps by state were a donut here too; in the
- * member panel it made the card long for what the phases already say. The four smaller figures sit
- * beside the name ({@link MemberSignals}). The path underneath is for working on it; pressing a
- * phase here shows it there.
+ * The numbers a manager comes for (how far, where, is anything off) in one read: overall progress
+ * as a ring, the phases (the current one up close, the rest as a strip and a line each). The four
+ * smaller figures sit beside the name ({@link MemberSignals}). The path underneath is for working
+ * on it; pressing a phase here shows it there.
  */
 export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSummaryProps) {
   const data = memberSummaryData(path, feedback);
@@ -383,8 +380,8 @@ type MemberSignalsProps = {
  * The four smaller figures — workload, how long they have been at it, what they said, their
  * skills — as one row of small tiles beside the member's name.
  *
- * They used to be a second row inside the summary card, at full size, which made the card the
- * tallest thing above the path and pushed the path most of a screen down.
+ * Beside the name rather than a full-size row in the card, which would push the path most of a
+ * screen down.
  */
 export function MemberSignals({
   path,

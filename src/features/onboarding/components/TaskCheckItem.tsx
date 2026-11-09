@@ -15,19 +15,17 @@ interface TaskCheckItemProps {
  * The tick is drawn rather than swapped: a `CheckCircle2` replacing a `Circle`
  * changes state without ever showing the *act* of completing, which is the part
  * that feels good. Here the ring fills, the check strokes itself on, and a
- * short pulse rings out — roughly 400ms of feedback for a click that used to
- * produce none.
+ * short pulse rings out — roughly 400ms of feedback for the click.
  *
  * The strikethrough is deliberately kept: crossing something out is the oldest
  * "done" signal there is, and it survives being the only cue for anyone who
  * cannot separate the green from the grey.
  *
- * Only the tick is a button. The whole row used to be one, and text inside a
- * button cannot be selected -- so a task could not be marked to hand to the
- * buddy (the app-wide selection toolbar's "Ask the buddy") or copied at all.
- * The tick and the rest of the row still tick it; the text itself does not, since a
- * click there is how selecting starts -- a double-click on a word is a single click
- * first, and would tick the task on the way to selecting the word.
+ * Only the tick is a button: text inside a button cannot be selected, and a task has to be markable
+ * for the buddy (the app-wide selection toolbar's "Ask the buddy") and copyable. The tick and the
+ * rest of the row still tick it; the text itself does not, since a click there is how selecting
+ * starts -- a double-click on a word is a single click first, and would tick the task on the way to
+ * selecting the word.
  */
 export function TaskCheckItem({ index, title, description, isDone, onToggle }: TaskCheckItemProps) {
   const reduceMotion = useReducedMotion();

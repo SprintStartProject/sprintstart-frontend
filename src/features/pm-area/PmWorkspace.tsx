@@ -187,13 +187,11 @@ function resolveSection(pathname: string, analysisRevision: number): ResolvedSec
  * The PM area as one page: one header, one tab bar, and the section underneath sliding in the
  * direction you are moving.
  *
- * A **layout route**. The PM pages used to be separate routes with separate headers: every
- * switch re-mounted the header (whose height depended on what each page put into it), faded
- * the whole page, and waited for that page's lazy chunk — the lag and the jumping header were
- * the same problem. Now the header never changes, every section ships in this one chunk, and
- * switching is a slide.
+ * A **layout route**: the header never changes, every section ships in this one chunk, and
+ * switching is a slide. Separate routes would re-mount a header whose height depends on each page,
+ * and wait for each page's lazy chunk.
  *
- * The section is chosen from the URL rather than from child route elements: the old URLs all
+ * The section is chosen from the URL rather than from child route elements: the section URLs all
  * keep working (`/team/:id`, `/insights/faq/:id`, …), and rendering the sections here instead of
  * through `<Outlet />` means the outgoing section keeps its own props while it slides out.
  *

@@ -184,11 +184,8 @@ export async function getTeamMember(userId: string): Promise<TeamOverviewUser | 
  * The signed-in user's own row of the team overview: their roles, skills and position in
  * their onboarding.
  *
- * Failures propagate. This used to answer with the first mock user instead, which is
- * indistinguishable from a real reply — so a user with no onboarding path (404) or a role
- * that may not read the overview at all (403) was handed somebody else's journey, and the
- * dashboard reported an onboarding that did not exist. Callers decide what an absent
- * overview means for them; a fixture cannot make that decision for them.
+ * Failures propagate: a fixture answer is indistinguishable from a real one and would hand a user
+ * somebody else's journey. Callers decide what an absent overview means for them.
  */
 export async function getMyTeamOverview(): Promise<TeamOverviewUser> {
   const user = await apiClient.fetch<BackendTeamOverviewUser>(
@@ -440,16 +437,14 @@ export async function markOnboardingFeedbackRead(feedbackId: string): Promise<vo
 /**
  * One member's onboarding path, for a reviewer looking at it.
  *
- * The endpoint now answers with the path *as its owner has it* — phases with their steps and their
+ * The endpoint answers with the path *as its owner has it* — phases with their steps and their
  * questions, each carrying that member's own status — so the hydration below is a fallback for a
- * thin response rather than the normal road it used to be.
+ * thin response.
  *
- * **Every phase is normalised before it leaves here**, and that is the part worth keeping. The
- * absence of `questions` on a phase took the whole team page down with a TypeError the moment
- * questions became first-class members of a phase: three surfaces read `phase.questions` because the
- * type promised it, and the wire did not deliver it. A missing array is filled at the boundary where
- * untrusted JSON becomes a typed object — which is the only place a default belongs, and the reason
- * no caller downstream has to defend itself against the same thing again.
+ * **Every phase is normalised before it leaves here**: three surfaces read `phase.questions`
+ * because the type promises it, and a missing array would be a TypeError. A missing array is filled
+ * at the boundary where untrusted JSON becomes a typed object — which is the only place a default
+ * belongs, and the reason no caller downstream has to defend itself against the same thing again.
  *
  * @returns The path, or `null` when the path cannot be loaded at all (including when the user
  *   has none). A phase whose steps fail to load is returned with an empty step list.
@@ -836,9 +831,7 @@ export async function createSkill(request: CreateSkillRequest): Promise<Skill> {
 /**
  * Deletes a project role.
  *
- * No mock fallback: it used to answer a failed delete by removing the role from the mock data,
- * so the caller reported "Role deleted" while the backend still had it — and the next reload
- * brought it straight back. A failure now reaches the caller, which says so.
+ * No mock fallback: a failure reaches the caller, which says so.
  *
  * @throws ApiError when the backend refuses or cannot be reached.
  */

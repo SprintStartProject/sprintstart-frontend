@@ -69,7 +69,6 @@ export function useAvailableSources(projectId: string | null): {
     };
   }, [projectId]);
 
-  // Without a project there is nothing to look up.
   if (!projectId) return { sources: [...ALWAYS_AVAILABLE], loading: false };
 
   if (result?.projectId !== projectId) return { sources: [...ALWAYS_AVAILABLE], loading: true };

@@ -582,9 +582,9 @@ const EXTRA_PENALTY = 1;
  * A 0–100 reading of how much the project needs its manager right now: 100 is nothing open.
  *
  * Counted per area rather than per finding: each area costs what its worst finding costs, plus a
- * point for every further one. Summing every finding at full weight sent a project with a few
- * ordinary loose ends straight to zero, where a score says nothing any more. Still simple enough
- * to explain — every point off is a finding on the list.
+ * point for every further one. Summing every finding at full weight would send a project with a few
+ * ordinary loose ends straight to zero, where a score says nothing. Still simple enough to explain
+ * — every point off is a finding on the list.
  */
 export function healthScore(findings: readonly Finding[]): number {
   const penalty = [...pointsLostByArea(findings).values()].reduce((sum, points) => sum + points, 0);

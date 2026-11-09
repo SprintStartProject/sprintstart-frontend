@@ -1,0 +1,26 @@
+name: Node without the exit deadlock
+description: >
+  Puts a `node` first on PATH that runs the real one with `--no-maglev --no-concurrent-sparkplug`.
+  Node 24 can deadlock in process.exit() while a background Maglev/Sparkplug compile job waits for the
+  main thread (nodejs/node#64274); measured here, about 1 in 13 `npm ci` runs never exited, and none
+  of 80 did with these flags. NODE_OPTIONS does not accept the flags, hence the shim. `npm` starts
+  through `#!/usr/bin/env node`, so it and every `node` its scripts call go through the shim, and
+  forked children inherit the flags. Use right after actions/setup-node; remove once Node ships the
+  fix.
+
+runs:
+  using: composite
+  steps:
+    - name: Put the node shim first on PATH
+      shell: bash
+      run: |
+        dir="$RUNNER_TEMP/node-exit-safe"
+        mkdir -p "$dir"
+        printf '#!/bin/sh\nexec "%s" --no-maglev --no-concurrent-sparkplug "$@"\n' "$(command -v node)" > "$dir/node"
+        chmod +x "$dir/node"
+        echo "$dir" >> "$GITHUB_PATH"
+
+    - name: Check that node runs through the shim
+      shell: bash
+      run: |
+        node -e 'if (!process.execArgv.includes("--no-maglev")) { console.error("the node shim is not active"); process.exitCode = 1; }'

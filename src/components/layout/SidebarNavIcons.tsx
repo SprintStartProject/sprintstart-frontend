@@ -255,8 +255,7 @@ export function OnboardingIcon({ isActive }: SidebarIconProps) {
 /**
  * Blueprints: the compass opens and draws its arc.
  *
- * It used to borrow the hire's rocket, which is the one icon in the sidebar that
- * already means something else — the path somebody is *walking*. A blueprint is
+ * The rocket already means the path somebody is *walking*. A blueprint is
  * the thing somebody *draws* for them, and a drafting compass is the oldest
  * picture there is of that: the legs part, the lead comes down, and the curve
  * appears under it.
