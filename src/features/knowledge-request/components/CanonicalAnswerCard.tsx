@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 import { BookCheck, Pencil } from "lucide-react";
 import { AutoResizeTextarea } from "../../../components/ui/AutoResizeTextarea";
 import { Button } from "../../../components/ui/Button";
-import type { CanonicalAnswer } from "../types";
+import type { CanonicalAnswer } from "../../../services/knowledgeRequestTypes";
 import { formatDateTime } from "../format";
 
 type CanonicalAnswerCardProps = {

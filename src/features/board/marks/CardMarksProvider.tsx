@@ -14,7 +14,7 @@ import {
 import { addMark, enclosingMark, isMarked, markGroup, splitMarks, unmarkPart } from "./markup";
 import { DEFAULT_HIGHLIGHT, type HighlightColor } from "./highlightColors";
 import { readMarkLabels, setMarkLabel, writeMarkLabels, type MarkLabels } from "./markLabels";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { useToastApi } from "../../../context/useToast";
 import { subscribeToBoardStorageReplaced } from "../layout/boardStorage";
 import type { BoardCard } from "../types";

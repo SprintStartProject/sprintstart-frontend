@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { KnowledgeBaseWidget } from "../../../../src/features/dashboard/components/KnowledgeBaseWidget";
-import type { Artifact } from "../../../../src/features/knowledge-base/types";
+import type { Artifact } from "../../../../src/services/knowledgeTypes";
 import type { UserProfile } from "../../../../src/services/types";
 import { PermissionGroup } from "../../../../src/services/types";
 import type { ProjectContextValue } from "../../../../src/features/projects/ProjectContext";

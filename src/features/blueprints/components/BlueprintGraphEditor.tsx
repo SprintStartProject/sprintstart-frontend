@@ -24,7 +24,7 @@ import {
   type BlueprintGraphCanvasNodeProps,
 } from "./BlueprintGraphCanvas.tsx";
 import { PhasePrerequisites } from "./PhasePrerequisites.tsx";
-import type { BlueprintPhase, BlueprintPhaseType } from "../types.ts";
+import type { BlueprintPhase, BlueprintPhaseType } from "../../../services/blueprintTypes.ts";
 
 export type BlueprintPhaseMetadata = {
   title: string;

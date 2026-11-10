@@ -7,7 +7,7 @@ import { Field } from "../../../components/ui/Field.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
 import { Select } from "../../../components/ui/Select.tsx";
 import { Textarea } from "../../../components/ui/Textarea.tsx";
-import type { BlueprintOption, BlueprintQuestion } from "../types.ts";
+import type { BlueprintOption, BlueprintQuestion } from "../../../services/blueprintTypes.ts";
 import { Detail, EmptyDetailListItem, SaveError } from "./DetailParts.tsx";
 import { fieldSetter, type BlueprintQuestionMetadata } from "./metadata.ts";
 

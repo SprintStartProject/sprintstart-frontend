@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { FilterSelect } from "../../../components/ui/FilterSelect";
 
 /**

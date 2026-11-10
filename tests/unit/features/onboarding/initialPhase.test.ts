@@ -5,7 +5,7 @@ import type {
   OnboardingPhaseEndpoint,
   OnboardingStepEndpoint,
   StepStatus,
-} from "../../../../src/features/onboarding/types";
+} from "../../../../src/services/onboardingTypes";
 
 function step(id: string, phaseId: string, status: StepStatus): OnboardingStepEndpoint {
   return {

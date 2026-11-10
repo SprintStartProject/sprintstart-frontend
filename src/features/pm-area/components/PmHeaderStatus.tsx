@@ -1,8 +1,8 @@
 import { AlertTriangle, CheckCircle2, Database, FolderKanban, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
-import { fetchIngestionSources } from "../../data-ingestion/ingestionSources";
-import { formatRelativeDate } from "../../knowledge-gaps/format";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { fetchIngestionSources } from "../../data-ingestion";
+import { formatRelativeDate } from "../../knowledge-gaps";
+import { useProjectContext } from "../../projects";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { queryKeys } from "../../../services/queryKeys";
 

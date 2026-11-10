@@ -1,10 +1,10 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { queryKeys } from "./queryKeys";
-import { knowledgeRequestService } from "./knowledgeRequestService";
-import { insightsService } from "./faqService";
-import { knowledgeGapService } from "./knowledgeGapService";
-import { onboardingMetricsService } from "./onboardingMetricsService";
-import { getTeamOverview } from "./teamManagementService";
+import { queryKeys } from "../services/queryKeys";
+import { knowledgeRequestService } from "../services/knowledgeRequestService";
+import { insightsService } from "../services/faqService";
+import { knowledgeGapService } from "../services/knowledgeGapService";
+import { onboardingMetricsService } from "../services/onboardingMetricsService";
+import { getTeamOverview } from "../services/teamManagementService";
 import { loadBoard } from "../features/board/hooks/useBoard";
 import {
   loadKnowledgeBasePage,

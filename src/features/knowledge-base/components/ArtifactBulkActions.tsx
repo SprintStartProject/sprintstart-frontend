@@ -6,7 +6,7 @@ import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { Artifact } from "../types";
+import type { Artifact } from "../../../services/knowledgeTypes";
 
 /** Props for {@link ArtifactBulkActions}. */
 export interface ArtifactBulkActionsProps {

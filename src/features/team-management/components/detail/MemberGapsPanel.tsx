@@ -1,8 +1,8 @@
 import { InfoHint } from "../../../../components/ui/InfoHint";
-import type { KnowledgeGap } from "../../../knowledge-gaps/types";
+import type { KnowledgeGap } from "../../../knowledge-gaps";
 import type { UserSkillLevel } from "../../../../services/teamManagementService";
 import { GraduationCap, SearchX } from "lucide-react";
-import { PmCard, PmCardHeader } from "../../../pm-area/components/PmCard";
+import { PmCard, PmCardHeader } from "../../../pm-area";
 
 type MemberGapsPanelProps = {
   skillLevels: UserSkillLevel[];

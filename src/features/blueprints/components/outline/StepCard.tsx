@@ -1,6 +1,6 @@
 import { Link, Minus, Pencil, Plus } from "lucide-react";
 import { Button } from "../../../../components/ui/Button.tsx";
-import type { BlueprintStep, BlueprintTask } from "../../types.ts";
+import type { BlueprintStep, BlueprintTask } from "../../../../services/blueprintTypes.ts";
 import { activatesOnKey } from "./activatesOnKey.ts";
 import { CollapseToggle } from "./CollapseToggle.tsx";
 import type { OutlineActions } from "./outlineActions.ts";

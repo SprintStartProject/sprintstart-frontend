@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useToast } from "../../../context/useToast";
 import { parseApiError } from "../../../services/apiError";
 import { acceptSkillSuggestion, updateRoleSkills } from "../../../services/teamManagementService";
-import type { Skill } from "../types";
+import type { Skill } from "../../../services/teamManagementTypes";
 
 type Args = {
   roleId: string | null;

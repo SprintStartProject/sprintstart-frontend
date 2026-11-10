@@ -3,7 +3,7 @@ import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Modal } from "../../../components/ui/Modal.tsx";
 import { versionWord } from "../pathLifecycle.ts";
-import type { BlueprintPath } from "../types.ts";
+import type { BlueprintPath } from "../../../services/blueprintTypes.ts";
 import type { LifecycleActions } from "../useLifecycleActions.ts";
 import type { VersionHistory } from "../useVersionHistory.ts";
 

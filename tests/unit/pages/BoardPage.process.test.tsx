@@ -9,7 +9,7 @@ import type { Board, BoardCard } from "../../../src/features/board/types";
 import { writeCardOrigins } from "../../../src/features/board/layout/cardOrigins";
 import { readBehindSeen, writeBehindSeen } from "../../../src/features/board/layout/behindSeen";
 import { onboardingService } from "../../../src/services/onboardingService";
-import type { OnboardingPathEndpoint } from "../../../src/features/onboarding/types";
+import type { OnboardingPathEndpoint } from "../../../src/services/onboardingTypes";
 
 vi.mock("../../../src/services/boardService", () => ({
   boardService: {

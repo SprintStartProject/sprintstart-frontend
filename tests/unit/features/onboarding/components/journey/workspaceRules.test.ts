@@ -16,7 +16,7 @@ import type {
   OnboardingStepDetail,
   OnboardingStepSkip,
   OnboardingTaskEndpoint,
-} from "../../../../../../src/features/onboarding/types";
+} from "../../../../../../src/services/onboardingTypes";
 
 function step(overrides: Partial<OnboardingStepDetail> = {}): OnboardingStepDetail {
   return {

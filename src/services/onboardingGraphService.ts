@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import type { OnboardingStepEndpoint, StepType } from "../features/onboarding/types";
+import type { OnboardingStepEndpoint, StepType } from "./onboardingTypes";
 
 /** Where one node of an onboarding graph sits on the canvas. */
 export type GraphNodePosition = { id: string; graphX: number; graphY: number };

@@ -4,16 +4,16 @@ import { BookmarkPlus, Eraser, Highlighter, MessageCircle, Reply } from "lucide-
 import { Button } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { useFocusMode } from "../../../context/useFocusMode";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { boardService } from "../../../services/boardService";
 import { useInvalidateBoard } from "../hooks/useInvalidateBoard";
 import { rememberOrigin } from "../layout/cardOrigins";
 import { withOnboardingPlace } from "../layout/onboardingOrigin";
 import { useCardMarks } from "../marks/useCardMarks";
 import { DEFAULT_HIGHLIGHT } from "../marks/highlightColors";
-import { openAiBuddy } from "../../buddy/aiBuddyBus";
-import { quoteFromSelection } from "../../buddy/quoteFromSelection";
-import { formatMarkdownQuote } from "../../buddy/utils/quoteFormat";
+import { openAiBuddy } from "../../buddy";
+import { quoteFromSelection } from "../../buddy";
+import { formatMarkdownQuote } from "../../buddy";
 import { cardFor } from "./selectionCapture";
 import { useTextSelection } from "./useTextSelection";
 

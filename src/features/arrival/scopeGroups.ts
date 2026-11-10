@@ -1,4 +1,4 @@
-import type { ArrivalStep } from "./types";
+import type { ArrivalStep } from "../../services/arrivalTypes";
 
 /** One scope's steps: `projectName` is null for the company-wide block. */
 export type ArrivalScopeGroup = {

@@ -6,7 +6,7 @@ import {
   savePosition,
   siblingIds,
 } from "../../../../src/features/blueprints/pathOrdering.ts";
-import type { BlueprintPath } from "../../../../src/features/blueprints/types.ts";
+import type { BlueprintPath } from "../../../../src/services/blueprintTypes.ts";
 
 const { service } = vi.hoisted(() => ({
   service: {

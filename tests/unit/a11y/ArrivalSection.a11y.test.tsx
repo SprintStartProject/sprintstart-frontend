@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { axe } from "vitest-axe";
 import { ArrivalSection } from "../../../src/features/arrival/components/ArrivalSection";
 import { arrivalService } from "../../../src/services/arrivalService";
-import type { ArrivalStep, DerivableArrivalStep } from "../../../src/features/arrival/types";
+import type { ArrivalStep, DerivableArrivalStep } from "../../../src/services/arrivalTypes";
 
 vi.mock("../../../src/services/arrivalService", () => ({
   arrivalService: {

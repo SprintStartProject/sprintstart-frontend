@@ -1,13 +1,13 @@
-import type { KnowledgeGap } from "../../features/knowledge-gaps/types";
+import type { KnowledgeGap } from "../../services/knowledgeGapTypes";
 import type {
   OnboardingPathEndpoint,
   OnboardingStepEndpoint,
   OnboardingTaskEndpoint,
-} from "../../features/onboarding/types";
+} from "../../services/onboardingTypes";
 import { waitingOn } from "../../features/pm-area/memberStatus";
 import { isUnread } from "../../features/pm-area/useMemberOpenItems";
 import type { OnboardingFeedback } from "../../services/teamManagementService";
-import type { ProjectRole, TeamOverviewUser } from "../../features/team-management/types";
+import type { ProjectRole, TeamOverviewUser } from "../../services/teamManagementTypes";
 
 /** A step as the member page reads it: with the timing and skip fields the API adds. */
 export type DetailOnboardingStep = OnboardingStepEndpoint & {

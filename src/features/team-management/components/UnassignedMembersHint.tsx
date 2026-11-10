@@ -1,6 +1,6 @@
 import { UserX } from "lucide-react";
 import { fullName, nameList } from "../roleRules";
-import type { TeamOverviewUser } from "../types";
+import type { TeamOverviewUser } from "../../../services/teamManagementTypes";
 
 type UnassignedMembersHintProps = {
   /** The members nobody has given a role yet. */

@@ -1,7 +1,7 @@
 import { ChevronDown, Layers, Trash2, TriangleAlert } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Button } from "../../../components/ui/Button";
-import type { ProjectRole, Skill, TeamOverviewUser } from "../types";
+import type { ProjectRole, Skill, TeamOverviewUser } from "../../../services/teamManagementTypes";
 
 /** Avatars beside a row before it says "+N": a row has room for a few faces, not a wall. */
 const MAX_SHOWN_MEMBERS = 4;

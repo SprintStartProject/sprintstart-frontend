@@ -3,7 +3,7 @@ import { Archive, CheckCircle2, GitBranch, PenLine, Ticket, UserRound } from "lu
 import { Badge, type BadgeVariant } from "../../../../components/ui/Badge";
 import { SkeletonBlock, SkeletonLine } from "../../../../components/ui/Skeleton";
 import { parseCandidateSource, trackerLabel } from "../../sourceId";
-import type { StarterWorkTask } from "../../types";
+import type { StarterWorkTask } from "../../../../services/starterWorkTypes";
 
 /** Placeholder for one pool row, matching `PoolListRow`'s marker/title/description/badge shape. */
 export function PoolRowSkeleton() {

@@ -7,7 +7,7 @@ import {
   progressPercent,
   waitingOn,
 } from "../../../../src/features/pm-area/memberStatus";
-import type { TeamOverviewUser } from "../../../../src/features/team-management/types";
+import type { TeamOverviewUser } from "../../../../src/services/teamManagementTypes";
 
 function member(overrides: Partial<TeamOverviewUser> = {}): TeamOverviewUser {
   return {

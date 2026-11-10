@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ArtifactList } from "../../../../../src/features/knowledge-base/components/ArtifactList";
-import type { Artifact, ArtifactAiStatus } from "../../../../../src/features/knowledge-base/types";
+import type { Artifact, ArtifactAiStatus } from "../../../../../src/services/knowledgeTypes";
 
 function makeArtifact(overrides: Partial<Artifact> = {}): Artifact {
   return {

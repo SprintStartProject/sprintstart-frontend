@@ -6,8 +6,8 @@ import { useToast } from "../../../context/useToast";
 import { ApiError } from "../../../services/apiClient";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { onboardingService } from "../../../services/onboardingService";
-import { useProjectContext } from "../../projects/useProjectContext";
-import type { OnboardingPathEndpoint } from "../types";
+import { useProjectContext } from "../../projects";
+import type { OnboardingPathEndpoint } from "../../../services/onboardingTypes";
 import { describeGenerationError } from "./generationErrors";
 import {
   asFailureReason,

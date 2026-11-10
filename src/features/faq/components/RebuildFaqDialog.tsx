@@ -3,7 +3,7 @@ import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { Spinner } from "../../../components/ui/Spinner";
 import { insightsService } from "../../../services/faqService";
-import type { FAQRebuildPreview, FAQRebuildScope } from "../types";
+import type { FAQRebuildPreview, FAQRebuildScope } from "../../../services/faqTypes";
 
 /**
  * The windows offered, in the order they are shown.

@@ -5,7 +5,7 @@ import { mockKeycloakInstance, server } from "../../unit/setup/vitest.setup";
 import type {
   OnboardingStepDetail,
   OnboardingTaskEndpoint,
-} from "../../../src/features/onboarding/types";
+} from "../../../src/services/onboardingTypes";
 
 describe("onboardingService", () => {
   beforeEach(() => {

@@ -9,7 +9,7 @@ import {
   pressLabels,
   worstFirst,
 } from "../../../../src/features/dashboard/components/gaps/gapRules";
-import type { KnowledgeGap } from "../../../../src/features/knowledge-gaps/types";
+import type { KnowledgeGap } from "../../../../src/services/knowledgeGapTypes";
 
 function gap(
   component: string,

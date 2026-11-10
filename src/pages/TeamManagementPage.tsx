@@ -37,7 +37,7 @@ import {
   type TeamManagementTab,
   type TeamOverviewFilters,
   type TeamOverviewUser,
-} from "../features/team-management/types";
+} from "../services/teamManagementTypes";
 import { queryKeys } from "../services/queryKeys";
 import { getProjectRoles } from "../services/teamManagementService";
 

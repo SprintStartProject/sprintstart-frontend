@@ -6,7 +6,7 @@ import {
   DraftPromptDialog,
   LifecycleDialog,
 } from "../../../../src/features/blueprints/components/BlueprintPathDialogs.tsx";
-import type { BlueprintPath } from "../../../../src/features/blueprints/types.ts";
+import type { BlueprintPath } from "../../../../src/services/blueprintTypes.ts";
 
 function pathOf(status: BlueprintPath["status"], version = 3): BlueprintPath {
   return { id: "p", status, version } as unknown as BlueprintPath;

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { withGraphNodes } from "../../../../src/features/blueprints/withGraphNodes.ts";
-import type {
-  BlueprintGraphNode,
-  BlueprintPath,
-} from "../../../../src/features/blueprints/types.ts";
+import type { BlueprintGraphNode, BlueprintPath } from "../../../../src/services/blueprintTypes.ts";
 
 function pathOf(...phaseIds: string[]): BlueprintPath {
   return {

@@ -1,7 +1,7 @@
 import { ArrowLeft, Hand, RefreshCw } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { MemberOpenItems } from "../../features/pm-area/components/MemberOpenItems";
-import type { TeamOverviewUser } from "../../features/team-management/types";
+import type { TeamOverviewUser } from "../../services/teamManagementTypes";
 import type { MemberPageModel } from "./useMemberPage";
 
 export function BackToTeam({ onBack }: { onBack: () => void }) {

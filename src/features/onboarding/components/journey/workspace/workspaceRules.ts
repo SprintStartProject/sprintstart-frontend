@@ -4,7 +4,7 @@ import type {
   OnboardingStepDetail,
   OnboardingStepSkip,
   OnboardingTaskEndpoint,
-} from "../../../types";
+} from "../../../../../services/onboardingTypes";
 
 export type Drawer = "skip" | "feedback" | null;
 

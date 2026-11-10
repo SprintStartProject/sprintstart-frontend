@@ -15,9 +15,9 @@ import { formatNumber } from "../data.ts";
 import type { DataSource } from "../types.ts";
 import { useQueryFetch } from "../../../hooks/useQueryFetch.ts";
 import { queryKeys } from "../../../services/queryKeys.ts";
-import { formatRelativeDate } from "../../knowledge-gaps/format.ts";
-import { useProjectContext } from "../../projects/useProjectContext.ts";
-import { PmCard, PmCardHeader, PmCardLink } from "../../pm-area/components/PmCard";
+import { formatRelativeDate } from "../../knowledge-gaps";
+import { useProjectContext } from "../../projects";
+import { PmCard, PmCardHeader, PmCardLink } from "../../pm-area";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 
 /** Sources listed by name before the card hands over to the Data Ingestion page. */

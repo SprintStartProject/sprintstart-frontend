@@ -7,7 +7,7 @@ import {
   entryPointIds,
   type GraphPoint,
   type GraphRuleNode,
-} from "../graph-diagram/graphLayout.ts";
+} from "../graph-diagram";
 
 /** One blueprint's graph, small enough to sit on a card and still say what shape it is. */
 export type PathShape = {

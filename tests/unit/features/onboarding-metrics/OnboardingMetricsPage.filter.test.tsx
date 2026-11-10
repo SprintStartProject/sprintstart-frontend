@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import type { HireTimeline } from "../../../../src/features/onboarding-metrics/types";
+import type { HireTimeline } from "../../../../src/services/onboardingMetricsTypes";
 
 // The page reads the selected project; the hook throws outside a provider, so stub it.
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {

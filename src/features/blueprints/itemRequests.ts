@@ -1,7 +1,7 @@
 import { blueprintService, type BlueprintScope } from "../../services/blueprintService.ts";
 import type { ItemFormValues } from "./itemFormValues.ts";
 import type { CreateTarget, EditTarget } from "./pathEditorTypes.ts";
-import type { BlueprintQuestion, BlueprintStep } from "./types.ts";
+import type { BlueprintQuestion, BlueprintStep } from "../../services/blueprintTypes.ts";
 
 type Editing = NonNullable<EditTarget>;
 type Creating = NonNullable<CreateTarget>;

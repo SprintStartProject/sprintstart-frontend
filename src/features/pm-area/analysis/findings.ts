@@ -1,8 +1,8 @@
-import type { FAQOverview } from "../../faq/types";
-import type { KnowledgeGapOverview } from "../../knowledge-gaps/types";
-import type { KnowledgeRequest } from "../../knowledge-request/types";
-import type { ProjectAttention, ProjectOnboardingMetrics } from "../../onboarding-metrics/types";
-import type { TeamOverviewUser } from "../../team-management/types";
+import type { FAQOverview } from "../../faq";
+import type { KnowledgeGapOverview } from "../../knowledge-gaps";
+import type { KnowledgeRequest } from "../../knowledge-request";
+import type { ProjectAttention, ProjectOnboardingMetrics } from "../../onboarding-metrics";
+import type { TeamOverviewUser } from "../../team-management";
 import type { OnboardingFeedback } from "../../../services/teamManagementService";
 import {
   AT_RISK_AFTER_DAYS,

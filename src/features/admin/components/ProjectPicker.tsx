@@ -5,7 +5,7 @@ import { FolderKanban, Plus, Search } from "lucide-react";
 import { Button, type ButtonVariant } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Spinner } from "../../../components/ui/Spinner";
-import { ProjectMonogram } from "../../projects/components/ProjectMonogram";
+import { ProjectMonogram } from "../../projects";
 import { getManagerName, getProjectUsersCount, pluralize } from "../data";
 import type { ProjectOverview } from "../types";
 

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { StepOriginBadge } from "../../../../../src/features/onboarding/components/StepOriginBadge";
-import type { OnboardingStepEndpoint } from "../../../../../src/features/onboarding/types";
+import type { OnboardingStepEndpoint } from "../../../../../src/services/onboardingTypes";
 
 /**
  * Who put a step on the path, said on the card.

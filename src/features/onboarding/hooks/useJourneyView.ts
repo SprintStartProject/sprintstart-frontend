@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readJourneyView, writeJourneyView } from "../journeyViewMemory";
-import type { OnboardingPhaseEndpoint } from "../types";
+import type { OnboardingPhaseEndpoint } from "../../../services/onboardingTypes";
 import type { LoadingState } from "./usePathLoading";
 
 export type ViewMode = "list" | "graph";

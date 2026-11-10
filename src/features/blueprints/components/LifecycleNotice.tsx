@@ -1,4 +1,4 @@
-import type { BlueprintPath } from "../types.ts";
+import type { BlueprintPath } from "../../../services/blueprintTypes.ts";
 
 /**
  * What this version of the blueprint means for the people it is for.

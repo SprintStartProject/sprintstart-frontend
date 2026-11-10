@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { getProjectRoles, getSkills } from "../../../services/teamManagementService";
-import type { ProjectRole, Skill } from "../../team-management/types";
+import type { ProjectRole, Skill } from "../../team-management";
 import type { LoadingState } from "../types";
 
 type UseSkillPoolResult = {

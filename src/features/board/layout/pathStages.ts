@@ -1,5 +1,5 @@
-import { phaseState, type PhaseState } from "../../onboarding/journey";
-import type { OnboardingPathEndpoint } from "../../onboarding/types";
+import { phaseState, type PhaseState } from "../../onboarding";
+import type { OnboardingPathEndpoint } from "../../onboarding";
 import type { BoardCard } from "../types";
 import type { CardOrigins } from "./cardOrigins";
 import { linkedStepIds, linkedTitles, titleKey } from "./stepLinks";

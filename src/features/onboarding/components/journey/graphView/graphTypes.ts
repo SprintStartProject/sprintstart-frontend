@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { GraphNodePosition } from "../../../../../services/onboardingGraphService";
 import type { PhaseItem } from "../../../journey";
 import type { GraphPoint } from "../../../graph/layout";
-import type { OnboardingPhaseEndpoint } from "../../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../../services/onboardingTypes";
 
 export type GraphEditing = {
   connectItems: (phaseId: string, blockerId: string, nodeId: string) => Promise<void>;

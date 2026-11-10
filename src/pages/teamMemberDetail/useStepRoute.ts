@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { OnboardingPathEndpoint } from "../../features/onboarding/types";
+import type { OnboardingPathEndpoint } from "../../services/onboardingTypes";
 import { MEMBER_PHASE_PARAM, MEMBER_STEP_PARAM } from "../../features/pm-area/pmWorkspacePaths";
 import type { MemberJourneyHandle } from "../../features/team-management/components/detail/MemberJourneySection";
 

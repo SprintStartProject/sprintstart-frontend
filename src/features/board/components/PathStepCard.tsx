@@ -14,10 +14,10 @@ import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { boardService } from "../../../services/boardService";
 import { queryKeys } from "../../../services/queryKeys";
-import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
+import { SelectionCheckbox } from "../../admin";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../buddy";
 import { useCardMarks } from "../marks/useCardMarks";
 import { PATH_STEP_FALLBACK_TITLE, type BoardCard, type PathStepContent } from "../types";
 

@@ -1,7 +1,7 @@
 import { CircleHelp, ListChecks } from "lucide-react";
 import type { BlueprintGraphCanvasNodeProps } from "../components/BlueprintGraphCanvas.tsx";
 import { BlueprintNodeCard } from "../components/BlueprintNodeCard.tsx";
-import type { BlueprintGraphNode } from "../types.ts";
+import type { BlueprintGraphNode } from "../../../services/blueprintTypes.ts";
 
 export function SubGraphNodeCard({
   node,

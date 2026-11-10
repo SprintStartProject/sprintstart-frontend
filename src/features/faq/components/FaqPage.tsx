@@ -9,7 +9,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import type { FAQGroup, FAQRebuildScope } from "../types";
+import type { FAQGroup, FAQRebuildScope } from "../../../services/faqTypes";
 import { insightsService } from "../../../services/faqService";
 import { useToast } from "../../../context/useToast";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
@@ -20,9 +20,9 @@ import type { FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { Spinner } from "../../../components/ui/Spinner";
 import { queryKeys } from "../../../services/queryKeys";
-import { PmSectionHeader, PmStat } from "../../pm-area/components/PmCard";
-import { PmFilterChip, PmListToolbar } from "../../pm-area/components/PmListToolbar";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { PmSectionHeader, PmStat } from "../../pm-area";
+import { PmFilterChip, PmListToolbar } from "../../pm-area";
+import { useProjectContext } from "../../projects";
 import { formatAskedAt } from "../format";
 import { FaqGroupPanel } from "./FaqGroupPanel";
 import { RebuildFaqDialog } from "./RebuildFaqDialog";

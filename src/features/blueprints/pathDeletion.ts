@@ -1,7 +1,7 @@
 import { blueprintService, type BlueprintScope } from "../../services/blueprintService.ts";
 import type { CreateKind } from "./pathEditorTypes.ts";
 import { findItem } from "./pathOrdering.ts";
-import type { BlueprintGraphNode, BlueprintPath } from "./types.ts";
+import type { BlueprintGraphNode, BlueprintPath } from "../../services/blueprintTypes.ts";
 
 /** An item the server renumbered or touched while deleting another one. */
 export type Revision = { id: string; revision: number };

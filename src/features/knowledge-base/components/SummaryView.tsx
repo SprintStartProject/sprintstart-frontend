@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { ArrowLeft, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { preprocessMarkdown } from "../markdown";
-import type { ArtifactSummaryCitation } from "../types";
+import type { ArtifactSummaryCitation } from "../../../services/knowledgeTypes";
 import { CitationsList } from "./CitationsList";
 import { REHYPE_PLUGINS, REMARK_PLUGINS, staticMarkdownComponents } from "./markdownComponents";
 

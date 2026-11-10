@@ -1,6 +1,6 @@
 import { Check, FilePlus2, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button.tsx";
-import type { BlueprintGraphNode } from "../types.ts";
+import type { BlueprintGraphNode } from "../../../services/blueprintTypes.ts";
 
 type NodeDetailFooterProps = {
   node: BlueprintGraphNode;

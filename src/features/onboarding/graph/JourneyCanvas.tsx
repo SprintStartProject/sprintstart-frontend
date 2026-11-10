@@ -1,4 +1,4 @@
-import { EDGE_STYLE_SWATCH } from "../../graph-diagram/edgeStyles.ts";
+import { EDGE_STYLE_SWATCH } from "../../graph-diagram";
 import type { JourneyCanvasProps } from "./canvasTypes";
 import { JourneyCanvasView } from "./JourneyCanvasView";
 import type { LayoutNode } from "./layout";

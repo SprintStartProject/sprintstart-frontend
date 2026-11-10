@@ -1,7 +1,7 @@
 import { useQueryFetch } from "../../hooks/useQueryFetch";
 import { queryKeys } from "../../services/queryKeys";
 import { getTeamOverview } from "../../services/teamManagementService";
-import { useProjectContext } from "../projects/useProjectContext";
+import { useProjectContext } from "../projects";
 
 /**
  * The selected project's team overview, from the one cache entry every PM surface shares.

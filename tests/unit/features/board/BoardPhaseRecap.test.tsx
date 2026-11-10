@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BoardPhaseRecap } from "../../../../src/features/board/components/BoardPhaseRecap";
 import * as bus from "../../../../src/features/buddy/aiBuddyBus";
-import type { OnboardingPathEndpoint } from "../../../../src/features/onboarding/types";
+import type { OnboardingPathEndpoint } from "../../../../src/services/onboardingTypes";
 
 const finished = (title: string) =>
   ({

@@ -1,9 +1,9 @@
 import { useAuth } from "../../../context/useAuth";
-import { TokenRow } from "../../settings/components/TokenRow";
-import { AtlassianCredentialAddForm } from "../../settings/components/atlassian/AtlassianCredentialAddForm";
-import { AtlassianCredentialRow } from "../../settings/components/atlassian/AtlassianCredentialRow";
-import { NotionCredentialAddForm } from "../../settings/components/notion/NotionCredentialAddForm";
-import { NotionCredentialRow } from "../../settings/components/notion/NotionCredentialRow";
+import { TokenRow } from "../../settings";
+import { AtlassianCredentialAddForm } from "../../settings";
+import { AtlassianCredentialRow } from "../../settings";
+import { NotionCredentialAddForm } from "../../settings";
+import { NotionCredentialRow } from "../../settings";
 import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService";
 import type { NotionCredentialDto } from "../../../services/sources/notionService";
 import type { AccessAddFormProps, AccessRowProps } from "../types";

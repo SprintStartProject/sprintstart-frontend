@@ -6,9 +6,9 @@ import {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   parseKnowledgeBaseSearch,
-  toKnowledgeBaseSearchString,
   useKnowledgeBaseUrlState,
 } from "../../../../../src/features/knowledge-base/hooks/useKnowledgeBaseUrlState";
+import { toKnowledgeBaseSearchString } from "../../../../../src/router/knowledgeBaseUrl";
 
 const parse = (search: string) => parseKnowledgeBaseSearch(new URLSearchParams(search));
 

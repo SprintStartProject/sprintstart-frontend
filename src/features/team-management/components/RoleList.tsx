@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useRef, type ReactNode } from "react";
 import { useExpandTransition } from "../roles/useExpandTransition";
-import type { ProjectRole, Skill, TeamOverviewUser } from "../types";
+import type { ProjectRole, Skill, TeamOverviewUser } from "../../../services/teamManagementTypes";
 import { RoleRow } from "./RoleRow";
 
 type RoleListProps = {

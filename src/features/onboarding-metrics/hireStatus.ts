@@ -1,4 +1,4 @@
-import type { HireTimeline } from "./types";
+import type { HireTimeline } from "../../services/onboardingMetricsTypes";
 
 /**
  * True when a hire has put work up and nobody has looked yet: a contribution was

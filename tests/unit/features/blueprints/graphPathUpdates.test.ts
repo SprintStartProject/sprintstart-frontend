@@ -13,7 +13,7 @@ import type {
   BlueprintPath,
   BlueprintQuestion,
   BlueprintStep,
-} from "../../../../src/features/blueprints/types.ts";
+} from "../../../../src/services/blueprintTypes.ts";
 
 function pathFixture(): BlueprintPath {
   return {

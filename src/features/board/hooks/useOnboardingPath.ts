@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../../services/apiClient";
 import { onboardingService } from "../../../services/onboardingService";
-import { onBuddyPathChanged } from "../../buddy/aiBuddyBus";
-import type { OnboardingPathEndpoint } from "../../onboarding/types";
+import { onBuddyPathChanged } from "../../buddy";
+import type { OnboardingPathEndpoint } from "../../onboarding";
 
 /**
  * The hire's onboarding path, for the board to place its cards against.

@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { SkillWizard } from "../../../src/features/team-management/components/SkillWizard";
-import type { Skill, TeamOverviewUser } from "../../../src/features/team-management/types";
+import type { Skill, TeamOverviewUser } from "../../../src/services/teamManagementTypes";
 
 const user: TeamOverviewUser = {
   userId: "u1",

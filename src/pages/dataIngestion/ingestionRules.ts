@@ -1,6 +1,6 @@
 import type { RunStatusFilter } from "../../features/data-ingestion/components/RunHistoryFilters.tsx";
 import { CONNECTORS, getConnector } from "../../features/data-ingestion/connectors/registry.ts";
-import type { SourceSystem } from "../../features/data-ingestion/connectors/sourceSystems.ts";
+import type { SourceSystem } from "../../services/sourceSystems.ts";
 import { githubRepositoryOf } from "../../features/data-ingestion/sourceDetails.ts";
 import type { DataSource, IngestionRunFilter } from "../../features/data-ingestion/types.ts";
 

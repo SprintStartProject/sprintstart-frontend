@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ArrivalStepThread } from "../../../../src/features/arrival/components/ArrivalStepThread";
-import type { ArrivalStep } from "../../../../src/features/arrival/types";
+import type { ArrivalStep } from "../../../../src/services/arrivalTypes";
 
 const step = (key: string, over: Partial<ArrivalStep> = {}): ArrivalStep => ({
   key,
@@ -139,6 +139,22 @@ describe("ArrivalStepThread", () => {
 
     await user.click(screen.getByRole("button", { name: 'Move "Apollo b" later' }));
     expect(props.onMove).toHaveBeenCalledWith("b", "down", "project");
+  });
+
+  it("gives a replaced company step a dot instead of the number its override takes", () => {
+    renderThread({
+      hasProject: true,
+      projectName: "Apollo",
+      companySteps: [step("a"), step("b"), step("c")],
+      projectSteps: [
+        step("b", { projectId: "p1", title: "Apollo b" }),
+        step("z", { projectId: "p1" }),
+      ],
+    });
+
+    const rows = screen.getAllByRole("listitem");
+    const numberOf = (row: HTMLElement) => within(row).queryByText(/^\d+$/)?.textContent ?? null;
+    expect(rows.map(numberOf)).toEqual(["1", null, "2", "3", "4"]);
   });
 
   it("falls back to a generic project name in the overridden tooltip", () => {

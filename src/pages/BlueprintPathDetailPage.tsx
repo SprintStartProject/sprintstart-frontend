@@ -5,7 +5,7 @@ import { useAuth } from "../context/useAuth.ts";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
 import { SegmentedTabs } from "../components/ui/SegmentedTabs.tsx";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation.ts";
-import type { BlueprintOption } from "../features/blueprints/types.ts";
+import type { BlueprintOption } from "../services/blueprintTypes.ts";
 import { BlueprintGraphEditor } from "../features/blueprints/components/BlueprintGraphEditor.tsx";
 import { BlueprintSubGraphEditor } from "../features/blueprints/components/BlueprintSubGraphEditor.tsx";
 

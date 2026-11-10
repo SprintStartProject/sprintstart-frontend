@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useToast } from "../../../context/useToast";
 import { onboardingService } from "../../../services/onboardingService";
 import type { OnboardingJourneyValue } from "../generation/OnboardingJourneyContext";
-import type { OnboardingPathEndpoint } from "../types";
+import type { OnboardingPathEndpoint } from "../../../services/onboardingTypes";
 import type { LoadingState } from "./usePathLoading";
 
 type Params = {

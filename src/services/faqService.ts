@@ -1,10 +1,5 @@
 import { apiClient } from "./apiClient";
-import type {
-  FAQOverview,
-  FAQDetail,
-  FAQRebuildScope,
-  FAQRebuildPreview,
-} from "../features/faq/types";
+import type { FAQOverview, FAQDetail, FAQRebuildScope, FAQRebuildPreview } from "./faqTypes";
 /**
  * FAQ insights are project-scoped: the groups are built from the questions asked in
  * one project's chats, so every call has to say which project it means.

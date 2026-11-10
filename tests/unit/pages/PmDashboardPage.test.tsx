@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { PmDashboardPage } from "../../../src/pages/PmDashboardPage";
-import type { TeamOverviewUser } from "../../../src/features/team-management/types";
+import type { TeamOverviewUser } from "../../../src/services/teamManagementTypes";
 
 const mocks = vi.hoisted(() => ({
   roster: [] as unknown[],

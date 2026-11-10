@@ -11,7 +11,7 @@ import type {
   SourceStatusPresentation,
 } from "./types.ts";
 import { CONNECTORS, getConnector } from "./connectors/registry.ts";
-import { SOURCE_SYSTEMS, type SourceSystem } from "./connectors/sourceSystems.ts";
+import { SOURCE_SYSTEMS, type SourceSystem } from "../../services/sourceSystems.ts";
 import type { ConnectorDefinition } from "./connectors/types.ts";
 
 /**

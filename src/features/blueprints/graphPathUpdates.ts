@@ -5,7 +5,7 @@ import type {
   BlueprintPath,
   BlueprintQuestion,
   BlueprintStep,
-} from "./types.ts";
+} from "../../services/blueprintTypes.ts";
 
 /** What the server reports about a node after it was moved or had an edge changed. */
 export type NodeChange = {

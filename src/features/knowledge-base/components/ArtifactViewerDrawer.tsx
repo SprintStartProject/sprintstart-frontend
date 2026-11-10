@@ -1,11 +1,11 @@
 import { useEffect, useRef, useMemo } from "react";
 import { ArrowLeft } from "lucide-react";
-import type { Artifact, ArtifactContent } from "../types";
+import type { Artifact, ArtifactContent } from "../../../services/knowledgeTypes";
 import { useArtifactDeletion } from "../hooks/useArtifactDeletion";
 import { useArtifactDrawerData } from "../hooks/useArtifactDrawerData";
 import { useScrollToCitedChunk } from "../hooks/useScrollToCitedChunk";
 import { contentKind, shouldRenderAsMarkdown } from "../artifactPresentation";
-import { findConnector } from "../../data-ingestion/connectors/registry";
+import { findConnector } from "../../data-ingestion";
 import { createMarkdownComponents } from "./markdownComponents";
 import { questionForArtifact, quoteForChat } from "../../../hooks/askAiQuote";
 import { useArtifactSelection } from "../hooks/useArtifactSelection";
@@ -20,9 +20,9 @@ import { CitedChunkBanner } from "./CitedChunkBanner";
 import { DeleteArtifactDialog } from "./DeleteArtifactDialog";
 import { DrawerActions } from "./DrawerActions";
 import { SummaryView } from "./SummaryView";
-import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame.ts";
-import { DinoGameLazy } from "../../easter-eggs/components/DinoGameLazy.tsx";
-import { DinoPlayHint } from "../../easter-eggs/components/DinoPlayHint.tsx";
+import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs";
+import { DinoGameLazy } from "../../easter-eggs";
+import { DinoPlayHint } from "../../easter-eggs";
 
 /**
  * Props for the ArtifactViewerDrawer component.

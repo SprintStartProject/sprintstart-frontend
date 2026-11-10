@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { knowledgeService } from "../../../services/knowledgeService";
-import { toSourceSystem } from "../../data-ingestion/connectors/sourceSystems";
-import { CHAT_SOURCE_SYSTEMS } from "../../data-ingestion/connectors/registry";
-import type { SourceSystem } from "../../data-ingestion/connectors/sourceSystems";
+import { toSourceSystem } from "../../../services/sourceSystems";
+import { CHAT_SOURCE_SYSTEMS } from "../../data-ingestion";
+import type { SourceSystem } from "../../../services/sourceSystems";
 
 /**
  * Uploads are not a connector: there is nothing to configure or enable, and the backend

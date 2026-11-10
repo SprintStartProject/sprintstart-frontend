@@ -5,7 +5,7 @@ import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
 import { Textarea } from "../../../components/ui/Textarea";
-import type { CreateStarterWorkTaskInput } from "../types";
+import type { CreateStarterWorkTaskInput } from "../../../services/starterWorkTypes";
 import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type NewStarterTaskModalProps = {

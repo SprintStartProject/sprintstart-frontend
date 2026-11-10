@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { NavLink } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { SidebarIcon } from "./SidebarNavIcons";
-import { prefetchRoute } from "../../services/routePrefetch";
+import { prefetchRoute } from "../../router/routePrefetch";
 import { ShortcutHint } from "../ui/ShortcutHint";
 import { useProjectContext } from "../../features/projects/useProjectContext";
 import { NavLinkBackdrop } from "./navLink/NavLinkBackdrop";

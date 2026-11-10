@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { ArrivalScope, ArrivalStep } from "../../types";
-import { moveTo } from "./boardKit";
+import type { ArrivalScope, ArrivalStep } from "../../../../services/arrivalTypes";
+import { moveTo } from "../../../../utils/moveTo";
 import { MOVE_COOLDOWN_MS, reorderByKeys, rowId, sameKeys, targetKeyUnder } from "./threadRules";
 
 type Setter<T> = Dispatch<SetStateAction<T>>;

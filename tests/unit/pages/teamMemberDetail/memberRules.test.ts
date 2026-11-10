@@ -15,8 +15,8 @@ import {
   unassignedRolesOf,
   type DetailOnboardingStep,
 } from "../../../../src/pages/teamMemberDetail/memberRules";
-import type { KnowledgeGap } from "../../../../src/features/knowledge-gaps/types";
-import type { TeamOverviewUser } from "../../../../src/features/team-management/types";
+import type { KnowledgeGap } from "../../../../src/services/knowledgeGapTypes";
+import type { TeamOverviewUser } from "../../../../src/services/teamManagementTypes";
 
 const step = (over: Partial<DetailOnboardingStep> = {}) =>
   ({ id: "s1", title: "Install", position: 1, ...over }) as DetailOnboardingStep;

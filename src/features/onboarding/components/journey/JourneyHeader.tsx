@@ -4,7 +4,7 @@ import { Badge } from "../../../../components/ui/Badge";
 import { SegmentedTabs } from "../../../../components/ui/SegmentedTabs";
 import { issueStatusLabel } from "../../generationIssues";
 import { ProgressRing } from "../../graph/JourneyNodeCards";
-import type { OnboardingGenerationIssueEndpoint } from "../../types";
+import type { OnboardingGenerationIssueEndpoint } from "../../../../services/onboardingTypes";
 import type { ViewMode } from "../../hooks/useJourneyView";
 
 /** How many phases could not be generated, beside the title. */

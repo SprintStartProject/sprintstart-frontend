@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getSkills } from "../../../services/teamManagementService";
 import { mergeRoleSkills, withoutRole } from "../roleRules";
-import type { Skill } from "../types";
+import type { Skill } from "../../../services/teamManagementTypes";
 
 export type SkillCatalog = {
   skills: Skill[];

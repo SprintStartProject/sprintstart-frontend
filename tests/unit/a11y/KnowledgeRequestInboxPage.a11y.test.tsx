@@ -7,7 +7,7 @@ import { knowledgeRequestService } from "../../../src/services/knowledgeRequestS
 import type {
   CanonicalAnswer,
   KnowledgeRequest,
-} from "../../../src/features/knowledge-request/types";
+} from "../../../src/services/knowledgeRequestTypes";
 
 vi.mock("../../../src/services/knowledgeRequestService", () => ({
   knowledgeRequestService: {

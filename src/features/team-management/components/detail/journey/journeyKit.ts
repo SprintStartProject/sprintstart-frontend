@@ -6,25 +6,14 @@
  * of the section takes them from here, so the coupling is one list instead of one import per file.
  * When onboarding gets a public entry point, this file is the only one that changes.
  */
-export { computeRanks } from "../../../../onboarding/graph/layout.ts";
-export {
-  memberJourneyViewKey,
-  readJourneyView,
-  writeJourneyView,
-} from "../../../../onboarding/journeyViewMemory.ts";
-export { ItemAside } from "../../../../onboarding/components/journey/ItemAside.tsx";
-export {
-  JourneyGraph,
-  type GraphEditing,
-} from "../../../../onboarding/components/journey/JourneyGraph.tsx";
-export { PhaseNavigator } from "../../../../onboarding/components/journey/PhaseNavigator.tsx";
-export { StepOriginBadge } from "../../../../onboarding/components/StepOriginBadge.tsx";
-export {
-  ItemFlags,
-  ItemGlyph,
-  ItemKindIcon,
-} from "../../../../onboarding/graph/JourneyNodeCards.tsx";
-export { itemKindLabel, itemStateLabel } from "../../../../onboarding/graph/nodeLabels.ts";
+export { computeRanks } from "../../../../onboarding";
+export { memberJourneyViewKey, readJourneyView, writeJourneyView } from "../../../../onboarding";
+export { ItemAside } from "../../../../onboarding";
+export { JourneyGraph, type GraphEditing } from "../../../../onboarding";
+export { PhaseNavigator } from "../../../../onboarding";
+export { StepOriginBadge } from "../../../../onboarding";
+export { ItemFlags, ItemGlyph, ItemKindIcon } from "../../../../onboarding";
+export { itemKindLabel, itemStateLabel } from "../../../../onboarding";
 export {
   blockingPhases,
   formatMinutes,
@@ -38,9 +27,6 @@ export {
   unlockedBy,
   waitingOn,
   type PhaseItem,
-} from "../../../../onboarding/journey.ts";
-export { resolveNextAction } from "../../../../onboarding/nextAction.ts";
-export type {
-  OnboardingPathEndpoint,
-  OnboardingPhaseEndpoint,
-} from "../../../../onboarding/types.ts";
+} from "../../../../onboarding";
+export { resolveNextAction } from "../../../../onboarding";
+export type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "../../../../onboarding";

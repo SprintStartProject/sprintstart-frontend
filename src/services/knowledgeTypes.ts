@@ -1,4 +1,4 @@
-import type { SourceSystem } from "../data-ingestion/connectors/sourceSystems.ts";
+import type { SourceSystem } from "./sourceSystems.ts";
 
 export type { SourceSystem };
 

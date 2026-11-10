@@ -1,4 +1,4 @@
-import type { BlueprintQuestion, BlueprintStep } from "../types.ts";
+import type { BlueprintQuestion, BlueprintStep } from "../../../services/blueprintTypes.ts";
 
 export type BlueprintQuestionMetadata = {
   title: string;

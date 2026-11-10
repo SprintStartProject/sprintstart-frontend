@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useToast } from "../../../context/useToast.ts";
-import type { BlueprintQuestion, BlueprintStep } from "../types.ts";
+import type { BlueprintQuestion, BlueprintStep } from "../../../services/blueprintTypes.ts";
 import type { BlueprintQuestionMetadata, BlueprintStepMetadata } from "./metadata.ts";
 
 type Args = {

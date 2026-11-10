@@ -193,6 +193,11 @@
       "count": 1
     }
   },
+  "src/components/upload/FileUploadZone.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
   "src/context/AuthProvider.tsx": {
     "complexity": {
       "count": 1
@@ -1238,11 +1243,6 @@
       "count": 1
     }
   },
-  "src/features/knowledge-base/bitbucketWorkspaceMetadata.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/features/knowledge-base/components/ArtifactBulkActions.tsx": {
     "max-lines-per-function": {
       "count": 1
@@ -1280,11 +1280,6 @@
       "count": 1
     }
   },
-  "src/features/knowledge-base/components/FileUploadZone.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/features/knowledge-base/components/UploadArtifactPanel.tsx": {
     "max-lines-per-function": {
       "count": 1
@@ -1314,11 +1309,6 @@
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "src/features/knowledge-base/orgMetadata.ts": {
-    "complexity": {
       "count": 1
     }
   },
@@ -2131,6 +2121,14 @@
       "count": 1
     }
   },
+  "src/router/routePrefetch.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
   "src/services/aiStreamService.ts": {
     "complexity": {
       "count": 1
@@ -2145,6 +2143,11 @@
   "src/services/apiClient.ts": {
     "max-depth": {
       "count": 2
+    }
+  },
+  "src/services/bitbucketWorkspaceMetadata.ts": {
+    "complexity": {
+      "count": 1
     }
   },
   "src/services/blueprintService.ts": {
@@ -2183,16 +2186,13 @@
       "count": 1
     }
   },
-  "src/services/projectService.ts": {
-    "max-lines": {
+  "src/services/orgMetadata.ts": {
+    "complexity": {
       "count": 1
     }
   },
-  "src/services/routePrefetch.ts": {
-    "complexity": {
-      "count": 2
-    },
-    "max-lines-per-function": {
+  "src/services/projectService.ts": {
+    "max-lines": {
       "count": 1
     }
   },

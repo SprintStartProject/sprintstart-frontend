@@ -4,7 +4,7 @@ import { VersionHistoryModal } from "../../../../src/features/blueprints/compone
 import { blueprintAddress } from "../../../../src/features/blueprints/pathPageContext.ts";
 import type { LifecycleActions } from "../../../../src/features/blueprints/useLifecycleActions.ts";
 import type { VersionHistory } from "../../../../src/features/blueprints/useVersionHistory.ts";
-import type { BlueprintPath } from "../../../../src/features/blueprints/types.ts";
+import type { BlueprintPath } from "../../../../src/services/blueprintTypes.ts";
 
 function version(id: string, number: number, status: BlueprintPath["status"], description = "") {
   return { id, version: number, status, description } as BlueprintPath;

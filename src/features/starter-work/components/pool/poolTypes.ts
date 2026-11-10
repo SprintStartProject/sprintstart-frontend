@@ -1,4 +1,4 @@
-import type { StarterWorkTask } from "../../types";
+import type { StarterWorkTask } from "../../../../services/starterWorkTypes";
 
 export type PoolView = "cloud" | "list";
 

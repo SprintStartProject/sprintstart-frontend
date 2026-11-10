@@ -4,7 +4,7 @@ import { Button } from "../../../components/ui/Button";
 import { Checkbox } from "../../../components/ui/Checkbox";
 import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
-import type { Skill } from "../types";
+import type { Skill } from "../../../services/teamManagementTypes";
 import { NewRoleSkillsInput, type PendingSkill } from "./NewRoleSkillsInput";
 
 type CreateRoleFormProps = {

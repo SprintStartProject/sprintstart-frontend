@@ -19,7 +19,7 @@ import { useRoleCreation } from "../roles/useRoleCreation";
 import { useRoleSkillEdits } from "../roles/useRoleSkillEdits";
 import { useSkillCatalog } from "../roles/useSkillCatalog";
 import { useSuggestionFlow } from "../roles/useSuggestionFlow";
-import type { ProjectRole, TeamOverviewUser } from "../types";
+import type { ProjectRole, TeamOverviewUser } from "../../../services/teamManagementTypes";
 import { CreateRoleForm } from "./CreateRoleForm";
 import { DeleteRoleDialog } from "./DeleteRoleDialog";
 import { MemberAssignmentList } from "./MemberAssignmentList";

@@ -1,7 +1,7 @@
 import { ExternalLink, Link2 } from "lucide-react";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { CardOriginLink } from "./CardOriginLink";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../buddy";
 import { questionAboutLink } from "../generation/cardQuestion";
 import type { CardOrigin } from "../layout/cardOrigins";
 import type { BoardCard, BoardUndoNotice, LinkContent } from "../types";

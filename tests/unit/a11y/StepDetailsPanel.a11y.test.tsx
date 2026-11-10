@@ -6,7 +6,7 @@ import { StepDetailsPanel } from "../../../src/features/team-management/componen
 import type {
   OnboardingStepEndpoint,
   OnboardingTaskEndpoint,
-} from "../../../src/features/onboarding/types";
+} from "../../../src/services/onboardingTypes";
 
 const step: OnboardingStepEndpoint = {
   id: "s1",

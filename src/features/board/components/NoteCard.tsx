@@ -5,7 +5,7 @@ import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { CardOriginLink } from "./CardOriginLink";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../buddy";
 import { questionAboutNote } from "../generation/cardQuestion";
 import { Marked } from "./Marked";
 import { NoteMarkdown } from "./NoteMarkdown";

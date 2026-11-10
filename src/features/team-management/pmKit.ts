@@ -5,5 +5,5 @@
  * is one list instead of one import per file. When they get a public entry point, this file is the
  * only one that changes.
  */
-export { PmFilterChip, PmListToolbar } from "../pm-area/components/PmListToolbar.tsx";
-export { useProjectContext } from "../projects/useProjectContext.ts";
+export { PmFilterChip, PmListToolbar } from "../pm-area";
+export { useProjectContext } from "../projects";

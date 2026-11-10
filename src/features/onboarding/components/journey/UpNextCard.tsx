@@ -2,7 +2,7 @@ import { ChevronRight, CircleHelp, PlayCircle } from "lucide-react";
 import { Button } from "../../../../components/ui/Button";
 import { primaryActionLabel } from "../../graph/nodeLabels";
 import { itemState, type ItemState, type PhaseItem } from "../../journey";
-import type { OnboardingPhaseEndpoint } from "../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../services/onboardingTypes";
 
 function eyebrow(state: ItemState, isQuestion: boolean): string {
   if (state === "active") return "In progress";
