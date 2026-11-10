@@ -12,7 +12,10 @@
 #
 # A changed file is mutated only when the branch adds code to it. A file whose diff only removes lines
 # or touches comments adds no behaviour a test could miss, so a comment sweep or a deletion is not
-# judged on tests it never touched.
+# judged on tests it never touched. Likewise a file whose added code is mostly moved: when MOVED_SKIP_PERCENT
+# percent or more of its added lines (ignoring lines shorter than four characters) also appear among the
+# lines the branch removes elsewhere, the branch split code out of another file and the tests that
+# covered it before still cover it.
 
 set -uo pipefail
 
@@ -55,12 +58,27 @@ else
 fi
 
 if [ "$all" = 0 ]; then
+    MOVED_SKIP_PERCENT=${MOVED_SKIP_PERCENT:-40}
+    removed=$(mktemp)
+    trap 'rm -f "$removed"' EXIT
+    git diff -U0 "$BASE" -- "${MUTATION_FILES[@]}" 2>/dev/null | grep -E '^-' | grep -vE '^--- ' | cut -c2-         | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | awk 'length($0) >= 4' | sort -u > "$removed"
     gated=()
     for file in "${files[@]}"; do
-        if [ -n "$(added_code_lines "$BASE" "$file")" ]; then
-            gated+=("$file")
-        else
+        code=$(added_code_lines "$BASE" "$file")
+        if [ -z "$code" ]; then
             echo "mutation: skipped $file (no added code)"
+            continue
+        fi
+        added=$(printf '%s
+' "$code" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | awk 'length($0) >= 4')
+        total=$(printf '%s
+' "$added" | grep -c . || true)
+        moved=$(printf '%s
+' "$added" | grep -cxFf "$removed" || true)
+        if [ "${total:-0}" -gt 0 ] && [ $((100 * moved)) -ge $((MOVED_SKIP_PERCENT * total)) ]; then
+            echo "mutation: skipped $file (moved code: $moved of $total added lines)"
+        else
+            gated+=("$file")
         fi
     done
     files=("${gated[@]}")

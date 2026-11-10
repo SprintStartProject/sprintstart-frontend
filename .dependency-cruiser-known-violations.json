@@ -405,9 +405,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/CreateProjectWizard.tsx",
+    "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/AddSourceFlow.tsx",
-    "unresolvedTo": "../../data-ingestion/add-source/AddSourceFlow",
+    "unresolvedTo": "../../../data-ingestion/add-source/AddSourceFlow",
     "dependencyTypes": [
       "local",
       "import"
@@ -419,9 +419,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/CreateProjectWizard.tsx",
+    "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/CredentialSlot.tsx",
-    "unresolvedTo": "../../data-ingestion/add-source/CredentialSlot",
+    "unresolvedTo": "../../../data-ingestion/add-source/CredentialSlot",
     "dependencyTypes": [
       "local",
       "import"
@@ -433,9 +433,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/CreateProjectWizard.tsx",
+    "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/projectSourcesDraft.ts",
-    "unresolvedTo": "../../data-ingestion/add-source/projectSourcesDraft",
+    "unresolvedTo": "../../../data-ingestion/add-source/projectSourcesDraft",
     "dependencyTypes": [
       "local",
       "import"
@@ -447,9 +447,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/CreateProjectWizard.tsx",
+    "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/sourceOwners.ts",
-    "unresolvedTo": "../../data-ingestion/add-source/sourceOwners",
+    "unresolvedTo": "../../../data-ingestion/add-source/sourceOwners",
     "dependencyTypes": [
       "local",
       "import"
@@ -461,9 +461,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/CreateProjectWizard.tsx",
+    "from": "src/features/admin/components/wizard/addSourceKit.ts",
     "to": "src/features/data-ingestion/add-source/useSourceDraftForm.ts",
-    "unresolvedTo": "../../data-ingestion/add-source/useSourceDraftForm",
+    "unresolvedTo": "../../../data-ingestion/add-source/useSourceDraftForm",
     "dependencyTypes": [
       "local",
       "import"
@@ -475,9 +475,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/ProjectDetailsDrawer.tsx",
+    "from": "src/features/admin/components/projectDrawer/projectsKit.ts",
     "to": "src/features/projects/components/ProjectMonogram.tsx",
-    "unresolvedTo": "../../projects/components/ProjectMonogram",
+    "unresolvedTo": "../../../projects/components/ProjectMonogram",
     "dependencyTypes": [
       "local",
       "import"
@@ -489,9 +489,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/admin/components/ProjectDetailsDrawer.tsx",
+    "from": "src/features/admin/components/projectDrawer/projectsKit.ts",
     "to": "src/features/projects/industry/ProjectIndustryPanel.tsx",
-    "unresolvedTo": "../../projects/industry/ProjectIndustryPanel",
+    "unresolvedTo": "../../../projects/industry/ProjectIndustryPanel",
     "dependencyTypes": [
       "local",
       "import"
@@ -876,9 +876,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/arrival/components/ArrivalStepThread.tsx",
+    "from": "src/features/arrival/components/thread/boardKit.ts",
     "to": "src/features/board/layout/boardOrder.ts",
-    "unresolvedTo": "../../board/layout/boardOrder",
+    "unresolvedTo": "../../../board/layout/boardOrder",
     "dependencyTypes": [
       "local",
       "import"
@@ -890,7 +890,7 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
+    "from": "src/features/blueprints/graphKit.ts",
     "to": "src/features/graph-diagram/EdgeLegend.tsx",
     "unresolvedTo": "../../graph-diagram/EdgeLegend.tsx",
     "dependencyTypes": [
@@ -904,7 +904,7 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
+    "from": "src/features/blueprints/graphKit.ts",
     "to": "src/features/graph-diagram/graphLayout.ts",
     "unresolvedTo": "../../graph-diagram/graphLayout.ts",
     "dependencyTypes": [
@@ -918,7 +918,7 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
+    "from": "src/features/blueprints/graphKit.ts",
     "to": "src/features/graph-diagram/lockWords.ts",
     "unresolvedTo": "../../graph-diagram/lockWords.ts",
     "dependencyTypes": [
@@ -932,7 +932,7 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
+    "from": "src/features/blueprints/graphKit.ts",
     "to": "src/features/onboarding/graph/JourneyCanvas.tsx",
     "unresolvedTo": "../../onboarding/graph/JourneyCanvas.tsx",
     "dependencyTypes": [
@@ -946,7 +946,7 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/blueprints/components/BlueprintGraphCanvas.tsx",
+    "from": "src/features/blueprints/graphKit.ts",
     "to": "src/features/onboarding/graph/layout.ts",
     "unresolvedTo": "../../onboarding/graph/layout.ts",
     "dependencyTypes": [
@@ -2339,9 +2339,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
+    "from": "src/features/dashboard/components/gaps/gapsKit.ts",
     "to": "src/features/knowledge-gaps/components/SeverityIndicators.tsx",
-    "unresolvedTo": "../../knowledge-gaps/components/SeverityIndicators",
+    "unresolvedTo": "../../../knowledge-gaps/components/SeverityIndicators",
     "dependencyTypes": [
       "local",
       "import"
@@ -2353,9 +2353,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
+    "from": "src/features/dashboard/components/gaps/gapsKit.ts",
     "to": "src/features/knowledge-gaps/format.ts",
-    "unresolvedTo": "../../knowledge-gaps/format",
+    "unresolvedTo": "../../../knowledge-gaps/format",
     "dependencyTypes": [
       "local",
       "import"
@@ -2367,9 +2367,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
+    "from": "src/features/dashboard/components/gaps/gapsKit.ts",
     "to": "src/features/knowledge-gaps/severity.ts",
-    "unresolvedTo": "../../knowledge-gaps/severity",
+    "unresolvedTo": "../../../knowledge-gaps/severity",
     "dependencyTypes": [
       "local",
       "import"
@@ -2381,9 +2381,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx",
+    "from": "src/features/dashboard/components/gaps/gapsKit.ts",
     "to": "src/features/knowledge-gaps/types.ts",
-    "unresolvedTo": "../../knowledge-gaps/types",
+    "unresolvedTo": "../../../knowledge-gaps/types",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -3530,9 +3530,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/components/journey/JourneyGraph.tsx",
+    "from": "src/features/onboarding/components/journey/graphView/graphKit.ts",
     "to": "src/features/graph-diagram/EdgeLegend.tsx",
-    "unresolvedTo": "../../../graph-diagram/EdgeLegend",
+    "unresolvedTo": "../../../../graph-diagram/EdgeLegend",
     "dependencyTypes": [
       "local",
       "import"
@@ -3544,9 +3544,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/components/journey/JourneyGraph.tsx",
+    "from": "src/features/onboarding/components/journey/graphView/graphKit.ts",
     "to": "src/features/graph-diagram/graphLayout.ts",
-    "unresolvedTo": "../../../graph-diagram/graphLayout",
+    "unresolvedTo": "../../../../graph-diagram/graphLayout",
     "dependencyTypes": [
       "local",
       "import"
@@ -3572,9 +3572,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/components/journey/StepWorkspace.tsx",
+    "from": "src/features/onboarding/components/journey/workspace/buddyKit.ts",
     "to": "src/features/buddy/aiBuddyBus.ts",
-    "unresolvedTo": "../../../buddy/aiBuddyBus",
+    "unresolvedTo": "../../../../buddy/aiBuddyBus",
     "dependencyTypes": [
       "local",
       "import"
@@ -3586,9 +3586,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/onboarding/components/journey/StepWorkspace.tsx",
+    "from": "src/features/onboarding/components/journey/workspace/buddyKit.ts",
     "to": "src/features/buddy/components/AskTheBuddy.tsx",
-    "unresolvedTo": "../../../buddy/components/AskTheBuddy",
+    "unresolvedTo": "../../../../buddy/components/AskTheBuddy",
     "dependencyTypes": [
       "local",
       "import"
@@ -4672,9 +4672,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/MemberJourneySection.tsx",
+    "from": "src/features/team-management/components/detail/journey/journeyKit.ts",
     "to": "src/features/onboarding/components/journey/ItemAside.tsx",
-    "unresolvedTo": "../../../onboarding/components/journey/ItemAside",
+    "unresolvedTo": "../../../../onboarding/components/journey/ItemAside.tsx",
     "dependencyTypes": [
       "local",
       "import"
@@ -4686,9 +4686,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/MemberJourneySection.tsx",
+    "from": "src/features/team-management/components/detail/journey/journeyKit.ts",
     "to": "src/features/onboarding/components/journey/JourneyGraph.tsx",
-    "unresolvedTo": "../../../onboarding/components/journey/JourneyGraph",
+    "unresolvedTo": "../../../../onboarding/components/journey/JourneyGraph.tsx",
     "dependencyTypes": [
       "local",
       "import"
@@ -4700,9 +4700,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/MemberJourneySection.tsx",
+    "from": "src/features/team-management/components/detail/journey/journeyKit.ts",
     "to": "src/features/onboarding/components/journey/PhaseNavigator.tsx",
-    "unresolvedTo": "../../../onboarding/components/journey/PhaseNavigator",
+    "unresolvedTo": "../../../../onboarding/components/journey/PhaseNavigator.tsx",
     "dependencyTypes": [
       "local",
       "import"
@@ -4714,9 +4714,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/MemberJourneySection.tsx",
+    "from": "src/features/team-management/components/detail/journey/journeyKit.ts",
     "to": "src/features/onboarding/components/StepOriginBadge.tsx",
-    "unresolvedTo": "../../../onboarding/components/StepOriginBadge",
+    "unresolvedTo": "../../../../onboarding/components/StepOriginBadge.tsx",
     "dependencyTypes": [
       "local",
       "import"
@@ -4728,9 +4728,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/MemberJourneySection.tsx",
+    "from": "src/features/team-management/components/detail/journey/journeyKit.ts",
     "to": "src/features/onboarding/graph/JourneyNodeCards.tsx",
-    "unresolvedTo": "../../../onboarding/graph/JourneyNodeCards",
+    "unresolvedTo": "../../../../onboarding/graph/JourneyNodeCards.tsx",
     "dependencyTypes": [
       "local",
       "import"
@@ -4742,9 +4742,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/MemberJourneySection.tsx",
+    "from": "src/features/team-management/components/detail/journey/journeyKit.ts",
     "to": "src/features/onboarding/graph/layout.ts",
-    "unresolvedTo": "../../../onboarding/graph/layout",
+    "unresolvedTo": "../../../../onboarding/graph/layout.ts",
     "dependencyTypes": [
       "local",
       "import"
@@ -4756,9 +4756,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/MemberJourneySection.tsx",
+    "from": "src/features/team-management/components/detail/journey/journeyKit.ts",
     "to": "src/features/onboarding/graph/nodeLabels.ts",
-    "unresolvedTo": "../../../onboarding/graph/nodeLabels",
+    "unresolvedTo": "../../../../onboarding/graph/nodeLabels.ts",
     "dependencyTypes": [
       "local",
       "import"
@@ -4770,9 +4770,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/MemberJourneySection.tsx",
+    "from": "src/features/team-management/components/detail/journey/journeyKit.ts",
     "to": "src/features/onboarding/journey.ts",
-    "unresolvedTo": "../../../onboarding/journey",
+    "unresolvedTo": "../../../../onboarding/journey.ts",
     "dependencyTypes": [
       "local",
       "import"
@@ -4784,9 +4784,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/MemberJourneySection.tsx",
+    "from": "src/features/team-management/components/detail/journey/journeyKit.ts",
     "to": "src/features/onboarding/journeyViewMemory.ts",
-    "unresolvedTo": "../../../onboarding/journeyViewMemory",
+    "unresolvedTo": "../../../../onboarding/journeyViewMemory.ts",
     "dependencyTypes": [
       "local",
       "import"
@@ -4798,9 +4798,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/MemberJourneySection.tsx",
+    "from": "src/features/team-management/components/detail/journey/journeyKit.ts",
     "to": "src/features/onboarding/nextAction.ts",
-    "unresolvedTo": "../../../onboarding/nextAction",
+    "unresolvedTo": "../../../../onboarding/nextAction.ts",
     "dependencyTypes": [
       "local",
       "import"
@@ -4812,9 +4812,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/MemberJourneySection.tsx",
+    "from": "src/features/team-management/components/detail/journey/journeyKit.ts",
     "to": "src/features/onboarding/types.ts",
-    "unresolvedTo": "../../../onboarding/types",
+    "unresolvedTo": "../../../../onboarding/types.ts",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -4856,9 +4856,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/StepDetailsPanel.tsx",
+    "from": "src/features/team-management/components/detail/stepPanel/stepPanelKit.ts",
     "to": "src/features/onboarding/journey.ts",
-    "unresolvedTo": "../../../onboarding/journey",
+    "unresolvedTo": "../../../../onboarding/journey",
     "dependencyTypes": [
       "local",
       "import"
@@ -4870,9 +4870,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/detail/StepDetailsPanel.tsx",
+    "from": "src/features/team-management/components/detail/stepPanel/stepPanelKit.ts",
     "to": "src/features/onboarding/types.ts",
-    "unresolvedTo": "../../../onboarding/types",
+    "unresolvedTo": "../../../../onboarding/types",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -4914,9 +4914,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/RoleManagementTab.tsx",
+    "from": "src/features/team-management/pmKit.ts",
     "to": "src/features/pm-area/components/PmListToolbar.tsx",
-    "unresolvedTo": "../../pm-area/components/PmListToolbar",
+    "unresolvedTo": "../pm-area/components/PmListToolbar.tsx",
     "dependencyTypes": [
       "local",
       "import"
@@ -4928,9 +4928,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/features/team-management/components/RoleManagementTab.tsx",
+    "from": "src/features/team-management/pmKit.ts",
     "to": "src/features/projects/useProjectContext.ts",
-    "unresolvedTo": "../../projects/useProjectContext",
+    "unresolvedTo": "../projects/useProjectContext.ts",
     "dependencyTypes": [
       "local",
       "import"
@@ -5002,9 +5002,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/buddyService.ts",
+    "from": "src/services/buddy/featureTypes.ts",
     "to": "src/features/buddy/types.ts",
-    "unresolvedTo": "../features/buddy/types",
+    "unresolvedTo": "../../features/buddy/types",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -5423,9 +5423,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/teamManagementService.ts",
+    "from": "src/services/team/featureTypes.ts",
     "to": "src/features/onboarding/types.ts",
-    "unresolvedTo": "../features/onboarding/types",
+    "unresolvedTo": "../../features/onboarding/types.ts",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -5438,9 +5438,9 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/teamManagementService.ts",
+    "from": "src/services/team/featureTypes.ts",
     "to": "src/features/team-management/types.ts",
-    "unresolvedTo": "../features/team-management/types",
+    "unresolvedTo": "../../features/team-management/types.ts",
     "dependencyTypes": [
       "local",
       "type-only",

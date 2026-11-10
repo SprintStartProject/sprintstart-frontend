@@ -1,103 +1,55 @@
 import { MainContent } from "../components/layout/MainContent";
-import {
-  AlertCircle,
-  AlertTriangle,
-  ArrowRight,
-  BookOpen,
-  CheckCircle2,
-  ChevronRight,
-  CircleHelp,
-  FolderKanban,
-  GitBranch,
-  ListChecks,
-  Loader2,
-  Lock,
-  PlayCircle,
-  RefreshCw,
-  Rocket,
-  Sparkles,
-} from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { PageHeader } from "../components/layout/PageHeader";
-import { PageShell } from "../components/layout/PageShell";
-import { Badge } from "../components/ui/Badge";
-import { Button } from "../components/ui/Button";
-import { SegmentedTabs } from "../components/ui/SegmentedTabs";
-import { SLIDING_PANEL_EXIT_MS, SlidingTabPanel } from "../components/ui/SlidingTabPanel";
+import { useMemo, useState } from "react";
+import { useLocation, useParams } from "react-router-dom";
+import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useAuth } from "../context/useAuth";
-import { useToast } from "../context/useToast";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
+import {
+  LoadErrorScreen,
+  LoadingScreen,
+} from "../features/onboarding/components/journey/StatusScreens";
+import { EmptyJourney } from "../features/onboarding/components/journey/EmptyJourney";
+import { ItemBody } from "../features/onboarding/components/journey/ItemBody";
+import {
+  JourneyHeader,
+  ViewToolbar,
+} from "../features/onboarding/components/journey/JourneyHeader";
+import { ListPanel } from "../features/onboarding/components/journey/ListPanel";
+import { NoPhasesState } from "../features/onboarding/components/journey/NoPhasesState";
 import { GenerationScreen } from "../features/onboarding/components/journey/GenerationScreen";
 import { JourneyGraph } from "../features/onboarding/components/journey/JourneyGraph";
-import { PhaseChooser } from "../features/onboarding/components/journey/PhaseChooser";
-import { PhaseItemList } from "../features/onboarding/components/journey/PhaseItemList";
-import { PhaseNavigator } from "../features/onboarding/components/journey/PhaseNavigator";
-import { primaryActionLabel } from "../features/onboarding/graph/nodeLabels";
-import { QuestionWorkspace } from "../features/onboarding/components/journey/QuestionWorkspace";
-import { StepWorkspace } from "../features/onboarding/components/journey/StepWorkspace";
+import { useOnboardingJourney } from "../features/onboarding/generation/OnboardingJourneyContext";
+import { useOnboardingPlace } from "../features/onboarding/hooks/useOnboardingPlace";
+import { useItemNavigation } from "../features/onboarding/hooks/useItemNavigation";
+import { useStepActions } from "../features/onboarding/hooks/useStepActions";
 import {
-  useOnboardingJourney,
-  type GenerationFailureReason,
-  type GenerationPhaseProgress,
-  type UnavailableReason,
-} from "../features/onboarding/generation/OnboardingJourneyContext";
-import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
+  useArrival,
+  useScrollToChooser,
+  useScrollToOpened,
+} from "../features/onboarding/hooks/useArrival";
+import { useGenerationScreen } from "../features/onboarding/hooks/useGenerationScreen";
+import { useJourneyView, type ViewMode } from "../features/onboarding/hooks/useJourneyView";
+import { usePathLoading } from "../features/onboarding/hooks/usePathLoading";
+import { useGenerationFollowUp } from "../features/onboarding/hooks/useGenerationFollowUp";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
 import {
-  blockingPhases,
-  isSkipPending,
-  itemState,
   pathProgress,
   phaseItems,
-  phaseProgress,
-  phaseState,
-  phasesUnlockedBy,
-  linkedCardId,
   sortedPhases,
-  waitingOn,
   type PhaseItem,
 } from "../features/onboarding/journey";
 import { resolveNextAction } from "../features/onboarding/nextAction";
-import type {
-  OnboardingPathEndpoint,
-  OnboardingPhaseEndpoint,
-  OnboardingQuestionEndpoint,
-  QuestionAttemptResult,
-} from "../features/onboarding/types";
 import { useMoments } from "../features/moments";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
 import { onBuddyPathChanged } from "../features/buddy/aiBuddyBus";
-import { setOnboardingPlace } from "../features/onboarding/onboardingPlace";
 import {
   askAboutEmptyPhase,
   askAboutEmptyPhases,
   askAboutPhase,
 } from "../features/onboarding/buddyDrafts";
-import { ApiError } from "../services/apiClient";
 import { onboardingGraphService } from "../services/onboardingGraphService";
-import { onboardingService } from "../services/onboardingService";
-import { queryKeys } from "../services/queryKeys";
-import { GenerationIssueSummary } from "../features/onboarding/components/GenerationIssueSummary";
-import { issueStatusLabel, retryCouldHelp } from "../features/onboarding/generationIssues";
-import {
-  notifySkipAnswerSeen,
-  withSkipAnswerSeen,
-  withSkipAnswerUnseen,
-} from "../features/onboarding/skipAnswers";
-import {
-  hireJourneyViewKey,
-  readJourneyView,
-  writeJourneyView,
-} from "../features/onboarding/journeyViewMemory";
-
-type LoadingState = "loading" | "empty" | "success" | "error";
-type ViewMode = "list" | "graph";
-
-/** How a step came to be opened: by its address, or by the member on the page. */
-type StartOptions = { byAddress?: boolean };
+import { hireJourneyViewKey } from "../features/onboarding/journeyViewMemory";
 
 const VIEW_ORDER: readonly ViewMode[] = ["graph", "list"];
 
@@ -107,29 +59,6 @@ type NavigationState = {
   /** A phase to land on, set by anything that sends the member here pointing at one. */
   openPhaseId?: string;
 } | null;
-
-/** The phase a visit opens on: what the member was sent for, else where they are, else a choice. */
-function initialPhaseId(
-  path: OnboardingPathEndpoint,
-  phases: OnboardingPhaseEndpoint[],
-  focusItemId: string | undefined,
-  openPhaseId: string | undefined,
-): string {
-  // A phase asked for by name wins over everything: whoever sent the member here was pointing at
-  // it, and landing them somewhere else answers a question they did not ask.
-  const named = openPhaseId ? phases.find((phase) => phase.id === openPhaseId) : undefined;
-  if (named) return named.id;
-  const requested = focusItemId
-    ? phases.find((phase) => phaseItems(phase).some((item) => item.id === focusItemId))
-    : undefined;
-  if (requested) return requested.id;
-  const next = resolveNextAction(path);
-  if (next.kind === "step" || next.kind === "question") return next.phase.id;
-  if (next.kind === "choose") return next.phases[0].id;
-  return (
-    (phases.find((phase) => phaseState(phase) !== "done") ?? phases[phases.length - 1])?.id ?? ""
-  );
-}
 
 /**
  * The hire's onboarding path.
@@ -151,14 +80,12 @@ export function OnBoardingPage() {
   // `/onboarding/:stepId` -- the old address of a step page -- now opens the path with that step
   // unfolded, so links from the dashboard and the buddy keep landing on the step.
   const { stepId: routeStepId } = useParams<{ stepId?: string }>();
-  const navigate = useNavigate();
   // Whose remembered view this is. Browser storage is per browser, so without this two accounts
   // on one machine share the List/Graph mode and the phase the graph was left on. Empty only
   // before the profile is there, which `AuthGuard` does not render this page without -- the
   // fallbacks below keep that case from writing under the wrong key anyway.
   const viewerId = useAuth().profile?.id ?? "";
   const viewKey = viewerId ? hireJourneyViewKey(viewerId) : null;
-  const toast = useToast();
   const { celebrate: celebrateMoment, completeMission, flyby } = useMoments();
   const {
     selectedProjectId,
@@ -175,400 +102,49 @@ export function OnBoardingPage() {
   const focusItemId = routeStepId ?? navigationState?.focusQuestionId;
   // Set by the board's "where you are" strip when a phase on it is pressed.
   const openPhaseId = navigationState?.openPhaseId;
-  /**
-   * Where a link from the buddy points: `?step=<id>`, `?question=<id>` or `?phase=<id>`.
-   *
-   * The mentor is handed each item's link so it can write "you are on [#3](...)" and have that be
-   * clickable. In the URL rather than in router state because the model writes it into text the hire
-   * can copy, keep or open in a second tab, and state survives none of that.
-   *
-   * A link *lands* rather than starts: the phase opens, the page scrolls to the item and lights it up
-   * briefly. Unlike `/onboarding/:stepId`, nothing is unfolded or started -- following a link in a
-   * conversation is a way of finding something, and starting it is the hire's own click.
-   */
-  const [searchParams, setSearchParams] = useSearchParams();
-  const linkedStepId = searchParams.get("step");
-  // `&open=1` beside `?step=`: unfold the step as well as finding it -- still without starting it.
-  // What a card's "Back to" on the board sends, since the words it was kept from are inside the step.
-  const linkOpensStep = searchParams.get("open") === "1";
-  const linkedQuestionId = searchParams.get("question");
-  const linkedPhaseId = searchParams.get("phase");
-
-  const [path, setPath] = useState<OnboardingPathEndpoint | null>(null);
-  const [loadingState, setLoadingState] = useState<LoadingState>("loading");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [selectedPhaseId, setSelectedPhaseId] = useState("");
+  const {
+    path,
+    setPath,
+    loadingState,
+    errorMessage,
+    selectedPhaseId,
+    setSelectedPhaseId,
+    applyPath,
+    refreshPath,
+  } = usePathLoading({ focusItemId, openPhaseId, subscribeToChanges: onBuddyPathChanged });
+  useGenerationFollowUp({ generation, clearGeneration, path, loadingState, applyPath });
   // A phase picked from the chooser before anything in it was started -- until then nothing else
   // says that this is where the hire wants to be.
   const [chosenPhaseId, setChosenPhaseId] = useState<string | null>(null);
-  // Where the member left the page last time: list or graph, and the phase the graph was zoomed into.
-  // A link to a step always opens the list, since that is where the step unfolds.
-  // Arriving for a particular step, question or phase choice opens the list: that is where each of
-  // them unfolds, whichever view was used last.
-  const [viewMode, setViewMode] = useState<ViewMode>(() =>
-    routeStepId || navigationState?.focusQuestionId || navigationState?.choosePhase
-      ? "list"
-      : viewKey
-        ? readJourneyView(viewKey).mode
-        : "graph",
-  );
-  const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
-    // A phase arrived at by name opens *inside* itself on the graph, the same way it opens selected
-    // in the list — the two views' idea of "here" has to be the one place the member was sent.
-    () => openPhaseId ?? (viewKey ? readJourneyView(viewKey).graphPhaseId : null),
-  );
   // The item unfolded in the list, and the one zoomed into on the graph.
   const [expandedItemId, setExpandedItemId] = useState<string | null>(focusItemId ?? null);
   const [graphItemId, setGraphItemId] = useState<string | null>(null);
-  /**
-   * Whether the list is on screen because this visit arrived for a step, a question or the phase
-   * chooser, rather than because the member wanted it.
-   *
-   * Without the distinction, one click on the dashboard's next-step card wrote "list" over a
-   * member's remembered graph -- for good, and again every time they used that card. Choosing a
-   * view clears it, and only then is the choice remembered.
-   */
-  const arrivedInForcedList = useRef(
-    Boolean(routeStepId || navigationState?.focusQuestionId || navigationState?.choosePhase),
+  const scrollToChooser = useScrollToChooser();
+  const {
+    lastGeneration,
+    isDinoActive: isDinoActiveInGeneration,
+    setIsDinoActive: setIsDinoActiveInGeneration,
+  } = useGenerationScreen(generation);
+  const scrollWhenOpened = useScrollToOpened(
+    focusItemId ?? null,
+    expandedItemId,
+    loadingState,
+    selectedPhaseId,
   );
-  const chooseViewMode = useCallback((mode: ViewMode) => {
-    arrivedInForcedList.current = false;
-    setViewMode(mode);
-  }, []);
-  const chooserScrollTimer = useRef(0);
-  useEffect(() => () => window.clearTimeout(chooserScrollTimer.current), []);
-  /** Brings the phase chooser into view, once the panel holding it has slid in. */
-  const scrollToChooser = useCallback(() => {
-    window.clearTimeout(chooserScrollTimer.current);
-    chooserScrollTimer.current = window.setTimeout(
-      () =>
-        document
-          .querySelector("#phase-chooser")
-          ?.scrollIntoView?.({ behavior: "smooth", block: "center" }),
-      SLIDING_PANEL_EXIT_MS,
-    );
-  }, []);
-  const [isDinoActiveInGeneration, setIsDinoActiveInGeneration] = useState(false);
-  /**
-   * The last running generation, kept so the generation screen can stay up while the dino game
-   * is still being played after the run has ended (see `isDinoActiveInGeneration`).
-   *
-   * `completed` outlives the `done` status on purpose: the page clears a finished generation as
-   * soon as the new path is fetched, so the status drops to `idle` while the game may still be
-   * open. Without the flag the screen would fall back to the frozen "working" snapshot and stop
-   * saying "Path ready".
-   */
-  const [lastGeneration, setLastGeneration] = useState<{
-    phases: GenerationPhaseProgress[];
-    startedAt: number;
-    completed: boolean;
-  }>(() =>
-    generation.status === "running"
-      ? { phases: generation.phases, startedAt: generation.startedAt, completed: false }
-      : { phases: [], startedAt: 0, completed: false },
-  );
-
-  // Follows the generation during render (React's "adjust state when a value changes" pattern)
-  // rather than in an effect, so the screen never paints one frame with a stale outcome.
-  const [seenGeneration, setSeenGeneration] = useState(generation);
-  if (seenGeneration !== generation) {
-    setSeenGeneration(generation);
-    if (generation.status === "running") {
-      setLastGeneration({
-        phases: generation.phases,
-        startedAt: generation.startedAt,
-        completed: false,
-      });
-    } else if (generation.status === "done") {
-      setLastGeneration((previous) => ({ ...previous, completed: true }));
-    } else if (generation.status === "error") {
-      // Failure wins over the game: the snapshot's phases are still "working", so keeping the
-      // generation screen up for the game would hide the failure behind a wait that is over.
-      // Dropping the flag unmounts the screen, which releases the game's shared slot with it.
-      setIsDinoActiveInGeneration(false);
-    }
-  }
-  // Set when the page itself moves the member on, so the item they land on is scrolled to.
-  const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
-  // The item a buddy link landed on, for as long as its light plays. `key` changes per arrival, so
-  // following the same link again scrolls to it again. Cleared when the light has played or the
-  // member moves to another phase, so neither the scroll nor the light comes back on its own later.
-  const [linkHighlight, setLinkHighlight] = useState<{ id: string; key: string } | null>(null);
-  const clearLinkHighlight = useCallback(() => setLinkHighlight(null), []);
 
   usePathRevealMoment(loadingState === "success" ? path : null);
 
   const phases = useMemo(() => (path ? sortedPhases(path) : []), [path]);
-
-  const queryClient = useQueryClient();
-  const applyPath = useCallback(
-    (next: OnboardingPathEndpoint, { keepSelection }: { keepSelection: boolean }) => {
-      setPath(next);
-      // The dashboard's "next step" card reads the same path through the query cache.
-      void queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() });
-      setSelectedPhaseId((current) => {
-        const ordered = sortedPhases(next);
-        if (keepSelection && ordered.some((phase) => phase.id === current)) return current;
-        return initialPhaseId(next, ordered, focusItemId, openPhaseId);
-      });
-      setLoadingState("success");
-    },
-    [focusItemId, openPhaseId, queryClient],
-  );
-
-  const hasLoadedRef = useRef(false);
-  useEffect(() => {
-    if (hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
-    void (async () => {
-      try {
-        // The step a link points at is started by the arrival effect below, which sees every
-        // link rather than only the one this visit started with.
-        applyPath(await onboardingService.fetchPath(), { keepSelection: false });
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 404) {
-          // Absence is a normal state; a path is only built when the user asks for one.
-          setLoadingState("empty");
-          return;
-        }
-        setLoadingState("error");
-        setErrorMessage(error instanceof Error ? error.message : "Unknown error");
-      }
-    })();
-  }, [applyPath]);
-
-  const refreshPath = useCallback(async () => {
-    try {
-      applyPath(await onboardingService.fetchPath(), { keepSelection: true });
-    } catch (error) {
-      console.error("Failed to refresh onboarding path:", error);
-      // Said out loud: after finishing a step, a silent failure leaves progress looking unchanged.
-      toast.error("Your path could not be refreshed", {
-        description: "What you did is saved. Reload the page to see it.",
-      });
-    }
-  }, [applyPath, toast]);
-
-  /**
-   * Re-reads the path after the buddy changed it.
-   *
-   * The buddy lives in a dock over this page, which is where a hire most likely is while talking
-   * about their path. Without this, confirming "mark this step as done" in the conversation left the
-   * list behind the dock still showing the step open. Told rather than polled; see
-   * `announceBuddyPathChanged`.
-   */
-  useEffect(() => onBuddyPathChanged(() => void refreshPath()), [refreshPath]);
-
-  // A generation that finished -- here or while the user was elsewhere -- means there is a new path.
-  // Read fresh rather than taken from the generation: the hire may have started working on it before
-  // coming back here, and the stream's copy knows nothing of that.
-  useEffect(() => {
-    if (generation.status !== "done") return;
-    let cancelled = false;
-    onboardingService
-      .fetchPath()
-      .then((next) => {
-        if (!cancelled) applyPath(next, { keepSelection: false });
-      })
-      .catch((error: unknown) => console.error("Failed to load the new onboarding path:", error))
-      .finally(() => clearGeneration());
-    return () => {
-      cancelled = true;
-    };
-  }, [applyPath, clearGeneration, generation]);
-
-  // A rebuild that failed leaves the path the member already had in place -- so the failure is said
-  // once, beside it, instead of taking the page over.
-  useEffect(() => {
-    if (generation.status !== "error" || loadingState !== "success" || !path) return;
-    toast.error("Your path could not be rebuilt", {
-      description:
-        generation.reason === "not-enough-knowledge"
-          ? "The project's knowledge base does not cover any phase yet. Your current path is unchanged."
-          : `${generation.message} Your current path is unchanged.`,
+  const { viewMode, chooseViewMode, showListByArrival, setGraphPhaseId, openGraphPhaseId } =
+    useJourneyView({
+      viewKey,
+      arrivedForList: Boolean(
+        routeStepId || navigationState?.focusQuestionId || navigationState?.choosePhase,
+      ),
+      openPhaseId,
+      phases,
+      loadingState,
     });
-    clearGeneration();
-  }, [clearGeneration, generation, loadingState, path, toast]);
-
-  /**
-   * Everything this visit was sent here for, in one place: a step in the address, a question or
-   * the phase chooser in the router's state.
-   *
-   * One effect rather than one per instruction, and keyed on the instruction rather than run once
-   * on mount. `/onboarding` and `/onboarding/:stepId` are the same component in the same position,
-   * so a second link arriving while the page is open remounts nothing -- which is how the first
-   * version came to follow a changed step id but not a changed question, and to bring the chooser
-   * into view exactly once per visit however often somebody was sent to it.
-   *
-   * Each arrival does the same four things: check the target is still on the path, put the view
-   * where the target unfolds, start a step that was opened for the first time, and scroll to it.
-   */
-  const focusQuestionId = navigationState?.focusQuestionId;
-  const wantsChooser = Boolean(navigationState?.choosePhase);
-  const arrival = useMemo(
-    () =>
-      routeStepId
-        ? { kind: "step" as const, id: routeStepId }
-        : focusQuestionId
-          ? { kind: "question" as const, id: focusQuestionId }
-          : wantsChooser
-            ? { kind: "choose" as const, id: "" }
-            : linkedStepId
-              ? { kind: "link-step" as const, id: linkedStepId }
-              : linkedQuestionId
-                ? { kind: "link-question" as const, id: linkedQuestionId }
-                : linkedPhaseId
-                  ? { kind: "link-phase" as const, id: linkedPhaseId }
-                  : null,
-    [focusQuestionId, linkedPhaseId, linkedQuestionId, linkedStepId, routeStepId, wantsChooser],
-  );
-  // A link carries the navigation's key as well: the hire who scrolled away and clicks the same link
-  // in the conversation again should land again.
-  const arrivalKey = arrival
-    ? `${arrival.kind}:${arrival.id}${arrival.kind.startsWith("link") ? `:${location.key}` : ""}`
-    : "";
-  const handledArrivalRef = useRef("");
-
-  // Read by the arrival effect, which must not re-run every time one of these is recreated.
-  const startStepRef = useRef<(item: PhaseItem, options: StartOptions) => void>(() => undefined);
-  const scrollToChooserRef = useRef<() => void>(() => undefined);
-  /**
-   * Takes a handled link out of the address, so a reload or the hire's own next click decides what
-   * they are looking at rather than the link lighting the same card up again.
-   */
-  const clearLinkRef = useRef<() => void>(() => undefined);
-
-  useEffect(() => {
-    if (loadingState !== "success" || !path || !arrival) return;
-    if (handledArrivalRef.current === arrivalKey) return;
-    handledArrivalRef.current = arrivalKey;
-
-    // Deferred to a microtask: React 19's lint rejects a synchronous setState in an effect body,
-    // and this is the pattern the repo already passes with.
-    queueMicrotask(() => {
-      // The list, whichever view was last used: a step, a question and the chooser all unfold
-      // there. Marked as forced, so it is not written back as a preference the member chose.
-      arrivedInForcedList.current = true;
-      setViewMode("list");
-
-      if (arrival.kind === "choose") {
-        setExpandedItemId(null);
-        scrollToChooserRef.current();
-        return;
-      }
-
-      // A link is followed in the list, so a step left open on the graph is let go of too --
-      // otherwise swiping stayed off and the graph reopened it on the way back.
-      if (arrival.kind.startsWith("link")) setGraphItemId(null);
-
-      if (arrival.kind === "link-phase") {
-        const linkedPhase = path.phases.find((phase) => phase.id === arrival.id);
-        if (linkedPhase) {
-          setSelectedPhaseId(arrival.id);
-          // An item open in the linked phase stays open: it may hold a typed answer.
-          setExpandedItemId((current) =>
-            phaseItems(linkedPhase).some((item) => item.id === current) ? current : null,
-          );
-        } else {
-          toast.error("That phase is not on your path", {
-            description: "It may have been replaced when your path was rebuilt.",
-          });
-        }
-        clearLinkRef.current();
-        return;
-      }
-
-      const owningPhase = path.phases.find((phase) =>
-        phaseItems(phase).some((item) => item.id === arrival.id),
-      );
-      if (!owningPhase) {
-        toast.error(
-          arrival.kind === "question" || arrival.kind === "link-question"
-            ? "That question is not on your path"
-            : "That step is not on your path",
-          { description: "It may have been replaced when your path was rebuilt." },
-        );
-        // Only the step has an address of its own to go back from; a question arrives in router
-        // state, which is dropped by navigating to the same place without it.
-        void navigate("/onboarding", { replace: true, state: null });
-        return;
-      }
-
-      if (arrival.kind === "link-step" || arrival.kind === "link-question") {
-        setSelectedPhaseId(owningPhase.id);
-        // "You're on #3" is most likely clicked while #3 is open -- collapsing it would throw away
-        // a typed answer or skip reason. A link that asks for the step open unfolds it instead.
-        if (arrival.kind === "link-step" && linkOpensStep) {
-          scrollToItemRef.current = arrival.id;
-          setExpandedItemId(arrival.id);
-        } else {
-          setExpandedItemId((current) => (current === arrival.id ? current : null));
-        }
-        setLinkHighlight({ id: arrival.id, key: arrivalKey });
-        clearLinkRef.current();
-        return;
-      }
-
-      setSelectedPhaseId(owningPhase.id);
-      scrollToItemRef.current = arrival.id;
-      setExpandedItemId(arrival.id);
-
-      // A step opened by its address is started like one opened by a click -- including the
-      // second link of a visit, which the load-time version could not see.
-      const item = phaseItems(owningPhase).find((candidate) => candidate.id === arrival.id);
-      if (item) startStepRef.current(item, { byAddress: true });
-    });
-  }, [arrival, arrivalKey, linkOpensStep, loadingState, navigate, path, toast]);
-
-  useEffect(() => {
-    clearLinkRef.current = () =>
-      setSearchParams(
-        (params) => {
-          params.delete("step");
-          params.delete("question");
-          params.delete("phase");
-          params.delete("open");
-          return params;
-        },
-        { replace: true },
-      );
-  }, [setSearchParams]);
-
-  // Scrolls to the card a link landed on, once per link. A link followed from the graph switches to
-  // the list, which `SlidingTabPanel` mounts only after the graph has slid out -- so a card that is
-  // not there yet is looked for again once it can be, the same wait `scrollToChooser` makes.
-  const scrolledLinkRef = useRef("");
-  useEffect(() => {
-    if (loadingState !== "success" || !linkHighlight) return;
-    if (scrolledLinkRef.current === linkHighlight.key) return;
-    const scroll = () => {
-      const card = document.getElementById(linkedCardId(linkHighlight.id));
-      if (!card) return false;
-      scrolledLinkRef.current = linkHighlight.key;
-      card.scrollIntoView?.({ behavior: "smooth", block: "center" });
-      return true;
-    };
-    if (scroll()) return;
-    const timer = window.setTimeout(scroll, SLIDING_PANEL_EXIT_MS);
-    return () => window.clearTimeout(timer);
-  }, [linkHighlight, loadingState, selectedPhaseId, viewMode]);
-
-  // Scrolls to an item the page opened on the member's behalf -- a link, "up next", "continue".
-  useEffect(() => {
-    const target = scrollToItemRef.current;
-    if (loadingState !== "success" || !target || target !== expandedItemId) return;
-    scrollToItemRef.current = null;
-    document
-      .querySelector(`[data-item-id="${target}"]`)
-      ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-  }, [expandedItemId, loadingState, selectedPhaseId]);
-
-  // A remembered phase that is not in this path (a rebuilt path, another project) opens the map.
-  const openGraphPhaseId = phases.some((phase) => phase.id === graphPhaseId) ? graphPhaseId : null;
-  useEffect(() => {
-    if (loadingState !== "success" || arrivedInForcedList.current || !viewKey) return;
-    writeJourneyView(viewKey, { mode: viewMode, graphPhaseId: openGraphPhaseId });
-  }, [loadingState, openGraphPhaseId, viewKey, viewMode]);
 
   const swipeRef = useSwipeableTabs<ViewMode, HTMLDivElement>({
     order: VIEW_ORDER,
@@ -595,249 +171,73 @@ export function OnBoardingPage() {
     nextAction?.kind === "step" || nextAction?.kind === "question" ? nextAction.phase.id : null;
   const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0] ?? null;
 
-  // Where the hire is on this page, for whatever they keep on their board from here: the step they
-  // have open, or the phase they are looking at. See `onboardingPlace.ts`.
-  useEffect(() => {
-    const openItemId = viewMode === "graph" ? graphItemId : expandedItemId;
-    const shownPhase =
-      viewMode === "graph"
-        ? (phases.find((phase) => phase.id === openGraphPhaseId) ?? null)
-        : selectedPhase;
-    const openItem = openItemId
-      ? phases.flatMap(phaseItems).find((item) => item.id === openItemId)
-      : undefined;
-    // A question is not a place a note is kept *about*; its phase is.
-    const itemPhase =
-      openItem?.kind === "question"
-        ? phases.find((phase) => phase.id === openItem.question.phaseId)
-        : undefined;
-    const phase = itemPhase ?? shownPhase;
-
-    setOnboardingPlace(
-      openItem?.kind === "step"
-        ? { kind: "step", id: openItem.id, title: openItem.title }
-        : phase
-          ? { kind: "phase", id: phase.id, title: phase.title }
-          : null,
-    );
-  }, [expandedItemId, graphItemId, openGraphPhaseId, phases, selectedPhase, viewMode]);
-
-  useEffect(() => () => setOnboardingPlace(null), []);
+  useOnboardingPlace({
+    viewMode,
+    phases,
+    selectedPhase,
+    openGraphPhaseId,
+    expandedItemId,
+    graphItemId,
+  });
   const overall = path ? pathProgress(path) : null;
   const generationIssues = path?.generationIssues ?? [];
-  const generationIssueSummary = generationIssues
-    .map((issue) => `${issue.title} — ${issueStatusLabel(issue.status)}`)
-    .join("\n");
 
-  const phaseOf = (item: PhaseItem) =>
-    phases.find(
-      (phase) => phase.id === (item.kind === "step" ? item.step.phaseId : item.question.phaseId),
-    );
-
-  /** A step the member opens for the first time is started; reopening one changes nothing. */
-  const beginStepIfWaiting = async (item: PhaseItem, { byAddress = false }: StartOptions = {}) => {
-    if (item.kind !== "step" || item.step.status !== "WAITING" || item.step.locked) return;
-    // Arriving at `/onboarding/<id>` for a step with a skip request open is arriving to change or
-    // withdraw it, not to begin the step; its own "Start step" button still does that. Only the
-    // address: the list's button says "Start", and a click on it should do what it says.
-    if (byAddress && isSkipPending(item.step.skip)) return;
-    try {
-      await onboardingService.startStep(item.step.id);
-      // The rocket marks a step *beginning*.
-      flyby();
-      await refreshPath();
-    } catch (error) {
-      console.error("Failed to start onboarding step:", error);
-      toast.error("The step could not be started", {
-        description: error instanceof Error ? error.message : undefined,
-      });
-    }
-  };
-
-  // Refreshed every render, so the arrival effect can call the latest of each without taking a
-  // dependency on a function that is recreated on every render.
-  useEffect(() => {
-    startStepRef.current = (item, options) => void beginStepIfWaiting(item, options);
-    scrollToChooserRef.current = scrollToChooser;
+  const { beginStepIfWaiting, acknowledgeSkipAnswer, handleAnswered } = useStepActions({
+    phases,
+    phasesDone: overall?.phasesDone ?? 0,
+    setPath,
+    refreshPath,
+    moments: { celebrate: celebrateMoment, completeMission, flyby },
   });
 
-  /**
-   * The answer to a skip request has been drawn for the member, so its "new" marker goes -- here
-   * and, so it stays gone on every device, on the server.
-   *
-   * Called by the step workspace once it has the answer on screen. Doing it from `openItem`
-   * marked answers seen on the way past: "Continue" and "Up next" open steps too, and a deep link
-   * opens one without going through it at all.
-   */
-  const acknowledgeSkipAnswer = useCallback(
-    (skipId: string) => {
-      const seenAt = new Date().toISOString();
-      setPath((current) => (current ? withSkipAnswerSeen(current, skipId, seenAt) : current));
-      onboardingService
-        .markSkipAnswerSeen(skipId)
-        .then(notifySkipAnswerSeen)
-        .catch((error: unknown) => {
-          console.error("Failed to mark skip answer as seen:", error);
-          // Put back, rather than left gone for the session and back after a reload -- and
-          // disagreeing with the sidebar's count in the meantime.
-          setPath((current) => (current ? withSkipAnswerUnseen(current, skipId) : current));
-          toast.error("The answer is still marked new", {
-            description: "It could not be marked as seen. It will still be there next time.",
-          });
-        });
+  const { linkHighlight, clearLinkHighlight } = useArrival({
+    path,
+    loadingState,
+    selectedPhaseId,
+    viewMode,
+    effects: {
+      showListByArrival,
+      setSelectedPhaseId,
+      setExpandedItemId,
+      setGraphItemId,
+      scrollToChooser,
+      scrollWhenOpened,
+      startStep: (item) => void beginStepIfWaiting(item, { byAddress: true }),
     },
-    [toast],
-  );
+  });
 
-  /** Start, continue or answer: the item opens where it is -- unfolded in the list, or on the graph. */
-  const openItem = (item: PhaseItem) => {
-    const phase = phaseOf(item);
-    if (phase) setSelectedPhaseId(phase.id);
-    if (viewMode === "graph") {
-      setGraphPhaseId(phase?.id ?? null);
-      setGraphItemId(item.id);
-    } else {
-      scrollToItemRef.current = item.id;
-      setExpandedItemId(item.id);
-    }
-    void beginStepIfWaiting(item);
-  };
-
-  const toggleItem = (item: PhaseItem) => {
-    if (expandedItemId === item.id) {
-      setExpandedItemId(null);
-      return;
-    }
-    openItem(item);
-  };
-
-  const selectPhase = (phaseId: string) => {
-    setSelectedPhaseId(phaseId);
-    setExpandedItemId(null);
-    setLinkHighlight(null);
-  };
-
-  const choosePhase = (phaseId: string) => {
-    setChosenPhaseId(phaseId);
-    selectPhase(phaseId);
-  };
-
-  /** What "continue" does once an item in a phase is behind the member, and what its button says. */
-  const continueAfter = (phaseId: string): { label: string; run: () => void } => {
-    const next = path ? resolveNextAction(path, { preferPhaseId: phaseId }) : null;
-    if (next?.kind === "step" || next?.kind === "question") {
-      const nextId = next.kind === "step" ? next.step.id : next.question.id;
-      const item = phaseItems(next.phase).find((candidate) => candidate.id === nextId);
-      return {
-        label:
-          next.phase.id !== phaseId
-            ? `On to ${next.phase.title}`
-            : next.kind === "question"
-              ? "Next: a question"
-              : "Next step",
-        run: () => {
-          if (item) openItem(item);
-        },
-      };
-    }
-    if (next?.kind === "choose") {
-      return {
-        label: "Choose your next phase",
-        run: () => {
-          setExpandedItemId(null);
-          setGraphItemId(null);
-          setGraphPhaseId(null);
-          // The chooser lives in the list; from inside the graph there is nothing to scroll to.
-          chooseViewMode("list");
-          scrollToChooser();
-        },
-      };
-    }
-    return {
-      label: "Back to your path",
-      run: () => {
-        setExpandedItemId(null);
-        setGraphItemId(null);
-      },
-    };
-  };
-
-  const handleAnswered = async (
-    question: OnboardingQuestionEndpoint,
-    result: QuestionAttemptResult,
-  ) => {
-    // The backend decides completion; nothing here is derived from the phase alone.
-    if (result.onboardingCompleted) {
-      completeMission();
-    } else if (result.correct) {
-      // Celebrate the phase, not the question: only when this answer finished its last open item.
-      const phase = phases.find((candidate) => candidate.id === question.phaseId);
-      const allStepsDone = phase?.steps.every(
-        (step) => step.status === "FINISHED" || step.status === "SKIPPED",
-      );
-      const allQuestionsPassed = phase?.questions.every(
-        (candidate) => candidate.status === "PASSED" || candidate.id === question.id,
-      );
-      if (allStepsDone && allQuestionsPassed) {
-        const done = (overall?.phasesDone ?? 0) + 1;
-        celebrateMoment({
-          tone: "milestone",
-          title: "Phase completed",
-          message: phase ? `You completed the ${phase.title} phase.` : "You completed the phase.",
-          progress: { current: Math.min(done, phases.length), total: phases.length },
-        });
-      }
-    }
-    await refreshPath();
-  };
+  const { phaseOf, openItem, toggleItem, selectPhase, choosePhase, continueFrom } =
+    useItemNavigation({
+      path,
+      phases,
+      viewMode,
+      expandedItemId,
+      setExpandedItemId,
+      setGraphItemId,
+      setGraphPhaseId,
+      setSelectedPhaseId,
+      setChosenPhaseId,
+      chooseViewMode,
+      scrollToChooser,
+      scrollWhenOpened,
+      clearLinkHighlight,
+      beginStepIfWaiting,
+    });
 
   /** The item itself: a step to work through, a question to answer, or why it is not open yet. */
   const renderItemBody = (item: PhaseItem, layout: "inline" | "focus") => {
     const phase = phaseOf(item);
     if (!phase) return null;
-    const state = itemState(item, phase.locked);
-    const next = continueAfter(phase.id);
-
-    if (state === "locked") {
-      const blockers = waitingOn(item, phaseItems(phase));
-      const phaseBlockers = phase.locked ? blockingPhases(phase, phases) : [];
-      return (
-        <div className="space-y-3 text-sm text-app-text-muted">
-          {item.kind === "step" && item.step.description ? <p>{item.step.description}</p> : null}
-          <p className="flex items-start gap-2 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-3 py-2.5">
-            <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            {phaseBlockers.length > 0
-              ? `Opens once ${phaseBlockers.map((blocker) => blocker.title).join(" and ")} ${phaseBlockers.length === 1 ? "is" : "are"} complete.`
-              : blockers.length > 0
-                ? `Opens once you have finished ${blockers.map((blocker) => blocker.title).join(" and ")}.`
-                : "Not open yet."}
-          </p>
-        </div>
-      );
-    }
-
-    if (item.kind === "question") {
-      return (
-        <QuestionWorkspace
-          key={item.id}
-          question={item.question}
-          phaseTitle={phase.title}
-          onAnswered={(result) => handleAnswered(item.question, result)}
-          continueLabel={next.label}
-          onContinue={next.run}
-        />
-      );
-    }
     return (
-      <StepWorkspace
-        key={item.id}
-        stepId={item.id}
-        stepStatus={item.step.status}
+      <ItemBody
+        item={item}
+        phase={phase}
+        phases={phases}
         layout={layout}
+        next={continueFrom(phase.id)}
+        onAnswered={handleAnswered}
         onPathChanged={refreshPath}
         onSkipAnswerSeen={acknowledgeSkipAnswer}
-        continueLabel={next.label}
-        onContinue={next.run}
       />
     );
   };
@@ -885,28 +285,10 @@ export function OnBoardingPage() {
   }
 
   if (loadingState === "loading" || (loadingState === "empty" && isProjectLoading)) {
-    return (
-      <CenteredState>
-        <Loader2 className="h-8 w-8 animate-spin text-app-brand" aria-hidden="true" />
-        <p className="mt-4 text-sm text-app-text-muted">Loading onboarding path...</p>
-      </CenteredState>
-    );
+    return <LoadingScreen />;
   }
 
-  if (loadingState === "error") {
-    return (
-      <CenteredState>
-        <StateIcon tone="danger">
-          <AlertCircle className="h-7 w-7" />
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">Onboarding could not be loaded</h2>
-        <p className="mt-2 max-w-md text-sm text-app-text-muted">{errorMessage}</p>
-        <Button className="mt-6" variant="primary" onClick={() => window.location.reload()}>
-          Try again
-        </Button>
-      </CenteredState>
-    );
-  }
+  if (loadingState === "error") return <LoadErrorScreen message={errorMessage} />;
 
   if (loadingState === "empty" || !path) {
     return (
@@ -927,186 +309,62 @@ export function OnBoardingPage() {
 
   if (!selectedPhase) {
     return (
-      <CenteredState>
-        <StateIcon tone="warning">
-          <AlertTriangle className="h-7 w-7" />
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">
-          {generationIssues.length > 0
-            ? "No onboarding phases were generated"
-            : "No onboarding phases are available"}
-        </h2>
-        <p className="mt-2 mb-5 max-w-lg text-sm text-app-text-muted">
-          {generationIssues.length > 0
-            ? "Every phase in this blueprint is written by the AI service when your path is built, and none of them could be. Nothing has been left half-finished — the journey is simply empty until one of them lands."
-            : "This onboarding path does not contain any phases for your current role and skills."}
-        </p>
-        {generationIssues.length > 0 ? (
-          <div className="w-full max-w-lg">
-            <GenerationIssueSummary issues={generationIssues} />
-            {/* Retrying a phase that was skipped for lack of material changes nothing, so when that
-                is all there is, the button says so rather than inviting the same answer. */}
-            {canManageSelected && (
-              <p className="mt-5 text-xs text-app-text-subtle">
-                {retryCouldHelp(generationIssues)
-                  ? "Trying again re-runs assembly for every phase."
-                  : "Another run will produce the same result until the project has more material."}
-              </p>
-            )}
-          </div>
-        ) : null}
-        {/* Building an existing path again replaces it, which is the project manager's call: the
-            backend refuses it to members, so they are pointed at the PM instead of a button that
-            can only fail. */}
-        {canManageSelected ? (
-          <Button
-            className="mt-6"
-            variant={
-              generationIssues.length === 0 || retryCouldHelp(generationIssues)
-                ? "primary"
-                : "secondary"
-            }
-            onClick={requestGeneration}
-            icon={<RefreshCw className="h-4 w-4" />}
-            disabled={!selectedProjectId}
-          >
-            Try generation again
-          </Button>
-        ) : (
-          <p className="mt-6 max-w-lg text-sm text-app-text-muted">
-            Your project manager can rebuild your path from your page in the team area.
-          </p>
-        )}
-        {/* Generating again is the wrong hope when the corpus is what was thin -- it comes back
-            empty a second time. The conversation is the one thing here that can produce
-            something, so it is offered beside the retry (or the pointer to the PM) rather than
-            instead of it. */}
-        {generationIssues.length > 0 ? (
+      <NoPhasesState
+        issues={generationIssues}
+        canManage={canManageSelected}
+        hasProject={!!selectedProjectId}
+        onStart={requestGeneration}
+        buddy={
           <AskTheBuddy
             question={askAboutEmptyPhases(generationIssues.map((issue) => issue.title))}
             label="Work it out with your buddy instead"
           />
-        ) : null}
-      </CenteredState>
+        }
+      />
     );
   }
 
-  const isFinished = nextAction?.kind === "done";
-
   return (
     <div className="min-h-screen" ref={swipeRef}>
-      <header className="border-b border-app-border bg-app-bg">
-        <div className="app-page-frame py-6">
-          <PageHeader
-            icon={Rocket}
-            title="Onboarding"
-            subtitle={
-              isFinished
-                ? "You made it through every phase. Everything stays here to look back on."
-                : "Your path into the project. Phases that are open can be done in any order."
-            }
-            // Rebuilding a path throws the member's progress away, so it is the PM's call: it lives
-            // on the member's page in the PM area, not here.
-            actions={
-              generationIssues.length > 0 && (
-                <span
-                  role="status"
-                  aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
-                >
-                  <Badge variant="warning" size="sm" title={generationIssueSummary}>
-                    <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                    {generationIssues.length}
-                  </Badge>
-                </span>
-              )
-            }
-          />
-        </div>
-      </header>
+      <JourneyHeader isFinished={nextAction?.kind === "done"} issues={generationIssues} />
 
       <MainContent className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <SegmentedTabs
-            layoutId="onboarding-view-mode"
-            ariaLabel="Onboarding view"
-            value={viewMode}
-            onChange={chooseViewMode}
-            options={[
-              { value: "graph", label: "Graph", icon: <GitBranch className="h-4 w-4" /> },
-              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
-            ]}
-          />
-          {overall ? (
-            <div className="flex items-center gap-3">
-              <ProgressRing value={overall.percentage} size={44} stroke={4.5}>
-                <span className="text-2xs font-bold text-app-text tabular-nums">
-                  {overall.percentage}%
-                </span>
-              </ProgressRing>
-              <div className="text-sm leading-tight">
-                <p className="font-semibold text-app-text tabular-nums">
-                  {overall.phasesDone} of {phases.length} phases complete
-                </p>
-                <p className="text-xs text-app-text-muted tabular-nums">
-                  {overall.stepsDone} {overall.stepsDone === 1 ? "step" : "steps"} done
-                  {overall.phasesDone > 0 ? " — keep it up" : ""}
-                </p>
-              </div>
-            </div>
-          ) : null}
-        </div>
+        <ViewToolbar
+          viewMode={viewMode}
+          onChange={chooseViewMode}
+          overall={overall}
+          phaseCount={phases.length}
+        />
 
         <SlidingTabPanel activeKey={viewMode} index={VIEW_ORDER.indexOf(viewMode)}>
           {viewMode === "list" ? (
-            <div className="space-y-5">
-              {nextAction?.kind === "choose" ? (
-                <div id="phase-chooser">
-                  <PhaseChooser
-                    phases={nextAction.phases}
-                    allPhases={phases}
-                    onChoose={choosePhase}
-                  />
-                </div>
-              ) : nextAction && (nextAction.kind === "step" || nextAction.kind === "question") ? (
-                <UpNextCard
-                  phase={nextAction.phase}
-                  phaseIndex={phases.findIndex((phase) => phase.id === nextAction.phase.id)}
-                  item={phaseItems(nextAction.phase).find((item) => item.id === nextItemId)}
-                  onPrimary={openItem}
-                  onShowPhase={() => selectPhase(nextAction.phase.id)}
+            <ListPanel
+              phases={phases}
+              selectedPhase={selectedPhase}
+              nextAction={nextAction}
+              nextItemId={nextItemId}
+              focusPhaseId={focusPhaseId}
+              expandedItemId={expandedItemId}
+              linkedItemId={linkHighlight?.id ?? null}
+              onLinkHighlightEnd={clearLinkHighlight}
+              onChoosePhase={choosePhase}
+              onSelectPhase={selectPhase}
+              onToggle={toggleItem}
+              onPrimary={openItem}
+              renderExpanded={(item) => renderItemBody(item, "inline")}
+              renderBuddy={(isEmpty) => (
+                <AskTheBuddy
+                  question={
+                    isEmpty ? askAboutEmptyPhase(selectedPhase.title) : askAboutPhase(selectedPhase)
+                  }
+                  label={
+                    isEmpty
+                      ? "This phase is empty — talk it through with your buddy"
+                      : "Ask your buddy about this phase"
+                  }
                 />
-              ) : null}
-
-              <div className="grid items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
-                <PhaseNavigator
-                  phases={phases}
-                  selectedPhaseId={selectedPhase.id}
-                  focusPhaseId={focusPhaseId}
-                  onSelect={selectPhase}
-                  showUpdates
-                  className="lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:max-h-[44rem]"
-                />
-
-                <section aria-labelledby="phase-title" className="min-w-0 space-y-4">
-                  <PhaseHeaderCard
-                    phase={selectedPhase}
-                    phases={phases}
-                    isFocus={selectedPhase.id === focusPhaseId}
-                    onSelectPhase={selectPhase}
-                  />
-                  <PhaseItemList
-                    phase={selectedPhase}
-                    nextItemId={nextItemId}
-                    expandedItemId={expandedItemId}
-                    linkedItemId={linkHighlight?.id ?? null}
-                    onLinkHighlightEnd={clearLinkHighlight}
-                    onToggle={toggleItem}
-                    onPrimary={openItem}
-                    renderExpanded={(item) => renderItemBody(item, "inline")}
-                  />
-                </section>
-              </div>
-            </div>
+              )}
+            />
           ) : (
             <JourneyGraph
               phases={phases}
@@ -1137,402 +395,5 @@ export function OnBoardingPage() {
         </SlidingTabPanel>
       </MainContent>
     </div>
-  );
-}
-
-/** Loading, error and empty states: inside the page's own chrome, so the header never blinks away. */
-function CenteredState({ children }: { children: ReactNode }) {
-  return (
-    <PageShell
-      icon={Rocket}
-      title="Onboarding"
-      subtitle="Your path into the project. Phases that are open can be done in any order."
-    >
-      <div className="flex min-h-96 flex-col items-center justify-center py-12 text-center">
-        {children}
-      </div>
-    </PageShell>
-  );
-}
-
-function StateIcon({
-  tone,
-  children,
-}: {
-  tone: "brand" | "warning" | "danger";
-  children: ReactNode;
-}) {
-  const toneClass =
-    tone === "danger"
-      ? "bg-app-danger-bg text-app-danger-text"
-      : tone === "warning"
-        ? "bg-app-warning-bg text-app-warning-text"
-        : "bg-app-brand-soft text-app-brand-text";
-  return (
-    <span
-      className={`flex h-16 w-16 items-center justify-center rounded-3xl ${toneClass}`}
-      aria-hidden="true"
-    >
-      {children}
-    </span>
-  );
-}
-
-function PhaseLinks({
-  label,
-  phases,
-  onSelect,
-}: {
-  label: string;
-  phases: OnboardingPhaseEndpoint[];
-  onSelect: (phaseId: string) => void;
-}) {
-  if (phases.length === 0) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-1.5 text-xs">
-      <span className="text-app-text-subtle">{label}</span>
-      {phases.map((phase) => (
-        <button
-          key={phase.id}
-          type="button"
-          onClick={() => onSelect(phase.id)}
-          className="inline-flex items-center gap-1 rounded-full border border-app-border px-2.5 py-1 font-medium text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-text"
-        >
-          {phase.title}
-          <ArrowRight className="h-3 w-3" aria-hidden="true" />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** The selected phase: what it is, how far along, and how it hangs together with the others. */
-function PhaseHeaderCard({
-  phase,
-  phases,
-  isFocus,
-  onSelectPhase,
-}: {
-  phase: OnboardingPhaseEndpoint;
-  phases: OnboardingPhaseEndpoint[];
-  isFocus: boolean;
-  onSelectPhase: (phaseId: string) => void;
-}) {
-  const state = phaseState(phase);
-  const progress = phaseProgress(phase);
-  const waitsOn = blockingPhases(phase, phases);
-  const unlocks = phasesUnlockedBy(phase, phases);
-  const isEmpty = phase.steps.length === 0 && phase.questions.length === 0;
-
-  return (
-    <div className="rounded-3xl border border-app-border bg-app-surface p-5">
-      <p className="text-xs font-semibold tracking-wide text-app-text-subtle uppercase">
-        Phase {phases.indexOf(phase) + 1} of {phases.length}
-        {isFocus ? <span className="text-app-brand-text"> · You are here</span> : null}
-      </p>
-      <h2 id="phase-title" className="mt-1 text-xl font-semibold text-app-text">
-        {phase.title}
-      </h2>
-      {phase.description ? (
-        <p className="mt-1 max-w-3xl text-sm text-app-text-muted">{phase.description}</p>
-      ) : null}
-      {/* The phase-level way in. A hire who does not know why a phase is here is not helped by any
-          of the buttons below it -- and an empty phase is the case the buddy exists for: its title
-          still says what it was meant to cover, and the mentor can put the result on their path. */}
-      <AskTheBuddy
-        question={isEmpty ? askAboutEmptyPhase(phase.title) : askAboutPhase(phase)}
-        label={
-          isEmpty
-            ? "This phase is empty — talk it through with your buddy"
-            : "Ask your buddy about this phase"
-        }
-      />
-      <div className="mt-3 flex items-center gap-3">
-        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-app-border-muted">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-[width] duration-500"
-            style={{ width: `${progress.percentage}%` }}
-          />
-        </div>
-        <span className="text-xs text-app-text-muted tabular-nums">
-          {progress.completed}/{progress.total} done
-        </span>
-      </div>
-
-      {state === "locked" ? (
-        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-3 py-2.5 text-sm text-app-text-muted">
-          <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>
-            Opens once {waitsOn.map((blocker) => blocker.title).join(" and ")}{" "}
-            {waitsOn.length === 1 ? "is" : "are"} complete. You can look around already.
-          </span>
-        </div>
-      ) : state === "done" ? (
-        <div className="mt-4 flex items-center gap-2 rounded-2xl border border-app-success-border bg-app-success-bg px-3 py-2.5 text-sm text-app-success-text">
-          <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-          Phase complete.
-        </div>
-      ) : null}
-
-      {waitsOn.length > 0 || unlocks.length > 0 ? (
-        <div className="mt-4 space-y-2 border-t border-app-border pt-3">
-          <PhaseLinks label="Waits on" phases={waitsOn} onSelect={onSelectPhase} />
-          <PhaseLinks label="Leads to" phases={unlocks} onSelect={onSelectPhase} />
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * The one thing to do next, on top of everything else.
- */
-function UpNextCard({
-  phase,
-  phaseIndex,
-  item,
-  onPrimary,
-  onShowPhase,
-}: {
-  phase: OnboardingPhaseEndpoint;
-  phaseIndex: number;
-  item: PhaseItem | undefined;
-  onPrimary: (item: PhaseItem) => void;
-  onShowPhase: () => void;
-}) {
-  if (!item) return null;
-  const state = itemState(item, phase.locked);
-  const action = primaryActionLabel(item, state) ?? "Open";
-  const isQuestion = item.kind === "question";
-
-  return (
-    <div className="relative overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface">
-      <div className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-app-brand-soft blur-3xl" />
-      <div className="relative flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-        <div className="flex min-w-0 items-start gap-4">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-app-brand text-white shadow-[0_10px_30px_-10px_var(--color-app-brand)]">
-            {isQuestion ? (
-              <CircleHelp className="h-6 w-6" aria-hidden="true" />
-            ) : (
-              <PlayCircle className="h-6 w-6" aria-hidden="true" />
-            )}
-          </span>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-wide text-app-brand-text uppercase">
-              {state === "active" ? "In progress" : isQuestion ? "Knowledge question" : "Up next"} ·{" "}
-              <button
-                type="button"
-                onClick={onShowPhase}
-                className="uppercase underline-offset-2 hover:underline"
-              >
-                Phase {phaseIndex + 1}: {phase.title}
-              </button>
-            </p>
-            <h2 className="mt-1 text-lg leading-snug font-bold text-app-text sm:text-xl">
-              {isQuestion ? item.question.question : item.title}
-            </h2>
-            {item.kind === "step" && item.step.description ? (
-              <p className="mt-1 line-clamp-2 max-w-3xl text-sm text-app-text-muted">
-                {item.step.description}
-              </p>
-            ) : isQuestion ? (
-              <p className="mt-1 text-sm text-app-text-muted">
-                {state === "retry"
-                  ? "You got this one wrong before — answer it correctly to move on."
-                  : "Answer this question to move on in your onboarding."}
-              </p>
-            ) : null}
-          </div>
-        </div>
-        <Button
-          variant="primary"
-          size="lg"
-          className="shrink-0 self-start sm:self-center"
-          onClick={() => onPrimary(item)}
-          trailingIcon={<ChevronRight className="h-4 w-4" />}
-        >
-          {action === "Start" ? "Start now" : action === "Answer" ? "Answer now" : action}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/**
- * No path yet: either a clear way to build one, or a clear reason there is none -- never a raw
- * error from a generation that could only fail.
- */
-function EmptyJourney({
-  hasProject,
-  isSwitcherEnabled,
-  canManage,
-  unavailableReason,
-  lastError,
-  failureReason,
-  checking,
-  onStart,
-}: {
-  hasProject: boolean;
-  isSwitcherEnabled: boolean;
-  canManage: boolean;
-  unavailableReason: UnavailableReason | null;
-  lastError: string | null;
-  /** Why the last generation came back without a path, when the backend could say. */
-  failureReason: GenerationFailureReason | null;
-  /** Whether a start could succeed is still being worked out. */
-  checking: boolean;
-  onStart: () => void;
-}) {
-  if (!hasProject || unavailableReason === "no-project") {
-    return (
-      <CenteredState>
-        <StateIcon tone="warning">
-          <FolderKanban className="h-7 w-7" />
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">No project selected</h2>
-        <p className="mt-2 max-w-md text-sm text-app-text-muted">
-          {isSwitcherEnabled
-            ? "Select a project from the project switcher before creating your personalized onboarding path."
-            : "You need to be assigned to a project before a personalized onboarding path can be created. Ask your project manager or administrator for access."}
-        </p>
-      </CenteredState>
-    );
-  }
-
-  if (
-    unavailableReason === "no-blueprint" ||
-    unavailableReason === "several-blueprints" ||
-    unavailableReason === "no-content"
-  ) {
-    const several = unavailableReason === "several-blueprints";
-    const noBlueprint = unavailableReason === "no-blueprint" || several;
-    return (
-      <CenteredState>
-        <StateIcon tone="brand">
-          {noBlueprint ? <GitBranch className="h-7 w-7" /> : <BookOpen className="h-7 w-7" />}
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">
-          {several
-            ? "This project has more than one onboarding blueprint"
-            : noBlueprint
-              ? "Onboarding isn't set up for this project yet"
-              : "There's nothing to learn from yet"}
-        </h2>
-        <p className="mt-2 max-w-md text-sm text-app-text-muted">
-          {several
-            ? "An onboarding path is built from one published blueprint, and this project has several — so it can't tell which to use."
-            : noBlueprint
-              ? "An onboarding path is built from the project's published blueprint, and this project doesn't have one."
-              : "An onboarding path is built from the project's knowledge base, and nothing has been added to it yet."}{" "}
-          {canManage
-            ? ""
-            : "Your project manager can set this up — your path will be ready to build afterwards."}
-        </p>
-        {canManage ? (
-          <Link
-            to={noBlueprint ? "/blueprints" : "/data-ingestion"}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-semibold text-white hover:bg-app-brand-hover"
-          >
-            {noBlueprint ? "Open blueprints" : "Add knowledge"}
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        ) : null}
-      </CenteredState>
-    );
-  }
-
-  // The AI ran and found nothing in the project's knowledge to build a phase from. Usually that is
-  // material that was just added and is still being processed; either way another start right now
-  // would end the same, so it is not the button this page leads with.
-  if (failureReason === "not-enough-knowledge") {
-    return (
-      <CenteredState>
-        <StateIcon tone="warning">
-          <BookOpen className="h-7 w-7" />
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">
-          Not enough project knowledge yet
-        </h2>
-        <p className="mt-2 max-w-md text-sm text-app-text-muted">
-          Your path is written from what the project’s knowledge base covers, and right now that is
-          not enough for any phase. If documents were added just now, they may still be processed —
-          give it a few minutes.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          {canManage ? (
-            <Link
-              to="/data-ingestion"
-              className="inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-semibold text-white hover:bg-app-brand-hover"
-            >
-              Add knowledge
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          ) : null}
-          <Button variant="secondary" onClick={onStart} icon={<RefreshCw className="h-4 w-4" />}>
-            Check again
-          </Button>
-        </div>
-        {canManage ? null : (
-          <p className="mt-4 max-w-md text-xs text-app-text-subtle">
-            Your project manager can add documentation to the knowledge base.
-          </p>
-        )}
-      </CenteredState>
-    );
-  }
-
-  if (failureReason === "no-phases") {
-    return (
-      <CenteredState>
-        <StateIcon tone="warning">
-          <GitBranch className="h-7 w-7" />
-        </StateIcon>
-        <h2 className="mt-5 text-xl font-semibold text-app-text">
-          The blueprint has nothing for your role yet
-        </h2>
-        <p className="mt-2 max-w-md text-sm text-app-text-muted">
-          Every phase of this project’s blueprint is meant for other roles or skills. Your project
-          manager can open a phase up for you.
-        </p>
-      </CenteredState>
-    );
-  }
-
-  const unreachable = failureReason === "ai-unavailable";
-
-  return (
-    <CenteredState>
-      <StateIcon tone={unreachable ? "warning" : "brand"}>
-        {unreachable ? <AlertTriangle className="h-7 w-7" /> : <Sparkles className="h-7 w-7" />}
-      </StateIcon>
-      <h2 className="mt-5 text-2xl font-bold text-app-text">
-        {unreachable ? "The onboarding service is not reachable" : "Build your onboarding path"}
-      </h2>
-      <p className="mt-2 max-w-md text-sm text-app-text-muted">
-        {unreachable
-          ? "Your path could not be put together because the AI service did not answer. Nothing was changed — try again in a moment."
-          : "Your path is put together from your project’s blueprint and knowledge base: phases, steps and a few questions to check what stuck. It takes a few minutes and keeps running in the background."}
-      </p>
-      {lastError && !unreachable ? (
-        <div
-          role="alert"
-          className="mt-5 flex max-w-md items-start gap-2 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-left text-sm text-app-danger-text"
-        >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          {lastError}
-        </div>
-      ) : null}
-      <Button
-        className="mt-6"
-        variant="primary"
-        size="lg"
-        onClick={onStart}
-        loading={checking}
-        disabled={checking}
-        icon={<PlayCircle className="h-4 w-4" />}
-      >
-        {checking ? "Checking the project…" : lastError ? "Try again" : "Start personalization"}
-      </Button>
-    </CenteredState>
   );
 }

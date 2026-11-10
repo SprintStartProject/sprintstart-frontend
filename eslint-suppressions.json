@@ -25,17 +25,6 @@
       "count": 1
     }
   },
-  "src/components/layout/SideBar.tsx": {
-    "complexity": {
-      "count": 3
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "src/components/layout/SidebarAccountFlyout.tsx": {
     "max-lines-per-function": {
       "count": 1
@@ -56,13 +45,10 @@
   },
   "src/components/layout/SidebarNavLink.tsx": {
     "complexity": {
-      "count": 2
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/components/layout/SidebarResizeHandle.tsx": {
@@ -257,12 +243,6 @@
     }
   },
   "src/features/admin/components/CreateProjectWizard.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 1
     }
@@ -278,17 +258,6 @@
     }
   },
   "src/features/admin/components/MultiProjectAssignment.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "src/features/admin/components/ProjectDetailsDrawer.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 1
     }
@@ -415,17 +384,6 @@
       "count": 1
     }
   },
-  "src/features/arrival/components/ArrivalStepThread.tsx": {
-    "complexity": {
-      "count": 2
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 4
-    }
-  },
   "src/features/arrival/hooks/useArrivalAuthoring.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -435,11 +393,8 @@
     "complexity": {
       "count": 1
     },
-    "max-lines": {
-      "count": 1
-    },
     "max-lines-per-function": {
-      "count": 3
+      "count": 1
     }
   },
   "src/features/blueprints/components/BlueprintGraphEditor.tsx": {
@@ -462,14 +417,8 @@
     }
   },
   "src/features/blueprints/components/BlueprintSubGraphEditor.tsx": {
-    "complexity": {
-      "count": 3
-    },
-    "max-lines": {
-      "count": 1
-    },
     "max-lines-per-function": {
-      "count": 5
+      "count": 1
     }
   },
   "src/features/blueprints/components/PhasePrerequisites.tsx": {
@@ -943,17 +892,6 @@
       "count": 1
     }
   },
-  "src/features/dashboard/components/MyKnowledgeGapsWidget.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "src/features/dashboard/components/NextStepWidget.tsx": {
     "complexity": {
       "count": 1
@@ -1087,13 +1025,10 @@
   },
   "src/features/data-ingestion/components/RepositoryDiscovery.tsx": {
     "complexity": {
-      "count": 3
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/features/data-ingestion/components/RunDetailsPanel.tsx": {
@@ -1130,9 +1065,6 @@
   },
   "src/features/data-ingestion/components/SyncScheduleSettings.tsx": {
     "complexity": {
-      "count": 2
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
@@ -1569,14 +1501,8 @@
     }
   },
   "src/features/onboarding/components/journey/JourneyGraph.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/features/onboarding/components/journey/PhaseChooser.tsx": {
@@ -1608,37 +1534,12 @@
       "count": 1
     }
   },
-  "src/features/onboarding/components/journey/StepWorkspace.tsx": {
-    "complexity": {
-      "count": 2
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/features/onboarding/generation/OnboardingJourneyProvider.tsx": {
     "complexity": {
       "count": 1
     },
     "max-lines-per-function": {
       "count": 2
-    }
-  },
-  "src/features/onboarding/graph/JourneyCanvas.tsx": {
-    "complexity": {
-      "count": 9
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "max-params": {
-      "count": 1
     }
   },
   "src/features/onboarding/graph/JourneyNodeCards.tsx": {
@@ -1991,13 +1892,10 @@
   },
   "src/features/starter-work/components/StarterWorkPoolCloud.tsx": {
     "complexity": {
-      "count": 2
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/features/starter-work/components/StarterWorkSection.tsx": {
@@ -2054,13 +1952,10 @@
   },
   "src/features/team-management/components/RoleManagementTab.tsx": {
     "complexity": {
-      "count": 4
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/features/team-management/components/RoleRow.tsx": {
@@ -2088,13 +1983,10 @@
   },
   "src/features/team-management/components/detail/MemberJourneySection.tsx": {
     "complexity": {
-      "count": 2
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 4
+      "count": 1
     }
   },
   "src/features/team-management/components/detail/PhaseCheckAdminModal.tsx": {
@@ -2114,14 +2006,8 @@
     }
   },
   "src/features/team-management/components/detail/StepDetailsPanel.tsx": {
-    "complexity": {
-      "count": 2
-    },
-    "max-lines": {
-      "count": 1
-    },
     "max-lines-per-function": {
-      "count": 3
+      "count": 1
     }
   },
   "src/features/team-management/components/detail/StepQuickEdit.tsx": {
@@ -2140,17 +2026,6 @@
   "src/hooks/useScrollRestoration.ts": {
     "max-lines-per-function": {
       "count": 2
-    }
-  },
-  "src/pages/AdminPage.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
     }
   },
   "src/pages/BlueprintPathDetailPage.tsx": {
@@ -2172,24 +2047,7 @@
       "count": 2
     }
   },
-  "src/pages/BoardPage.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/pages/BuddyPage.tsx": {
-    "complexity": {
-      "count": 2
-    },
-    "max-lines": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 1
     }
@@ -2201,9 +2059,6 @@
   },
   "src/pages/DataIngestionPage.tsx": {
     "complexity": {
-      "count": 1
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
@@ -2228,13 +2083,10 @@
   },
   "src/pages/OnBoardingPage.tsx": {
     "complexity": {
-      "count": 8
-    },
-    "max-lines": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 4
+      "count": 1
     }
   },
   "src/pages/PmDashboardPage.tsx": {
@@ -2263,20 +2115,6 @@
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "src/pages/TeamMemberDetailPage.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    },
-    "max-params": {
       "count": 1
     }
   },
@@ -2314,21 +2152,14 @@
       "count": 1
     }
   },
-  "src/services/buddyService.ts": {
-    "complexity": {
-      "count": 3
-    },
-    "max-depth": {
-      "count": 3
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 4
-    },
+  "src/services/buddy/messageStream.ts": {
     "max-params": {
-      "count": 2
+      "count": 1
+    }
+  },
+  "src/services/buddy/readBuddyStream.ts": {
+    "max-params": {
+      "count": 1
     }
   },
   "src/services/ingestionService.ts": {
@@ -2373,11 +2204,6 @@
   "src/services/sse.ts": {
     "max-depth": {
       "count": 3
-    }
-  },
-  "src/services/teamManagementService.ts": {
-    "max-lines": {
-      "count": 1
     }
   }
 }
