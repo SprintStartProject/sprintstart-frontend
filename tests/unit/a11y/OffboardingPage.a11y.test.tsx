@@ -77,7 +77,7 @@ describe("OffboardingPage accessibility", () => {
 
     await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}");
     await user.click(screen.getByRole("button", { name: "Rank files" }));
-    expect(await screen.findByText("files lose their last author")).toBeInTheDocument();
+    expect(await screen.findByText("src/Engine.kt")).toBeInTheDocument();
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });

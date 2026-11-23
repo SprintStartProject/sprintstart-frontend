@@ -69,7 +69,7 @@ describe("OffboardingPage", () => {
 
     expect(screen.getByRole("heading", { name: "Offboarding" })).toBeInTheDocument();
     expect(asked).toBe(false);
-    expect(screen.queryByText("files lose their last author")).not.toBeInTheDocument();
+    expect(screen.queryByText("Files at risk")).not.toBeInTheDocument();
   });
 
   it("ranks the files that lose the person who is named", async () => {
@@ -84,7 +84,8 @@ describe("OffboardingPage", () => {
 
     await rankFor(user, "ada");
 
-    expect(await screen.findByText("files lose their last author")).toBeInTheDocument();
+    expect(await screen.findByText("src/Engine.kt")).toBeInTheDocument();
+    expect(screen.getByText("files lose their last author")).toBeInTheDocument();
     expect(leaving).toEqual(["ada"]);
   });
 
@@ -101,6 +102,6 @@ describe("OffboardingPage", () => {
     await waitFor(() =>
       expect(screen.getByText("The ranking could not be computed")).toBeInTheDocument(),
     );
-    expect(screen.queryByText("files lose their last author")).not.toBeInTheDocument();
+    expect(screen.queryByText("Files at risk")).not.toBeInTheDocument();
   });
 });
