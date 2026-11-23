@@ -164,6 +164,24 @@ describe("FileTree", () => {
     expect(screen.queryByText("Changes together with:")).not.toBeInTheDocument();
   });
 
+  it("shows how much of a hotspot the selected file is, when it was measured", async () => {
+    const user = userEvent.setup();
+    render(<FileTree files={[file("github:acme/app", "src/A.kt", { hotspot: 0.77 })]} />);
+
+    await user.click(button(/A\.kt/));
+
+    expect(screen.getByText("Hotspot 77%")).toBeInTheDocument();
+  });
+
+  it("shows no hotspot for a file whose complexity was never measured", async () => {
+    const user = userEvent.setup();
+    render(<FileTree files={[file("github:acme/app", "src/A.kt", { hotspot: null })]} />);
+
+    await user.click(button(/A\.kt/));
+
+    expect(screen.queryByText(/Hotspot/)).not.toBeInTheDocument();
+  });
+
   it("shows no reasons for a map stored before there were any", async () => {
     const user = userEvent.setup();
     render(<FileTree files={FILES} />);

@@ -71,6 +71,9 @@ export function FileDetails({ file }: { file: FileRisk }) {
           {level.label}
         </Badge>
         <span className="text-app-text">Risk {percent(file.score)}</span>
+        {typeof file.hotspot === "number" && (
+          <span className="text-app-text-muted">Hotspot {percent(file.hotspot)}</span>
+        )}
         {stays && <span className="text-app-text-muted">Stays: {stays}</span>}
         <span className="text-app-text-muted">{describeBreakdown(file.sourceBreakdown)}</span>
         <span className="text-app-text-muted">Last changed {formatDay(file.lastChangedAt)}</span>

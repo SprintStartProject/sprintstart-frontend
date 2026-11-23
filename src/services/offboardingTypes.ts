@@ -40,6 +40,8 @@ export interface FileRisk {
   fragmentation: number;
   /** How unevenly the knowledge is spread; maps stored before it was measured have none. */
   concentration?: Concentration | null;
+  /** How complicated and how often changed the file is against the others, from 0 to 1; none when its complexity was never measured. */
+  hotspot?: number | null;
   /** The files that change together with this one; maps stored before it was measured have none. */
   coupling?: Coupling | null;
   /** People who know the surroundings of the file and could take it over, best first. */
