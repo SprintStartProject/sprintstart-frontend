@@ -1,12 +1,8 @@
 import { Badge } from "../../../components/ui/Badge";
-import type { FileRisk, RiskLevel } from "../../../services/offboardingTypes";
+import type { FileRisk } from "../../../services/offboardingTypes";
 import { describeBreakdown, percent } from "../format";
+import { LEVELS } from "../levels";
 import { SourceLinkIcon } from "./SourceLinks";
-
-const LEVELS: Record<RiskLevel, { label: string; variant: "danger" | "warning" }> = {
-  ORPHANED: { label: "Nobody left", variant: "danger" },
-  HOARDED: { label: "One person left", variant: "warning" },
-};
 
 function ScoreBar({ score }: { score: number }) {
   return (

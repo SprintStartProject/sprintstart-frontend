@@ -9,3 +9,13 @@ export function describeBreakdown(breakdown: Record<string, number>): string {
     .map(([source, share]) => `${source} ${percent(share)}`)
     .join(" · ");
 }
+
+/** A moment as a short calendar day, such as `1 Nov 2026`. */
+export function formatDay(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}

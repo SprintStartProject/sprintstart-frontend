@@ -23,3 +23,26 @@ export function SourceLinkIcon({ file }: { file: FileRisk }) {
     </a>
   );
 }
+
+const LINK =
+  "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-app-brand-text hover:bg-app-brand-soft focus-ring";
+
+/** Links that open the selected file, and its history, at the source. Nothing for an unknown host. */
+export function SourceLinkButtons({ file }: { file: FileRisk }) {
+  const links = sourceLinks(file.repository, file.path);
+  if (!links) return null;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <a href={links.file} target="_blank" rel="noopener noreferrer" className={LINK}>
+        Open on {links.provider}
+        <ExternalLink className="h-3 w-3" aria-hidden />
+      </a>
+      {links.history && (
+        <a href={links.history} target="_blank" rel="noopener noreferrer" className={LINK}>
+          History
+          <ExternalLink className="h-3 w-3" aria-hidden />
+        </a>
+      )}
+    </span>
+  );
+}
