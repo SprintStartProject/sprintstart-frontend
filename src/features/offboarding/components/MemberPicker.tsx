@@ -1,5 +1,6 @@
 import { Checkbox } from "../../../components/ui/Checkbox";
 import type { MemberMatch } from "../../../services/offboardingTypes";
+import { formatDay } from "../format";
 
 type MemberPickerProps = {
   members: MemberMatch[];
@@ -10,7 +11,9 @@ type MemberPickerProps = {
 function describe(member: MemberMatch): string {
   if (!member.matched) return "Nothing in the history is theirs yet, so they cannot be ranked.";
   const count = member.identities.length;
-  return `${count} ${count === 1 ? "name" : "names"} in the history`;
+  const names = `${count} ${count === 1 ? "name" : "names"} in the history`;
+  if (!member.inactive || !member.lastSeenAt) return names;
+  return `${names}. Inactive since ${formatDay(member.lastSeenAt)}, the ranking counts them as gone already.`;
 }
 
 function MemberRow({

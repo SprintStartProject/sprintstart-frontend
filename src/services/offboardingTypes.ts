@@ -135,6 +135,10 @@ export interface MemberMatch {
   identities: SeenIdentity[];
   /** Links that would make the member's identities count as one person, for a manager to confirm. */
   suggestions: AliasLink[];
+  /** Whether they left no trace for so long that the ranking already counts them as gone. */
+  inactive?: boolean;
+  /** When they last left a trace under any identity. */
+  lastSeenAt?: string | null;
 }
 
 /** The project's members, and how many of them the evidence can be attributed to. */

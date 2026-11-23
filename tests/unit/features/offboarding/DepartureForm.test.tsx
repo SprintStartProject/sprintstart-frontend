@@ -40,6 +40,29 @@ const TEAM: TeamState = {
 };
 
 describe("DepartureForm", () => {
+  it("tells a member who went quiet from the others", () => {
+    const quiet = {
+      ...member("u9", "Quiet Quinn", null, ["quinn@example.com"]),
+      inactive: true,
+      lastSeenAt: "2025-03-12T00:00:00Z",
+    };
+    setup(false, { members: [quiet, ...TEAM.members], loading: false, failed: false });
+
+    expect(screen.getByText(/Inactive since 12 Mar 2025/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Inactive since/)).toHaveLength(1);
+  });
+
+  it("does not mark an active member or one without a last trace as inactive", () => {
+    const odd = {
+      ...member("u8", "Odd Olly", null, ["olly@example.com"]),
+      inactive: true,
+      lastSeenAt: null,
+    };
+    setup(false, { members: [odd, ...TEAM.members], loading: false, failed: false });
+
+    expect(screen.queryByText(/Inactive since/)).not.toBeInTheDocument();
+  });
+
   it("adds a typed person as a chip and clears the field", async () => {
     const { user } = setup();
 
