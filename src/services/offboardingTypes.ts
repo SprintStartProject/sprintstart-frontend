@@ -65,3 +65,41 @@ export interface RiskQuery {
   /** How many files to list. */
   limit?: number;
 }
+
+/** An identity the evidence names, such as a commit email or a GitHub login. */
+export interface SeenIdentity {
+  /** The email or login as the evidence recorded it. */
+  identity: string;
+  /** Who it counts as once the confirmed links are applied. */
+  person: string;
+  /** How many traces each kind of evidence holds for it. */
+  touches: Record<string, number>;
+  lastSeenAt: string;
+}
+
+/** A confirmed link: `alias` counts as `person`. */
+export interface AliasLink {
+  alias: string;
+  person: string;
+}
+
+/**
+ * A registered member of the project and the identities in the evidence that are theirs.
+ * A member with none (`matched` is false) cannot be ranked.
+ */
+export interface MemberMatch {
+  member: string;
+  displayName: string;
+  githubLogin: string | null;
+  matched: boolean;
+  identities: SeenIdentity[];
+  /** Links that would make the member's identities count as one person, for a manager to confirm. */
+  suggestions: AliasLink[];
+}
+
+/** The project's members, and how many of them the evidence can be attributed to. */
+export interface MembersOverview {
+  matched: number;
+  total: number;
+  members: MemberMatch[];
+}

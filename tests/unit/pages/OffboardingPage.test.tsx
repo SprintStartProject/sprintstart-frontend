@@ -41,7 +41,12 @@ const map: RiskMap = {
   ],
 };
 
+const noMembers = http.get("/api/v1/projects/proj1/offboarding/identities/members", () =>
+  HttpResponse.json({ matched: 0, total: 0, members: [] }),
+);
+
 function renderPage() {
+  server.use(noMembers);
   render(
     <MemoryRouter>
       <OffboardingPage />
@@ -103,5 +108,69 @@ describe("OffboardingPage", () => {
       expect(screen.getByText("The ranking could not be computed")).toBeInTheDocument(),
     );
     expect(screen.queryByText("Files at risk")).not.toBeInTheDocument();
+  });
+});
+
+describe("OffboardingPage with the members of the project", () => {
+  it("ranks the member who was chosen by every name the history knows them by", async () => {
+    let leaving: string[] = [];
+    server.use(
+      http.get("/api/v1/projects/proj1/offboarding/identities/members", () =>
+        HttpResponse.json({
+          matched: 1,
+          total: 1,
+          members: [
+            {
+              member: "u1",
+              displayName: "Ada Lovelace",
+              githubLogin: "ada-lovelace",
+              matched: true,
+              identities: [
+                { identity: "ada-lovelace", person: "ada-lovelace", touches: {}, lastSeenAt: "x" },
+                {
+                  identity: "ada@example.com",
+                  person: "ada@example.com",
+                  touches: {},
+                  lastSeenAt: "x",
+                },
+              ],
+              suggestions: [],
+            },
+          ],
+        }),
+      ),
+      http.get("/api/v1/projects/proj1/offboarding/risk", ({ request }) => {
+        leaving = new URL(request.url).searchParams.getAll("leaving");
+        return HttpResponse.json(map);
+      }),
+    );
+    render(
+      <MemoryRouter>
+        <OffboardingPage />
+      </MemoryRouter>,
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByLabelText(/Ada Lovelace/));
+    await user.click(screen.getByRole("button", { name: "Rank files" }));
+
+    expect(await screen.findByText("files lose their last author")).toBeInTheDocument();
+    expect(leaving).toEqual(["ada-lovelace", "ada@example.com"]);
+  });
+
+  it("falls back to typing when the members cannot be loaded", async () => {
+    server.use(
+      http.get("/api/v1/projects/proj1/offboarding/identities/members", () =>
+        HttpResponse.json({ message: "boom" }, { status: 500 }),
+      ),
+    );
+    render(
+      <MemoryRouter>
+        <OffboardingPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/team could not be loaded/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Who is leaving?")).toBeInTheDocument();
   });
 });

@@ -9,6 +9,8 @@ import { parsePeople } from "../departure";
 type PeopleInputProps = {
   people: string[];
   onChange: (people: string[]) => void;
+  label: string;
+  hint: string;
 };
 
 /**
@@ -16,7 +18,7 @@ type PeopleInputProps = {
  *
  * Several can be pasted at once, separated by commas, spaces or lines.
  */
-export function PeopleInput({ people, onChange }: PeopleInputProps) {
+export function PeopleInput({ people, onChange, label, hint }: PeopleInputProps) {
   const [typed, setTyped] = useState("");
 
   const add = () => {
@@ -33,10 +35,7 @@ export function PeopleInput({ people, onChange }: PeopleInputProps) {
 
   return (
     <div className="space-y-2">
-      <Field
-        label="Who is leaving?"
-        hint="An email or a GitHub login. Press Enter to add, or paste several."
-      >
+      <Field label={label} hint={hint}>
         <Input
           value={typed}
           onChange={(event) => setTyped(event.target.value)}

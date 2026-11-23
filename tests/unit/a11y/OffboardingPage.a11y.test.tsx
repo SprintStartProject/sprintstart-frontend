@@ -53,19 +53,74 @@ const map = {
   ],
 };
 
+const members = {
+  matched: 2,
+  total: 3,
+  members: [
+    {
+      member: "u1",
+      displayName: "Ada Lovelace",
+      githubLogin: "ada-lovelace",
+      matched: true,
+      identities: [
+        {
+          identity: "ada-lovelace",
+          person: "ada-lovelace",
+          touches: { commits: 4 },
+          lastSeenAt: "x",
+        },
+      ],
+      suggestions: [],
+    },
+    {
+      member: "u2",
+      displayName: "Ben Franklin",
+      githubLogin: null,
+      matched: true,
+      identities: [
+        {
+          identity: "ben@example.com",
+          person: "ben@example.com",
+          touches: { commits: 2 },
+          lastSeenAt: "x",
+        },
+      ],
+      suggestions: [],
+    },
+    {
+      member: "u3",
+      displayName: "Newcomer",
+      githubLogin: "newcomer",
+      matched: false,
+      identities: [],
+      suggestions: [],
+    },
+  ],
+};
+
+const membersEndpoint = () =>
+  http.get("/api/v1/projects/proj1/offboarding/identities/members", () =>
+    HttpResponse.json(members),
+  );
+
 describe("OffboardingPage accessibility", () => {
   it("has no violations before a departure is named", async () => {
+    server.use(membersEndpoint());
     const { baseElement } = render(
       <MemoryRouter>
         <OffboardingPage />
       </MemoryRouter>,
     );
 
+    expect(await screen.findByLabelText(/Ada Lovelace/)).toBeInTheDocument();
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 
   it("has no violations with a ranking, a warning and a validation message", async () => {
-    server.use(http.get("/api/v1/projects/proj1/offboarding/risk", () => HttpResponse.json(map)));
+    server.use(
+      membersEndpoint(),
+      http.get("/api/v1/projects/proj1/offboarding/risk", () => HttpResponse.json(map)),
+    );
     const user = userEvent.setup();
     const { baseElement } = render(
       <MemoryRouter>
@@ -75,7 +130,7 @@ describe("OffboardingPage accessibility", () => {
     await user.click(screen.getByRole("button", { name: "Rank files" }));
     expect(screen.getByRole("alert")).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}");
+    await user.click(await screen.findByLabelText(/Ada Lovelace/));
     await user.click(screen.getByRole("button", { name: "Rank files" }));
     expect(await screen.findByText("src/Engine.kt")).toBeInTheDocument();
 

@@ -6,21 +6,22 @@ import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import type { RiskQuery } from "../../../services/offboardingTypes";
 import { draftProblem, toRiskQuery, type DepartureDraft } from "../departure";
-import { PeopleInput } from "./PeopleInput";
+import { WhoIsLeaving, type TeamState } from "./WhoIsLeaving";
 
 type DepartureFormProps = {
+  team: TeamState;
   busy: boolean;
   onSubmit: (query: RiskQuery) => void;
 };
 
-const EMPTY_DRAFT: DepartureDraft = { people: [], asOfDay: "", reviewWeight: "" };
+const EMPTY_DRAFT: DepartureDraft = { memberIds: [], people: [], asOfDay: "", reviewWeight: "" };
 
 /**
  * Describes a departure: who leaves, as of which day, and whether reviews count next to commits.
  *
  * It only builds the request; ranking is the page's business.
  */
-export function DepartureForm({ busy, onSubmit }: DepartureFormProps) {
+export function DepartureForm({ team, busy, onSubmit }: DepartureFormProps) {
   const [draft, setDraft] = useState<DepartureDraft>(EMPTY_DRAFT);
   const [submitted, setSubmitted] = useState(false);
   const problem = submitted ? draftProblem(draft) : null;
@@ -28,7 +29,7 @@ export function DepartureForm({ busy, onSubmit }: DepartureFormProps) {
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     setSubmitted(true);
-    if (draftProblem(draft) === null) onSubmit(toRiskQuery(draft));
+    if (draftProblem(draft) === null) onSubmit(toRiskQuery(draft, team.members));
   };
 
   return (
@@ -38,7 +39,7 @@ export function DepartureForm({ busy, onSubmit }: DepartureFormProps) {
       className="space-y-4"
       aria-label="Departure to simulate"
     >
-      <PeopleInput people={draft.people} onChange={(people) => setDraft({ ...draft, people })} />
+      <WhoIsLeaving team={team} draft={draft} onChange={setDraft} />
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="As of" hint="Replays the history up to the end of this day. Empty means now.">
           <Input

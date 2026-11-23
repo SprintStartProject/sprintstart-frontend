@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import type { RiskMap, RiskQuery } from "./offboardingTypes";
+import type { MembersOverview, RiskMap, RiskQuery } from "./offboardingTypes";
 
 /** The query string of a risk request: each leaving person as its own `leaving` parameter. */
 function riskSearchParams(query: RiskQuery): string {
@@ -20,6 +20,16 @@ export const offboardingService = {
   async fetchRiskMap(projectId: string, query: RiskQuery): Promise<RiskMap> {
     return await apiClient.fetch<RiskMap>(
       `/api/v1/projects/${encodeURIComponent(projectId)}/offboarding/risk?${riskSearchParams(query)}`,
+    );
+  },
+
+  /**
+   * Lists the project's members with the commit emails and logins that are theirs, found by their
+   * registered email or declared GitHub login. A member with none cannot be ranked.
+   */
+  async fetchMembers(projectId: string): Promise<MembersOverview> {
+    return await apiClient.fetch<MembersOverview>(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/offboarding/identities/members`,
     );
   },
 };

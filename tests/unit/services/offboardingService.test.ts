@@ -85,3 +85,26 @@ describe("offboardingService.fetchRiskMap", () => {
     await expect(offboardingService.fetchRiskMap("p1", { leaving: ["ada"] })).rejects.toThrow();
   });
 });
+
+describe("offboardingService.fetchMembers", () => {
+  it("asks the project's members endpoint", async () => {
+    const overview = { matched: 1, total: 2, members: [] };
+    server.use(
+      http.get("/api/v1/projects/proj%201/offboarding/identities/members", () =>
+        HttpResponse.json(overview),
+      ),
+    );
+
+    expect(await offboardingService.fetchMembers("proj 1")).toEqual(overview);
+  });
+
+  it("propagates a refusal", async () => {
+    server.use(
+      http.get("/api/v1/projects/p1/offboarding/identities/members", () =>
+        HttpResponse.json({ message: "Forbidden" }, { status: 403 }),
+      ),
+    );
+
+    await expect(offboardingService.fetchMembers("p1")).rejects.toThrow();
+  });
+});

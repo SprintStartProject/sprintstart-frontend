@@ -1,4 +1,4 @@
-import type { RiskQuery } from "../../services/offboardingTypes";
+import type { MemberMatch, RiskQuery } from "../../services/offboardingTypes";
 
 /** How many files a ranking lists; the summary counts all of them. */
 export const RISK_LIST_LIMIT = 200;
@@ -28,6 +28,9 @@ export function endOfDay(date: string): string | undefined {
 
 /** What somebody entered to describe a departure, as the form holds it. */
 export interface DepartureDraft {
+  /** The members chosen to leave, by user id. */
+  memberIds: string[];
+  /** Emails or logins typed in for people the member list does not offer. */
   people: string[];
   /** A calendar day (`yyyy-mm-dd`), or empty for now. */
   asOfDay: string;
@@ -37,7 +40,9 @@ export interface DepartureDraft {
 
 /** Why a draft cannot be ranked yet, or `null` when it can. */
 export function draftProblem(draft: DepartureDraft): string | null {
-  if (draft.people.length === 0) return "Name at least one person who is leaving.";
+  if (draft.memberIds.length === 0 && draft.people.length === 0) {
+    return "Choose at least one person who is leaving.";
+  }
   const weight = parseWeight(draft.reviewWeight);
   if (weight !== undefined && !(weight >= 0)) return "The review weight must be a number from 0.";
   return null;
@@ -47,10 +52,21 @@ function parseWeight(raw: string): number | undefined {
   return raw.trim() === "" ? undefined : Number(raw);
 }
 
+/**
+ * Every identity that leaves: all the identities of the chosen members, then the ones typed in. A
+ * member's commit email and login are different identities in the history, so choosing the member
+ * sends all of them.
+ */
+export function leavingIdentities(draft: DepartureDraft, members: MemberMatch[]): string[] {
+  const chosen = members.filter((member) => draft.memberIds.includes(member.member));
+  const identities = chosen.flatMap((member) => member.identities.map((seen) => seen.identity));
+  return parsePeople([...identities, ...draft.people].join(" "));
+}
+
 /** The request a draft stands for. Call only when {@link draftProblem} is `null`. */
-export function toRiskQuery(draft: DepartureDraft): RiskQuery {
+export function toRiskQuery(draft: DepartureDraft, members: MemberMatch[]): RiskQuery {
   return {
-    leaving: draft.people,
+    leaving: leavingIdentities(draft, members),
     asOf: endOfDay(draft.asOfDay),
     reviewWeight: parseWeight(draft.reviewWeight),
     limit: RISK_LIST_LIMIT,

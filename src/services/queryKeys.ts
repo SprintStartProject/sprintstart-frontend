@@ -70,6 +70,7 @@ export const queryKeys = {
     // rankings, and none may serve another's cache.
     riskMap: (projectId: string, query: RiskQuery) =>
       ["offboarding", "risk", projectId, query] as const,
+    members: (projectId: string) => ["offboarding", "members", projectId] as const,
   },
   knowledgeGaps: {
     mine: (projectId: string) => ["knowledge-gaps", "mine", projectId] as const,
