@@ -182,6 +182,24 @@ describe("FileTree", () => {
     expect(screen.queryByText(/Hotspot/)).not.toBeInTheDocument();
   });
 
+  it("says how much of the selected file was written by people who left, when it was blamed", async () => {
+    const user = userEvent.setup();
+    render(<FileTree files={[file("github:acme/app", "src/A.kt", { abandonedShare: 0.724 })]} />);
+
+    await user.click(button(/A\.kt/));
+
+    expect(screen.getByText("72% of the lines from people who left")).toBeInTheDocument();
+  });
+
+  it("says nothing of the lines of a file that was never blamed", async () => {
+    const user = userEvent.setup();
+    render(<FileTree files={[file("github:acme/app", "src/A.kt", { abandonedShare: null })]} />);
+
+    await user.click(button(/A\.kt/));
+
+    expect(screen.queryByText(/of the lines from people who left/)).not.toBeInTheDocument();
+  });
+
   it("shows no reasons for a map stored before there were any", async () => {
     const user = userEvent.setup();
     render(<FileTree files={FILES} />);
