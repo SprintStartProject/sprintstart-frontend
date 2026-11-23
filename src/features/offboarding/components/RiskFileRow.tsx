@@ -41,8 +41,8 @@ export function RiskFileRow({ file }: { file: FileRisk }) {
       <p className="text-xs text-app-text-muted sm:w-52">
         {describeBreakdown(file.sourceBreakdown)}
       </p>
-      <div className="flex items-center gap-3 sm:w-52 sm:justify-end">
-        <Badge variant={level.variant} size="sm">
+      <div className="flex items-center gap-3 sm:w-72 sm:justify-end">
+        <Badge variant={level.variant} size="sm" className="whitespace-nowrap">
           {level.label}
         </Badge>
         <ScoreBar score={file.score} />

@@ -46,6 +46,8 @@ describe("the list of files at risk", () => {
 
     const row = screen.getByText("src/core/Engine.kt").closest("li")!;
     expect(within(row).getByText("Nobody left")).toBeInTheDocument();
+    // The label stays on one line; a status that wraps reads as two words of two lines.
+    expect(within(row).getByText("Nobody left")).toHaveClass("whitespace-nowrap");
     expect(within(row).getByText("81%")).toBeInTheDocument();
     expect(within(row).getByText("commits 50% · reviews 75%")).toBeInTheDocument();
     expect(within(row).getByRole("meter", { name: "Risk score" })).toHaveAttribute(
