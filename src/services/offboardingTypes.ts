@@ -40,11 +40,35 @@ export interface FileRisk {
   fragmentation: number;
   /** How unevenly the knowledge is spread; maps stored before it was measured have none. */
   concentration?: Concentration | null;
+  /** The files that change together with this one; maps stored before it was measured have none. */
+  coupling?: Coupling | null;
+  /** People who know the surroundings of the file and could take it over, best first. */
+  successors?: Successor[];
   /** Plain sentences that say why the file is on the map; they name nobody. */
   reasons?: string[];
   /** The people who stay and still know the file; at most one. */
   remainingKnowers: string[];
   lastChangedAt: string;
+}
+
+/** A file that tends to change in the same commits as another, and how strongly, from 0 to 1. */
+export interface CoupledFile {
+  repository: string;
+  path: string;
+  degree: number;
+}
+
+/** The files that change together with a file. */
+export interface Coupling {
+  sum: number;
+  /** The most strongly coupled files, strongest first. */
+  partners: CoupledFile[];
+}
+
+/** A person who could take a file over. */
+export interface Successor {
+  person: string;
+  score: number;
 }
 
 /** How unevenly the knowledge of a file is spread over people. */

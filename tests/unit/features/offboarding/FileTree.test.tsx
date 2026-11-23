@@ -130,6 +130,40 @@ describe("FileTree", () => {
     ).toBeInTheDocument();
   });
 
+  it("names who could take the file over and the files it changes together with", async () => {
+    const user = userEvent.setup();
+    const handover = file("github:acme/app", "src/A.kt", {
+      successors: [
+        { person: "ben@x.org", score: 12 },
+        { person: "carol@x.org", score: 6 },
+      ],
+      coupling: {
+        sum: 1.5,
+        partners: [{ repository: "github:acme/app", path: "src/Parser.kt", degree: 0.82 }],
+      },
+    });
+    render(<FileTree files={[handover]} />);
+
+    await user.click(button(/A\.kt/));
+
+    const details = screen.getByRole("status", { name: "Selected file" });
+    expect(within(details).getByText("ben@x.org, carol@x.org")).toBeInTheDocument();
+    expect(within(details).getByText("src/Parser.kt (82%)")).toBeInTheDocument();
+  });
+
+  it("shows only what it has of the handover", async () => {
+    const user = userEvent.setup();
+    const onlySuccessor = file("github:acme/app", "src/A.kt", {
+      successors: [{ person: "ben", score: 3 }],
+    });
+    render(<FileTree files={[onlySuccessor]} />);
+
+    await user.click(button(/A\.kt/));
+
+    expect(screen.getByText("Could take over:")).toBeInTheDocument();
+    expect(screen.queryByText("Changes together with:")).not.toBeInTheDocument();
+  });
+
   it("shows no reasons for a map stored before there were any", async () => {
     const user = userEvent.setup();
     render(<FileTree files={FILES} />);

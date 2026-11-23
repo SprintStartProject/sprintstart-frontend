@@ -29,6 +29,31 @@ function Why({ file }: { file: FileRisk }) {
   );
 }
 
+/** Who could take the file over, and which files it moves with. */
+function Handover({ file }: { file: FileRisk }) {
+  const successors = file.successors ?? [];
+  const partners = file.coupling?.partners ?? [];
+  if (successors.length === 0 && partners.length === 0) return null;
+  return (
+    <dl className="mt-3 space-y-1 text-sm">
+      {successors.length > 0 && (
+        <div className="flex gap-2">
+          <dt className="text-app-text-muted">Could take over:</dt>
+          <dd className="text-app-text">{successors.map((s) => s.person).join(", ")}</dd>
+        </div>
+      )}
+      {partners.length > 0 && (
+        <div className="flex gap-2">
+          <dt className="text-app-text-muted">Changes together with:</dt>
+          <dd className="font-mono text-xs break-all text-app-text">
+            {partners.map((p) => `${p.path} (${percent(p.degree)})`).join(", ")}
+          </dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
 /** The concrete file that was selected: where it is, how it was left and what the evidence says. */
 export function FileDetails({ file }: { file: FileRisk }) {
   const level = LEVELS[file.level];
@@ -51,6 +76,7 @@ export function FileDetails({ file }: { file: FileRisk }) {
         <span className="text-app-text-muted">Last changed {formatDay(file.lastChangedAt)}</span>
       </div>
       <Why file={file} />
+      <Handover file={file} />
       <div className="mt-2 -ml-1.5">
         <SourceLinkButtons file={file} />
       </div>
