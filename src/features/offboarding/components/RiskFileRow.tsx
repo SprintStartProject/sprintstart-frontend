@@ -1,6 +1,7 @@
 import { Badge } from "../../../components/ui/Badge";
 import type { FileRisk, RiskLevel } from "../../../services/offboardingTypes";
 import { describeBreakdown, percent } from "../format";
+import { SourceLinkIcon } from "./SourceLinks";
 
 const LEVELS: Record<RiskLevel, { label: string; variant: "danger" | "warning" }> = {
   ORPHANED: { label: "Nobody left", variant: "danger" },
@@ -49,6 +50,7 @@ export function RiskFileRow({ file }: { file: FileRisk }) {
         <span className="w-10 text-right text-sm font-medium text-app-text">
           {percent(file.score)}
         </span>
+        <SourceLinkIcon file={file} />
       </div>
     </li>
   );
