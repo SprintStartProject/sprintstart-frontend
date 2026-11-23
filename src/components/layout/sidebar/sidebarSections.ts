@@ -12,6 +12,7 @@ import {
   PmDashboardIcon,
   type SidebarIcon,
 } from "../SidebarNavIcons";
+import { OffboardingIcon } from "./OffboardingIcon";
 
 export type SidebarNavItem = {
   label: string;
@@ -86,6 +87,12 @@ const projectManagerNavItems: SidebarNavItem[] = [
     label: "Hire Setup",
     path: "/hire-setup",
     icon: HireSetupIcon,
+  },
+  // What the project loses when somebody leaves: after what is set up for those who arrive.
+  {
+    label: "Offboarding",
+    path: "/offboarding",
+    icon: OffboardingIcon,
   },
 ];
 

@@ -42,6 +42,17 @@ describe("accessPolicy", () => {
       expect(canAccessRoute(null, "/chat")).toBe(false);
     });
 
+    it("offers /offboarding to project managers of the selected project and to admins, not to HR or hires", () => {
+      const pm = createMockProfile(PermissionGroup.PM);
+
+      expect(canAccessRoute(pm, "/offboarding", true)).toBe(true);
+      expect(canAccessRoute(pm, "/offboarding", false)).toBe(false);
+      expect(canAccessRoute(createMockProfile(PermissionGroup.ADMIN), "/offboarding")).toBe(true);
+      // The backend answers 403 to anybody else, so the page is not offered to them.
+      expect(canAccessRoute(createMockProfile(PermissionGroup.HR), "/offboarding")).toBe(false);
+      expect(canAccessRoute(createMockProfile(PermissionGroup.USER), "/offboarding")).toBe(false);
+    });
+
     it("blocks a PM who only has member access to the selected project from the manager-scoped routes", () => {
       const pmProfile = createMockProfile(PermissionGroup.PM);
 

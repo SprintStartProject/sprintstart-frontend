@@ -15,6 +15,7 @@ export type AppRoute =
   | "/blueprints"
   | "/data-ingestion"
   | "/hire-setup"
+  | "/offboarding"
   | "/arrival-steps"
   | "/starter-work"
   | "/admin"
@@ -54,6 +55,9 @@ const routePermissions: Record<AppRoute, readonly PermissionGroup[]> = {
   "/arrival-steps": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/starter-work": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/admin": [PermissionGroup.HR, PermissionGroup.ADMIN],
+  // The offboarding endpoints name the people who stay on a file, so the backend limits them to the
+  // project's managers and admins; HR is left out here too rather than shown a page of refusals.
+  "/offboarding": [PermissionGroup.PM, PermissionGroup.ADMIN],
   "/pm-dashboard": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/team-management": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/insights/faq": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
@@ -82,6 +86,7 @@ const MANAGER_ASSIGNMENT_ROUTES: readonly AppRoute[] = [
   "/pm-dashboard",
   "/data-ingestion",
   "/blueprints",
+  "/offboarding",
   "/team-management",
   "/insights/faq",
   "/insights/knowledge-gaps",

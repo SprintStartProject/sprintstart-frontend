@@ -1,5 +1,6 @@
 import type { IngestionRunFilter } from "../features/data-ingestion/types";
 import type { KnowledgeListParams } from "./knowledgeTypes";
+import type { RiskQuery } from "./offboardingTypes";
 
 /**
  * Central query-key factory, shared by every migrated hook, invalidation call and
@@ -63,6 +64,12 @@ export const queryKeys = {
   notionCredentials: {
     // Not scoped by user id, for the same reason as `atlassianCredentials.mine`.
     mine: () => ["notion-credentials"] as const,
+  },
+  offboarding: {
+    // The whole query is part of the key: who leaves, as of when and with which weights are different
+    // rankings, and none may serve another's cache.
+    riskMap: (projectId: string, query: RiskQuery) =>
+      ["offboarding", "risk", projectId, query] as const,
   },
   knowledgeGaps: {
     mine: (projectId: string) => ["knowledge-gaps", "mine", projectId] as const,
