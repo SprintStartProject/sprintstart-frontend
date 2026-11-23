@@ -43,15 +43,9 @@ export function PeopleInput({ people, onChange }: PeopleInputProps) {
           onKeyDown={handleKey}
           placeholder="ada@example.com or ada-lovelace"
           trailing={
-            <Button
-              iconOnly
-              size="xs"
-              variant="ghost"
-              aria-label="Add person"
-              icon={<Plus className="h-4 w-4" />}
-              onClick={add}
-              type="button"
-            />
+            <Button iconOnly size="xs" variant="ghost" aria-label="Add person" onClick={add}>
+              <Plus className="h-4 w-4" />
+            </Button>
           }
         />
       </Field>
@@ -75,15 +69,9 @@ function PersonChip({ person, onRemove }: { person: string; onRemove: () => void
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft py-0.5 pr-1 pl-3 text-sm text-app-brand-text">
       {person}
-      <Button
-        iconOnly
-        size="xs"
-        variant="ghost"
-        aria-label={`Remove ${person}`}
-        icon={<X className="h-3.5 w-3.5" />}
-        onClick={onRemove}
-        type="button"
-      />
+      <Button iconOnly size="xs" variant="ghost" aria-label={`Remove ${person}`} onClick={onRemove}>
+        <X className="h-3.5 w-3.5" />
+      </Button>
     </span>
   );
 }

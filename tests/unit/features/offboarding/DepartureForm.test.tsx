@@ -32,6 +32,15 @@ describe("DepartureForm", () => {
     expect(chips).toHaveTextContent("carol");
   });
 
+  it("draws an icon on the buttons that add and remove a person", async () => {
+    const { user } = setup();
+    expect(screen.getByRole("button", { name: "Add person" }).querySelector("svg")).not.toBeNull();
+
+    await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}");
+
+    expect(screen.getByRole("button", { name: "Remove ada" }).querySelector("svg")).not.toBeNull();
+  });
+
   it("removes a person again", async () => {
     const { user } = setup();
     await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}ben{Enter}");
