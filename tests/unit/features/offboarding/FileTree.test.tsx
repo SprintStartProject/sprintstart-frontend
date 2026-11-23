@@ -107,6 +107,52 @@ describe("FileTree", () => {
     );
   });
 
+  it("says why the selected file is at risk and how its knowledge is spread", async () => {
+    const user = userEvent.setup();
+    const why = ["Nobody who knows it is left.", "It last changed 14 months ago."];
+    const withReasons = file("github:acme/app", "src/A.kt", {
+      reasons: why,
+      concentration: { effectiveKnowers: 1.14, island: "ada" },
+    });
+    render(<FileTree files={[withReasons]} />);
+
+    await user.click(button(/A\.kt/));
+
+    const details = screen.getByRole("status", { name: "Selected file" });
+    const list = within(details).getByRole("list", { name: "Why this file is at risk" });
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(why);
+    expect(
+      within(details).getByText(/Worth 1\.1 equally strong knowers, a knowledge island: ada/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no reasons for a map stored before there were any", async () => {
+    const user = userEvent.setup();
+    render(<FileTree files={FILES} />);
+
+    await user.click(button(/Reader\.kt/));
+
+    const details = screen.getByRole("status", { name: "Selected file" });
+    expect(within(details).queryByRole("list")).not.toBeInTheDocument();
+    expect(within(details).queryByText(/equally strong/)).not.toBeInTheDocument();
+  });
+
+  it("names a spread without an island by its knowers only", async () => {
+    const user = userEvent.setup();
+    const shared = file("github:acme/app", "src/A.kt", {
+      concentration: { effectiveKnowers: 2, island: null },
+    });
+    render(<FileTree files={[shared]} />);
+
+    await user.click(button(/A\.kt/));
+
+    expect(screen.getByText("Worth 2.0 equally strong knowers")).toBeInTheDocument();
+  });
+
   it("offers a Bitbucket file without a history", async () => {
     const user = userEvent.setup();
     render(<FileTree files={[file("bitbucket:team/app", "src/A.kt")]} />);

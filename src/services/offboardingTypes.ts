@@ -38,9 +38,21 @@ export interface FileRisk {
   sourceBreakdown: Record<string, number>;
   recentActivity: number;
   fragmentation: number;
+  /** How unevenly the knowledge is spread; maps stored before it was measured have none. */
+  concentration?: Concentration | null;
+  /** Plain sentences that say why the file is on the map; they name nobody. */
+  reasons?: string[];
   /** The people who stay and still know the file; at most one. */
   remainingKnowers: string[];
   lastChangedAt: string;
+}
+
+/** How unevenly the knowledge of a file is spread over people. */
+export interface Concentration {
+  /** How many equally strong knowers the spread is worth. */
+  effectiveKnowers: number;
+  /** The person who holds almost all of the knowledge, if one does. */
+  island: string | null;
 }
 
 /** The risk map of a simulated departure. */
