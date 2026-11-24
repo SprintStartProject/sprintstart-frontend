@@ -446,7 +446,9 @@ describe("ProjectDetailsDrawer", () => {
       const user = userEvent.setup();
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
+      await waitFor(() =>
+        expect(screen.getByLabelText(/^Description/)).toHaveValue("Detailed project description"),
+      );
 
       // There is no edit mode to enter first.
       expect(screen.queryByRole("button", { name: /Edit Project/i })).not.toBeInTheDocument();
@@ -469,7 +471,9 @@ describe("ProjectDetailsDrawer", () => {
         />,
       );
 
-      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
+      await waitFor(() =>
+        expect(screen.getByLabelText(/^Description/)).toHaveValue("Detailed project description"),
+      );
 
       await user.type(screen.getByLabelText(/^Description/), "!");
       await user.click(screen.getByRole("button", { name: /Remove Jane Doe from project/ }));
@@ -484,7 +488,9 @@ describe("ProjectDetailsDrawer", () => {
 
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
+      await waitFor(() =>
+        expect(screen.getByLabelText(/^Description/)).toHaveValue("Detailed project description"),
+      );
 
       await user.clear(screen.getByLabelText(/^Name/));
       await user.type(screen.getByLabelText(/^Name/), "Beta");
@@ -504,7 +510,9 @@ describe("ProjectDetailsDrawer", () => {
       const user = userEvent.setup();
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
+      await waitFor(() =>
+        expect(screen.getByLabelText(/^Description/)).toHaveValue("Detailed project description"),
+      );
 
       await user.clear(screen.getByLabelText(/^Name/));
       await user.click(screen.getByRole("button", { name: "Save changes" }));
@@ -517,7 +525,9 @@ describe("ProjectDetailsDrawer", () => {
       const user = userEvent.setup();
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
+      await waitFor(() =>
+        expect(screen.getByLabelText(/^Description/)).toHaveValue("Detailed project description"),
+      );
 
       await user.clear(screen.getByLabelText(/^Name/));
       await user.type(screen.getByLabelText(/^Name/), "Beta");
@@ -531,7 +541,9 @@ describe("ProjectDetailsDrawer", () => {
     it("shows no footer while nothing is staged", async () => {
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
+      await waitFor(() =>
+        expect(screen.getByLabelText(/^Description/)).toHaveValue("Detailed project description"),
+      );
 
       expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
     });
@@ -579,7 +591,9 @@ describe("ProjectDetailsDrawer", () => {
         />,
       );
 
-      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
+      await waitFor(() =>
+        expect(screen.getByLabelText(/^Description/)).toHaveValue("Detailed project description"),
+      );
       expect(screen.queryByTestId("edit-industry-button")).not.toBeInTheDocument();
       expect(screen.queryByTestId("reevaluate-industry-button")).not.toBeInTheDocument();
     });
@@ -650,7 +664,9 @@ describe("ProjectDetailsDrawer", () => {
         />,
       );
 
-      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
+      await waitFor(() =>
+        expect(screen.getByLabelText(/^Description/)).toHaveValue("Detailed project description"),
+      );
 
       await user.click(screen.getByTestId("reevaluate-industry-button"));
 
@@ -685,7 +701,9 @@ describe("ProjectDetailsDrawer", () => {
         />,
       );
 
-      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
+      await waitFor(() =>
+        expect(screen.getByLabelText(/^Description/)).toHaveValue("Detailed project description"),
+      );
       await user.clear(screen.getByLabelText(/^Name/));
       await user.type(screen.getByLabelText(/^Name/), "Renamed draft");
 
