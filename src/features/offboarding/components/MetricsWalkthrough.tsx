@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Ruler } from "lucide-react";
 
-import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Select } from "../../../components/ui/Select";
@@ -35,9 +34,6 @@ function Step({ step }: { step: MetricStep }) {
           {step.number ?? "Σ"}
         </span>
         <h3 className="text-sm font-semibold text-app-text">{step.name}</h3>
-        <Badge variant="neutral" size="sm">
-          {step.id}
-        </Badge>
         <InfoHint text={explanation(step)} label={`About ${step.name}`} />
       </div>
       <div className="min-w-0 flex-1 text-sm text-app-text">
