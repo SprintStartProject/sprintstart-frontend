@@ -22,12 +22,12 @@ function Bar({ value }: { value: number }) {
   );
 }
 
-function Step({ step, number }: { step: MetricStep; number: number }) {
+function Step({ step }: { step: MetricStep }) {
   return (
     <li className="border-t border-app-border px-4 py-4 first:border-t-0">
       <div className="flex flex-wrap items-center gap-2">
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-app-brand-soft text-xs font-semibold text-app-brand">
-          {number}
+          {step.number ?? "Σ"}
         </span>
         <h3 className="text-sm font-semibold text-app-text">{step.name}</h3>
         <Badge variant="neutral" size="sm">
@@ -36,6 +36,10 @@ function Step({ step, number }: { step: MetricStep; number: number }) {
       </div>
       <p className="mt-2 text-sm text-app-text">{step.asks}</p>
       <p className="mt-1 text-sm text-app-text-muted">{step.how}</p>
+      <p className="mt-1 text-sm text-app-text-muted">
+        <span className="font-medium text-app-text">Why: </span>
+        {step.why}
+      </p>
       <div className="mt-2 rounded-lg bg-app-brand-soft px-3 py-2 text-sm text-app-text">
         <span className="font-medium">On this file: </span>
         {step.measured}
@@ -81,8 +85,8 @@ export function MetricsWalkthrough({ map }: { map: RiskMap | undefined }) {
           meta={`${steps.length}`}
         />
         <ol className="-mx-4 -mb-4 border-t border-app-border">
-          {steps.map((step, index) => (
-            <Step key={step.id + step.name} step={step} number={index + 1} />
+          {steps.map((step) => (
+            <Step key={step.id + step.name} step={step} />
           ))}
         </ol>
       </PmCard>
