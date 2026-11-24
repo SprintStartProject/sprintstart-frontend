@@ -28,6 +28,45 @@ const EMPTY_DRAFT: DepartureDraft = {
   knowledge: "authorship",
 };
 
+function ModelFields({
+  draft,
+  onChange,
+}: {
+  draft: DepartureDraft;
+  onChange: (draft: DepartureDraft) => void;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field
+        label="Rank files by"
+        hint="The departing share puts files that lose their knowledge first; the placeholder score also weighs how relevant a file is."
+      >
+        <Select
+          value={draft.ranking}
+          onChange={(event) => onChange({ ...draft, ranking: event.target.value as RankingName })}
+        >
+          <option value="departing-share">Departing share</option>
+          <option value="placeholder">Placeholder score</option>
+        </Select>
+      </Field>
+      <Field
+        label="Who knows a file"
+        hint="Authorship counts whoever wrote enough of it; time-weighted lets evidence fade with its age."
+      >
+        <Select
+          value={draft.knowledge}
+          onChange={(event) =>
+            onChange({ ...draft, knowledge: event.target.value as KnowledgeModelName })
+          }
+        >
+          <option value="authorship">Authorship</option>
+          <option value="time-weighted">Time-weighted</option>
+        </Select>
+      </Field>
+    </div>
+  );
+}
+
 /**
  * Describes a departure: who leaves, as of which day, and whether reviews count next to commits.
  *
@@ -73,34 +112,7 @@ export function DepartureForm({ team, busy, onSubmit }: DepartureFormProps) {
           />
         </Field>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          label="Rank files by"
-          hint="The departing share puts files that lose their knowledge first; the placeholder score also weighs how relevant a file is."
-        >
-          <Select
-            value={draft.ranking}
-            onChange={(event) => setDraft({ ...draft, ranking: event.target.value as RankingName })}
-          >
-            <option value="departing-share">Departing share</option>
-            <option value="placeholder">Placeholder score</option>
-          </Select>
-        </Field>
-        <Field
-          label="Who knows a file"
-          hint="Authorship counts whoever wrote enough of it; time-weighted lets evidence fade with its age."
-        >
-          <Select
-            value={draft.knowledge}
-            onChange={(event) =>
-              setDraft({ ...draft, knowledge: event.target.value as KnowledgeModelName })
-            }
-          >
-            <option value="authorship">Authorship</option>
-            <option value="time-weighted">Time-weighted</option>
-          </Select>
-        </Field>
-      </div>
+      <ModelFields draft={draft} onChange={setDraft} />
       {problem && (
         <p role="alert" className="text-sm text-app-danger-text">
           {problem}

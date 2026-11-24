@@ -161,3 +161,54 @@ export interface MembersOverview {
   total: number;
   members: MemberMatch[];
 }
+
+/** What a stored risk map is, without its ranking. */
+export interface SnapshotSummary {
+  id: string;
+  label: string | null;
+  computedAt: string;
+  asOf: string;
+  departing: string[];
+  profileName: string;
+  files: number;
+  orphaned: number;
+  hoarded: number;
+}
+
+/** A stored risk map with its ranking. */
+export interface Snapshot {
+  snapshot: SnapshotSummary;
+  map: RiskMap;
+}
+
+/** Where one file stands in each of two rankings; a side that does not list it has no values. */
+export interface FileMovement {
+  repository: string;
+  path: string;
+  leftRank: number | null;
+  rightRank: number | null;
+  leftScore: number | null;
+  rightScore: number | null;
+  leftLevel: RiskLevel | null;
+  rightLevel: RiskLevel | null;
+}
+
+/** How far the rankings of two stored risk maps agree. */
+export interface SnapshotComparison {
+  left: SnapshotSummary;
+  right: SnapshotSummary;
+  onlyLeft: number;
+  onlyRight: number;
+  both: number;
+  /** Share of the union of both top lists that is in both, from 0 to 1. */
+  topOverlap: number;
+  /** Spearman's correlation of the shared files, from -1 to 1; none when fewer than two are shared. */
+  rankCorrelation: number | null;
+  movements: FileMovement[];
+}
+
+/** Every stored risk map with its ranking and every person pseudonymised, for the study. */
+export interface StudyExport {
+  exportedAt: string;
+  snapshots: { id: string; computedAt: string; map: RiskMap }[];
+}

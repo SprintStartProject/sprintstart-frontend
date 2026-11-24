@@ -71,6 +71,9 @@ export const queryKeys = {
     riskMap: (projectId: string, query: RiskQuery) =>
       ["offboarding", "risk", projectId, query] as const,
     members: (projectId: string) => ["offboarding", "members", projectId] as const,
+    snapshots: (projectId: string) => ["offboarding", "snapshots", projectId] as const,
+    comparison: (projectId: string, left: string, right: string) =>
+      ["offboarding", "comparison", projectId, left, right] as const,
   },
   knowledgeGaps: {
     mine: (projectId: string) => ["knowledge-gaps", "mine", projectId] as const,
