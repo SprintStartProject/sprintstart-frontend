@@ -1,11 +1,7 @@
-// ============================================================
-// features/onboarding/itemNumbers.ts
-// ============================================================
 // The number a phase's steps and questions carry on screen, so
 // a hire can say "let's do 3" to their buddy and mean this one.
-// ============================================================
 
-import type { OnboardingPhaseEndpoint } from "./types";
+import type { OnboardingPhaseEndpoint } from "../../services/onboardingTypes";
 
 /**
  * The number each item of a phase is shown with, keyed by id.

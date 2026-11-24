@@ -72,9 +72,7 @@ export function MarkPopover({ anchor, color, onPick, onRemove, onClose }: MarkPo
   const bar = useRef<HTMLDivElement>(null);
 
   // Naming a colour lives here, and only here, because this is the one moment somebody is actually
-  // thinking about what a colour means: they are pointing at a sentence they marked. It used to be
-  // a row of names above the cards, permanently on, where it read as a set of filters, did nothing
-  // when pressed but open a text field, and asked a question nobody had at that moment.
+  // thinking about what a colour means: they are pointing at a sentence they marked.
   const [naming, setNaming] = useState(false);
   const [draft, setDraft] = useState("");
   const field = useRef<HTMLInputElement>(null);

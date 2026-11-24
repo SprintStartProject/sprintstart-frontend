@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { formatRelativeDate, formatDate } from "../../../../src/features/knowledge-gaps/format";
 
 const MINUTE = 60 * 1000;
@@ -7,6 +7,18 @@ const DAY = 24 * HOUR;
 
 describe("knowledge-gaps format", () => {
   describe("formatRelativeDate", () => {
+    // Pinned to midday: the function counts calendar days in the test zone, and "now minus N
+    // times 24 hours" lands on a different calendar day for the hour around midnight whenever a
+    // daylight-saving change lies in between.
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-15T12:00:00+02:00"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('returns "just now" for a timestamp seconds old', () => {
       expect(formatRelativeDate(new Date().toISOString())).toBe("just now");
     });

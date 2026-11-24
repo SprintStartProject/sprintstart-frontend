@@ -1,9 +1,5 @@
-// ============================================================
-// features/knowledge-gaps/ownerAnnouncement.ts
-// ============================================================
 // What a user has acknowledged about the components they own,
 // and which of them the dialog has already interrupted about.
-// ============================================================
 
 // Two records, because they answer different questions and one is far stickier than the
 // other. The dialog interrupts about a component exactly once, ever -- being told twice that

@@ -1,5 +1,3 @@
-// Shared display formatters for the buddy feature.
-
 /**
  * Whole calendar days between the given ISO timestamp and today.
  * Returns 0 (today) for missing or unparseable dates so freshly-created chats

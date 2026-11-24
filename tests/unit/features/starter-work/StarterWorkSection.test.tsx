@@ -7,7 +7,7 @@ import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { starterWorkService } from "../../../../src/services/starterWorkService";
 import { orientationService } from "../../../../src/services/orientationService";
 import { userService } from "../../../../src/services/userService";
-import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
+import type { StarterWorkTask } from "../../../../src/services/starterWorkTypes";
 
 const selectedProjectId = vi.hoisted(() => ({ current: "p1" }));
 

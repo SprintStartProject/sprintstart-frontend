@@ -5,7 +5,7 @@ import { IconTile } from "../../../components/ui/IconTile.tsx";
 import { SourceTypeStep } from "../components/SourceTypeStep.tsx";
 import { getConnector } from "../connectors/registry.ts";
 import type { DraftSource } from "../connectors/draft.ts";
-import type { SourceSystem } from "../connectors/sourceSystems.ts";
+import type { SourceSystem } from "../../../services/sourceSystems.ts";
 import type { DraftFormContext } from "../connectors/types.ts";
 
 /** The two screens of the add-source sub-flow: pick a type, then fill it in. */

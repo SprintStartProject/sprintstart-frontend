@@ -1,8 +1,8 @@
 import { Plus } from "lucide-react";
 import { Button } from "../../../../../components/ui/Button";
-import { StagedSourceList } from "../../../../data-ingestion/add-source/StagedSourceList";
-import type { SourceOwnerOption } from "../../../../data-ingestion/add-source/sourceOwners";
-import type { DraftSource } from "../../../../data-ingestion/add-source/projectSourcesDraft";
+import { StagedSourceList } from "../../../../data-ingestion";
+import type { SourceOwnerOption } from "../../../../data-ingestion";
+import type { DraftSource } from "../../../../data-ingestion";
 
 type WizardSourcesStepProps = {
   sources: DraftSource[];

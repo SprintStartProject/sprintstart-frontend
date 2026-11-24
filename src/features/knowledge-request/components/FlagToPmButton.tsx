@@ -4,7 +4,7 @@ import { AlertTriangle, Check, Flag } from "lucide-react";
 import { AutoResizeTextarea } from "../../../components/ui/AutoResizeTextarea";
 import { Button } from "../../../components/ui/Button";
 import { IconTile } from "../../../components/ui/IconTile";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 
 type FlagToPmButtonProps = {

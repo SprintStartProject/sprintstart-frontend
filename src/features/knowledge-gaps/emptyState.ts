@@ -1,4 +1,4 @@
-import type { KnowledgeGapOverview } from "./types";
+import type { KnowledgeGapOverview } from "../../services/knowledgeGapTypes";
 
 /**
  * Which of the four "nothing to list" situations the panel is in.

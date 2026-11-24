@@ -101,8 +101,6 @@ type Palette = {
   surface: string;
 };
 
-// --- Game constants (logical 600x400 coordinate space) ---
-
 const CANVAS_WIDTH = 600;
 const CANVAS_HEIGHT = 400;
 const PLAYER_SPEED = 320;
@@ -327,7 +325,6 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
     worldRef.current.shootHeld = false;
   }, []);
 
-  // --- Keyboard input (Escape, Space, Arrows / A-D) ---
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       // Shortcuts (Ctrl/Cmd+A, Alt+D, …) and typing belong to the browser and
@@ -387,7 +384,6 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
     };
   }, [pressShoot, releaseShoot, onExit]);
 
-  // --- Render + physics loop ---
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;

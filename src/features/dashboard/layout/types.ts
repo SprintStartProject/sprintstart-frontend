@@ -1,9 +1,5 @@
-// ============================================================
-// features/dashboard/layout/types.ts
-// ============================================================
 // The vocabulary of the configurable dashboard: which widgets
 // exist, how big they may be, and who is allowed to place them.
-// ============================================================
 
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";

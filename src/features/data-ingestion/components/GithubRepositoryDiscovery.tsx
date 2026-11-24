@@ -13,7 +13,7 @@ import {
 
 // Re-exported so the wizard, the add-source modal and the draft helpers keep
 // importing the selection types from here.
-export type { DiscoverySelection, RepositoryLinkState } from "./RepositoryDiscovery.tsx";
+export type { DiscoverySelection } from "./RepositoryDiscovery.tsx";
 
 type GithubRepositoryDiscoveryProps = {
   tokenNames: string[];

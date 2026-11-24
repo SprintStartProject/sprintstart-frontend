@@ -1,0 +1,282 @@
+// All types of the onboarding area.
+
+export interface OnboardingPathSummaryEndpoint {
+  id: string;
+  userId: string;
+  createdAt: string;
+  phaseCount: number;
+  stepCount: number;
+  finishedStepCount: number;
+}
+
+export type StepStatus = "WAITING" | "IN_PROGRESS" | "FINISHED" | "SKIPPED";
+export type StepType = "VIDEO" | "DOCUMENT" | "TASK" | "LINK";
+export type GenerationStatus =
+  "NOT_APPLICABLE" | "GENERATED" | "EMPTY" | "SKIPPED" | "FAILED" | "TIMED_OUT";
+// Matches the backend SkipStatus enum (CreateOnboardingSkipResponse.status etc.)
+export type SkipStatus = "PENDING" | "ACCEPTED" | "DENIED";
+
+export interface OnboardingStepFeedback {
+  id: string;
+  stepId: string;
+  helpful: boolean | null;
+  comment: string;
+  createdAt: string;
+}
+
+export interface OnboardingStepSkip {
+  id: string;
+  stepId: string;
+  reason: string;
+  accepted: boolean | null;
+  reviewComment: string | null;
+  reviewedAt: string | null;
+  /** When the member saw the PM's answer; null while it is new to them. */
+  answerSeenAt?: string | null;
+}
+
+/** Who put a step on a path — see the backend's `StepOrigin`. */
+export type StepOrigin = "GENERATED" | "PM" | "HIRE" | "BUDDY";
+
+export interface OnboardingStepEndpoint {
+  id: string;
+  phaseId: string;
+  position: number;
+  isAiAssisted?: boolean;
+  /**
+   * Who put this step on the path.
+   *
+   * Optional because a row written before the column existed carries none; `StepOriginBadge` falls
+   * back to `isAiAssisted` for those, which is the only signal they have.
+   */
+  origin?: StepOrigin;
+  title: string;
+  description: string;
+  type: StepType;
+  estimatedMinutes: number;
+  expectedOutcomes: string[];
+  tasks: OnboardingTaskEndpoint[];
+  resources: OnboardingResourceEndpoint[];
+  status: StepStatus;
+  startedAt: string | null;
+  completedAt: string | null;
+  feedback: OnboardingStepFeedback | null;
+  skip: OnboardingStepSkip | null;
+  /** Persisted position copied from the blueprint phase subgraph. */
+  graphX?: number | null;
+  graphY?: number | null;
+  /** IDs of prerequisite steps or knowledge-check questions in the same phase. */
+  blockerIds?: string[];
+  /** True when the phase or an in-phase blocker keeps this step out of reach. */
+  locked?: boolean;
+}
+
+export interface OnboardingPhaseEndpoint {
+  id: string;
+  pathId: string;
+  position: number;
+  title: string;
+  description: string;
+  locked: boolean;
+  steps: OnboardingStepEndpoint[];
+  /** The phase's knowledge-check questions, first-class nodes alongside its steps. */
+  questions: OnboardingQuestionEndpoint[];
+  /** Persisted position copied from the blueprint path graph. */
+  graphX?: number | null;
+  graphY?: number | null;
+  /** IDs of prerequisite phases in this onboarding path. */
+  blockerIds?: string[];
+  generationStatus?: GenerationStatus;
+}
+
+export interface OnboardingGenerationIssueEndpoint {
+  phaseId: string;
+  title: string;
+  status: "EMPTY" | "SKIPPED" | "FAILED" | "TIMED_OUT";
+}
+
+export interface OnboardingPathEndpoint {
+  id: string;
+  userId: string;
+  createdAt: string;
+  phases: OnboardingPhaseEndpoint[];
+  blueprintId?: string | null;
+  /** AI phases retained for auditing but omitted from the visible journey. */
+  generationIssues?: OnboardingGenerationIssueEndpoint[];
+}
+
+export interface OnboardingTaskEndpoint {
+  id: string;
+  stepId: string;
+  position: number;
+  title: string;
+  description: string;
+  finished: boolean;
+}
+
+export interface OnboardingResourceEndpoint {
+  id: string;
+  stepId: string;
+  title: string;
+  description: string;
+  url: string;
+}
+
+export interface OnboardingSkipEndpoint {
+  id: string;
+  stepId: string;
+  status: SkipStatus;
+  reason: string;
+  reviewComment: string | null;
+  createdAt: string;
+  resolvedAt?: string | null;
+  reviewedAt?: string | null;
+}
+
+export interface OnboardingStepDetail extends OnboardingStepEndpoint {
+  tasks: OnboardingTaskEndpoint[];
+  resources: OnboardingResourceEndpoint[];
+}
+
+export type CheckQuestionType = "MULTIPLE_CHOICE" | "SHORT_TEXT";
+
+/** Availability of a question for the user, derived by the backend. */
+export type QuestionStatus = "LOCKED" | "OPEN" | "RETRY" | "PASSED";
+
+export interface OnboardingQuestionOptionEndpoint {
+  id: string;
+  position: number;
+  label: string;
+}
+
+/** A knowledge-check question embedded in the user's path, alongside the phase's steps. */
+export interface OnboardingQuestionEndpoint {
+  id: string;
+  phaseId: string;
+  position: number;
+  type: CheckQuestionType;
+  question: string;
+  // Only present for MULTIPLE_CHOICE questions
+  options?: OnboardingQuestionOptionEndpoint[];
+  status: QuestionStatus;
+  /** Display title copied from the blueprint question. */
+  title?: string;
+  graphX?: number | null;
+  graphY?: number | null;
+  blockerIds?: string[];
+}
+
+// POST /onboarding/me/questions/{questionId}/attempts — reveals correct answers
+export interface QuestionAttemptSubmission {
+  selectedOptionIds?: string[];
+  textAnswer?: string;
+}
+
+export interface QuestionAttemptResult {
+  attemptId: string;
+  questionId: string;
+  correct: boolean;
+  createdAt: string;
+  correctOptionIds: string[];
+  correctAnswer: string | null;
+  explanation: string | null;
+  // AI feedback for short-text answers; null for multiple choice.
+  feedback: string | null;
+  status: QuestionStatus;
+  // True when this attempt completed the entire onboarding journey.
+  onboardingCompleted: boolean;
+}
+
+export interface AdminQuestionOptionEndpoint {
+  id: string;
+  position: number;
+  label: string;
+  correct: boolean;
+}
+
+export interface AdminQuestionEndpoint {
+  id: string;
+  position: number;
+  type: CheckQuestionType;
+  question: string;
+  explanation: string | null;
+  correctAnswer?: string | null;
+  options?: AdminQuestionOptionEndpoint[];
+}
+
+export interface AdminPhaseQuestionsEndpoint {
+  phaseId: string;
+  questions: AdminQuestionEndpoint[];
+}
+
+export interface UpsertQuestion {
+  /**
+   * ID of an existing question, so it survives the update with its identity intact.
+   * Omit for questions being created.
+   *
+   * Sending it back matters: stored attempts reference questions by ID, so a question
+   * recreated instead of updated loses its whole history.
+   */
+  id?: string | null;
+  position: number;
+  type: CheckQuestionType;
+  question: string;
+  explanation?: string | null;
+  // SHORT_TEXT only
+  correctAnswer?: string | null;
+  // MULTIPLE_CHOICE only
+  options?: {
+    /** ID of an existing option; omit for new ones. Stored attempts reference these. */
+    id?: string | null;
+    position: number;
+    label: string;
+    correct: boolean;
+  }[];
+}
+
+// GET /onboarding/users/{userId}/questions/{questionId}/attempts
+export interface QuestionAttemptsReviewEndpoint {
+  userId: string;
+  questionId: string;
+  attempts: {
+    id: string;
+    correct: boolean;
+    createdAt: string;
+    selectedOptionIds: string[];
+    textAnswer: string | null;
+  }[];
+}
+
+export interface OnboardingPersonalizeEvent {
+  type: "stage" | "path" | "done" | "error";
+  name?: string;
+  detail?: string;
+  path?: OnboardingPathEndpoint;
+  message?: string;
+  /** On `error`: a code the client can explain, e.g. `not-enough-knowledge`. */
+  reason?: string;
+}
+
+/** GET /projects/{projectId}/onboarding/me/path/generation */
+export interface OnboardingGenerationStatus {
+  running: boolean;
+  runningProjectId?: string | null;
+  startedAt?: string | null;
+  hasActiveBlueprint: boolean;
+  /** Tells "none yet" from "several, which is ambiguous" when `hasActiveBlueprint` is false. */
+  activeBlueprintCount?: number;
+}
+
+export interface OnboardingPersonalizeHandlers {
+  onStage?: (name: string, detail?: string) => void;
+  onPath: (path: OnboardingPathEndpoint) => void;
+  onDone: () => void;
+  /** `reason` is a code for failures the client can explain, e.g. `not-enough-knowledge`. */
+  onError?: (message: string, reason?: string) => void;
+  /**
+   * The stream ended without `done` or `error`. The backend always terminates with one of the
+   * two, so this means the connection was cut -- an idle proxy, a restart, a dropped network --
+   * while the run itself carries on detached. Not a finished path.
+   */
+  onInterrupted?: () => void;
+}

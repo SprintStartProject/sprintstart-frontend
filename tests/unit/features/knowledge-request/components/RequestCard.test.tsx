@@ -6,7 +6,7 @@ import { RequestCard } from "../../../../../src/features/knowledge-request/compo
 import type {
   EscalationHire,
   KnowledgeRequest,
-} from "../../../../../src/features/knowledge-request/types";
+} from "../../../../../src/services/knowledgeRequestTypes";
 
 const hire = (overrides: Partial<EscalationHire> = {}): EscalationHire => ({
   userId: "u2",

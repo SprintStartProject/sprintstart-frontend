@@ -1,4 +1,4 @@
-import type { ArrivalStep } from "./types";
+import type { ArrivalStep } from "../../services/arrivalTypes";
 
 /**
  * How many distinct steps a hire actually sees once a project's overrides replace their

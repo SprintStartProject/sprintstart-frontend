@@ -3,9 +3,9 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AskTheBuddy } from "../../buddy";
 import { AddTaskToBoard } from "./AddTaskToBoard";
-import { GrabTaskButton } from "../../task-pool/components/GrabTaskButton";
+import { GrabTaskButton } from "../../task-pool";
 import type { BoardCard, SuggestedTasksContent } from "../types";
 
 type SuggestedTasksCardProps = {
@@ -24,9 +24,8 @@ type SuggestedTasksCardProps = {
  * line per signal, and a number is not something a hire can act on. The order already carries
  * everything a score would say.
  *
- * Grabbing is a button here, with its own confirm step (see `GrabTaskButton`). It used to be
- * buddy-only — "I want to work on this" opened the conversation and the mentor proposed the claim —
- * but a hire who already knows what they want should not need a conversation to say so. The buddy
+ * Grabbing is a button here, with its own confirm step (see `GrabTaskButton`): a hire who already
+ * knows what they want should not need a conversation to say so. The buddy
  * is still one press away, for the hire who wants a second opinion first.
  */
 export function SuggestedTasksCard({

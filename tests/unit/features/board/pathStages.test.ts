@@ -7,7 +7,7 @@ import {
   placeOfUrl,
 } from "../../../../src/features/board/layout/pathStages";
 import type { BoardCard } from "../../../../src/features/board/types";
-import type { OnboardingPathEndpoint } from "../../../../src/features/onboarding/types";
+import type { OnboardingPathEndpoint } from "../../../../src/services/onboardingTypes";
 
 function note(id: string): BoardCard {
   return {

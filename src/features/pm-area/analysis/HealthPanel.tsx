@@ -2,7 +2,7 @@ import { animate, useReducedMotion } from "framer-motion";
 import { CircleAlert, RotateCcw, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../../components/ui/Button";
-import { formatRelativeDate } from "../../knowledge-gaps/format";
+import { formatRelativeDate } from "../../knowledge-gaps";
 import { AREA_META, AREA_ORDER, SEVERITY_META, SEVERITY_RANK, scoreGlow } from "./analysisMeta";
 import {
   countBySeverity,

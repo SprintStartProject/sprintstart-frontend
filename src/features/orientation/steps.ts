@@ -1,4 +1,4 @@
-import type { OrientationStep } from "./types";
+import type { OrientationStep } from "../../services/orientationTypes";
 
 /**
  * What each step is called for a reader.

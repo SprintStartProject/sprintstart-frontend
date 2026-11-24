@@ -13,7 +13,7 @@ import {
   User,
 } from "lucide-react";
 
-import type { KnowledgeGapSeverity } from "../types";
+import type { KnowledgeGapSeverity } from "../../../services/knowledgeGapTypes";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { useToast } from "../../../context/useToast";
 import { useLiveFetch } from "../../../hooks/useLiveFetch";
@@ -28,9 +28,9 @@ import { Button } from "../../../components/ui/Button";
 import type { FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { queryKeys } from "../../../services/queryKeys";
-import { PmSectionHeader, PmStat } from "../../pm-area/components/PmCard";
-import { PmFilterChip, PmListToolbar } from "../../pm-area/components/PmListToolbar";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { PmSectionHeader, PmStat } from "../../pm-area";
+import { PmFilterChip, PmListToolbar } from "../../pm-area";
+import { useProjectContext } from "../../projects";
 
 type GapSortOption = "severity" | "date" | "component";
 
@@ -70,8 +70,7 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
   const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
 
-  // The severities chosen to narrow the list; none chosen shows them all. It used to start with all
-  // four chosen, which drew four brand-filled chips on every visit for a list nobody had narrowed.
+  // The severities chosen to narrow the list; none chosen shows them all.
   const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([]);
   const [sortBy, setSortBy] = useState<GapSortOption>("severity");
   const [query, setQuery] = useState("");

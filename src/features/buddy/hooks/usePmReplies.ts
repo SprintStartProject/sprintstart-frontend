@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { KnowledgeRequest } from "../../knowledge-request/types";
+import type { KnowledgeRequest } from "../../knowledge-request";
 
 export type PmReplies = {
   /** Questions the PM has answered, with the answer itself. */

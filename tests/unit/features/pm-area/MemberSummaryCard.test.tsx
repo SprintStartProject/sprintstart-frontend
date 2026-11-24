@@ -8,8 +8,8 @@ import {
 import type {
   OnboardingPathEndpoint,
   OnboardingStepEndpoint,
-} from "../../../../src/features/onboarding/types";
-import type { TeamOverviewUser } from "../../../../src/features/team-management/types";
+} from "../../../../src/services/onboardingTypes";
+import type { TeamOverviewUser } from "../../../../src/services/teamManagementTypes";
 
 function step(overrides: Partial<OnboardingStepEndpoint>): OnboardingStepEndpoint {
   return {

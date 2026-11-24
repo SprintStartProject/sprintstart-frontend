@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
-import { formatRelativeDate } from "../../knowledge-gaps/format";
+import { formatRelativeDate } from "../../knowledge-gaps";
 import { AnalysisMap, type MapSelection } from "./AnalysisMap";
 import { AnalysisOrbit } from "./AnalysisOrbit";
 import { scoreGlow } from "./analysisMeta";

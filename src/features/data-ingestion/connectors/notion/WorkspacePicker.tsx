@@ -13,7 +13,7 @@ import {
   type NotionCredentialDto,
   type NotionPageDto,
 } from "../../../../services/sources/notionService.ts";
-import { describeNotionCredentialError } from "../../../settings/components/notion/notionCredentialErrors.ts";
+import { describeNotionCredentialError } from "../../../settings";
 import { notionConnections } from "./connections.ts";
 
 /** The workspace of the chosen credential, handed to the form's draft. */

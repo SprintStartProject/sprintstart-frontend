@@ -1,8 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { myStarterWorkService } from "../../../services/myStarterWorkService";
 import { queryKeys } from "../../../services/queryKeys";
-import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
-import type { Board, CurrentTaskContent } from "../../board/types";
+import { useInvalidateBoard } from "../../board";
+import type { Board, CurrentTaskContent } from "../../board";
 
 /**
  * The task the hire is on right now, read off the board already in the cache.

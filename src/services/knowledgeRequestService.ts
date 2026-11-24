@@ -1,5 +1,5 @@
 import { ApiError, apiClient } from "./apiClient";
-import type { CanonicalAnswer, KnowledgeRequest } from "../features/knowledge-request/types";
+import type { CanonicalAnswer, KnowledgeRequest } from "./knowledgeRequestTypes";
 
 const BASE = "/api/v1/onboarding";
 

@@ -52,8 +52,7 @@ export function useKnownOpenEscalationCount(
   const isActive = enabled && Boolean(projectId);
 
   // Re-subscribed on a project switch so the closure always invalidates the
-  // project actually on screen. What used to be a local nonce bumped on this
-  // event is now a direct cache invalidation of that project's own query.
+  // project actually on screen. It invalidates that project's own query directly.
   useEffect(() => {
     if (!projectId) return;
     return onOpenEscalationsChanged(() => {

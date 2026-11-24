@@ -7,7 +7,7 @@ import { parseApiError } from "../../../services/apiError";
 import { projectService, type AdminProjectDetails } from "../../../services/projectService";
 import { useProjectContext } from "../useProjectContext";
 import { ProjectIndustryPanel } from "./ProjectIndustryPanel";
-import { PmCard, PmCardHeader } from "../../pm-area/components/PmCard";
+import { PmCard, PmCardHeader } from "../../pm-area";
 
 /**
  * PM overview card showing the selected project's detected industry.

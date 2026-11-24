@@ -1,10 +1,6 @@
-// ============================================================
-// features/onboarding/graph/layout.ts
-// ============================================================
 // Lays out an onboarding graph -- the phases of a path, or the
 // steps and questions of a phase -- when it has no positions of
 // its own, and orders its items the way the graph reads.
-// ============================================================
 
 export type GraphPoint = { x: number; y: number };
 

@@ -4,10 +4,11 @@ import { arrivalService } from "../../../services/arrivalService";
 import { Spinner } from "../../../components/ui/Spinner";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { useCardMarks } from "../marks/useCardMarks";
-import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
-import { ArrivalStepList } from "../../arrival/components/ArrivalStepList";
-import { summarise } from "../../arrival/summarise";
-import type { ArrivalStep } from "../../arrival/types";
+import { AskTheBuddy } from "../../buddy";
+import { ArrivalStepList } from "../../arrival";
+import { Marked } from "./Marked";
+import { summarise } from "../../arrival";
+import type { ArrivalStep } from "../../../services/arrivalTypes";
 import type { ArrivalStepsContent, BoardCard } from "../types";
 
 type ArrivalStepsCardProps = {
@@ -100,8 +101,7 @@ export function ArrivalStepsCard({ content, card, onDismiss, dismissing }: Arriv
     >
       <ArrivalStepList
         steps={steps}
-        marks={marks}
-        cardId={card.id}
+        renderText={(text) => <Marked text={text} marks={marks} cardId={card.id} />}
         pendingKey={pendingKey}
         failedKey={failedKey}
         onConfirm={(step) => void confirm(step)}

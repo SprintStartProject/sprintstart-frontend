@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { starterWorkService } from "../../../services/starterWorkService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { StarterWorkCandidate, StarterWorkTask } from "../types";
+import type { StarterWorkCandidate, StarterWorkTask } from "../../../services/starterWorkTypes";
 import type { PoolFlightRect } from "../components/poolFlight";
 
 function toMessage(error: unknown, fallback: string): string {
@@ -72,8 +72,7 @@ export function useCorpusIssueBrowser(
   const candidates = projectId ? (data ?? NO_CANDIDATES) : NO_CANDIDATES;
 
   // A fresh, successful load (a project switch, or react-query's own background
-  // revalidation) supersedes a stale promote failure the same way it used to
-  // when both lived in one shared error slot. Deferred to a microtask so this
+  // revalidation) supersedes a stale promote failure. Deferred to a microtask so this
   // setState call doesn't run synchronously in the effect body (React's
   // cascading-render guard).
   useEffect(() => {

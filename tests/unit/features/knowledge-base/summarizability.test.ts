@@ -5,7 +5,7 @@ import {
   isEmptyContent,
   summariseBlockReason,
 } from "../../../../src/features/knowledge-base/summarizability";
-import type { ArtifactContent } from "../../../../src/features/knowledge-base/types";
+import type { ArtifactContent } from "../../../../src/services/knowledgeTypes";
 
 function content(overrides: Partial<ArtifactContent> = {}): ArtifactContent {
   return { content: "", mimeType: "text/plain", isObjectUrl: false, ...overrides };

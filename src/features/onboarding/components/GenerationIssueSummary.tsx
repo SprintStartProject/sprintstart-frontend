@@ -1,5 +1,5 @@
 import { groupIssues } from "../generationIssues.ts";
-import type { OnboardingGenerationIssueEndpoint } from "../types.ts";
+import type { OnboardingGenerationIssueEndpoint } from "../../../services/onboardingTypes.ts";
 
 /**
  * Why phases are missing from a journey, grouped by what actually happened to them.

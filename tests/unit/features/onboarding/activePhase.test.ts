@@ -7,7 +7,7 @@ import type {
   OnboardingStepEndpoint,
   QuestionStatus,
   StepStatus,
-} from "../../../../src/features/onboarding/types";
+} from "../../../../src/services/onboardingTypes";
 
 function makeStep(status: StepStatus): OnboardingStepEndpoint {
   return {

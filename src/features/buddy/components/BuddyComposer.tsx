@@ -410,9 +410,8 @@ export function BuddyComposer({
         <Button
           type="submit"
           variant="primary"
-          // `sm`, not the default: the send button sets the height of the whole bar, and at
-          // `md` (44px) plus the frame's padding the composer was a good deal taller than the
-          // one line it usually holds.
+          // `sm`, not the default: the send button sets the bar's height, and `md` would make it
+          // taller than the one line it usually holds.
           size="sm"
           iconOnly
           aria-label={streaming ? "Queue message" : "Send message"}

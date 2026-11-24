@@ -1,10 +1,6 @@
-// ============================================================
-// features/onboarding/graph/nodeLabels.ts
-// ============================================================
 // Sizes and words shared by the graph cards and the lists, kept
 // apart from the card components so those files export only
 // components (fast refresh).
-// ============================================================
 
 import type { ItemState, PhaseItem, PhaseState } from "../journey";
 

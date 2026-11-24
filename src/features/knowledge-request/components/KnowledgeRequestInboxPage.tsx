@@ -9,9 +9,9 @@ import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { PermissionGroup } from "../../../services/types";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 import { queryKeys } from "../../../services/queryKeys";
-import { PmSectionHeader } from "../../pm-area/components/PmCard";
-import { INBOX_VIEW_PARAM } from "../../pm-area/pmWorkspacePaths";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { PmSectionHeader } from "../../pm-area";
+import { INBOX_VIEW_PARAM } from "../../pm-area";
+import { useProjectContext } from "../../projects";
 import { RequestCard } from "./RequestCard";
 import { CanonicalAnswerCard } from "./CanonicalAnswerCard";
 
@@ -25,9 +25,9 @@ const TAB_ORDER: Tab[] = ["open", "answered"];
  * dismisses a one-off. The "Durable answers" tab shows the knowledge that has accumulated, editable
  * when reality changes. PM/HR read; only PM/ADMIN write (enforced server-side too).
  *
- * Lives in the PM workspace as its own section (it used to be a sidebar entry and a page of its
- * own). Per-project, since escalations belong to a project; a switcher scopes it. Empty states separate
- * "no project" from "inbox clear" — a clear inbox is a good state, not a missing one.
+ * Lives in the PM workspace as its own section. Per-project, since escalations belong to a project;
+ * a switcher scopes it. Empty states separate "no project" from "inbox clear" — a clear inbox is a
+ * good state, not a missing one.
  */
 export function KnowledgeRequestInboxPage() {
   const { profile } = useAuth();

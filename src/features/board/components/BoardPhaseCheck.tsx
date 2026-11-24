@@ -1,8 +1,8 @@
 import { ArrowRight, ClipboardCheck, Highlighter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "../../../components/ui/Badge";
-import { resolveNextAction } from "../../onboarding/nextAction";
-import type { OnboardingPathEndpoint } from "../../onboarding/types";
+import { resolveNextAction } from "../../onboarding";
+import type { OnboardingPathEndpoint } from "../../onboarding";
 import { cardName } from "../layout/cardNames";
 import type { CardOrigins } from "../layout/cardOrigins";
 import { phaseOfCard, type PathPhases } from "../layout/pathStages";

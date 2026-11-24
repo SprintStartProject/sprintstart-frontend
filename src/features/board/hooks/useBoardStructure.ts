@@ -24,8 +24,8 @@ export type UseBoardStructureResult = {
 /**
  * The board's process layer: which stage each card is in, what it waits on, and what that makes it.
  *
- * Read once per board and written on every change, the way the folded and pinned sets are. It is no
- * longer only local: `sync/useBoardStructureSync.ts` carries it to the server and brings it back,
+ * Read once per board and written on every change, the way the folded and pinned sets are.
+ * `sync/useBoardStructureSync.ts` carries it to the server and brings it back,
  * and the re-read below is how an arrangement that arrived that way reaches the screen.
  *
  * The read is derived during render rather than in an effect, matching `BoardPage`'s handling of
@@ -36,7 +36,7 @@ export type UseBoardStructureResult = {
  * keeps "blocked" from going stale: it is a question about other cards, answered fresh on every
  * board, and never a flag anybody has to remember to clear.
  *
- * Which stage a card is in is not part of what is kept here any more: it comes from the onboarding
+ * Which stage a card is in is not kept here: it comes from the onboarding
  * path, as `stageOf` (see `layout/pathStages.ts`), so there is nothing for the hire to set.
  */
 export function useBoardStructure(

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useOnboardingPath } from "../../../../src/features/board/hooks/useOnboardingPath";
 import { announceBuddyPathChanged } from "../../../../src/features/buddy/aiBuddyBus";
-import type { OnboardingPathEndpoint } from "../../../../src/features/onboarding/types";
+import type { OnboardingPathEndpoint } from "../../../../src/services/onboardingTypes";
 import { ApiError } from "../../../../src/services/apiClient";
 import { onboardingService } from "../../../../src/services/onboardingService";
 

@@ -1,4 +1,4 @@
-import { FlagToPmButton } from "../../knowledge-request/components/FlagToPmButton";
+import { FlagToPmButton } from "../../knowledge-request";
 
 /**
  * What a hire can do with a question they have already asked.
@@ -18,8 +18,7 @@ export function BuddyQuestionActions({ question }: { question: string }) {
     <div className="-mr-2 flex justify-end">
       <FlagToPmButton
         defaultQuestion={question}
-        // Short, because it repeats under every question. The default phrasing ("Buddy can't
-        // help?") is a reaction to an answer, which is not what this is attached to any more.
+        // Short, because it repeats under every question.
         triggerLabel="Send this to your PM"
       />
     </div>

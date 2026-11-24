@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { itemNumbers } from "../../../../src/features/onboarding/itemNumbers";
-import type { OnboardingPhaseEndpoint } from "../../../../src/features/onboarding/types";
+import type { OnboardingPhaseEndpoint } from "../../../../src/services/onboardingTypes";
 
 /**
  * The number an item is shown with.

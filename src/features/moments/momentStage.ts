@@ -1,13 +1,11 @@
 /**
  * Where the page-scoped moments play.
  *
- * The onboarding launch and landing used to take the whole screen; now they
- * cover only the app's content area, so the sidebar stays put and the takeover
- * reads as the *page* doing something rather than the app being replaced. The
- * area is found by attribute rather than handed down as props, because the
- * moments render from `MomentsProvider` — nowhere near the layout — and
- * threading a rect through every level in between would couple the whole tree
- * to two animations.
+ * The onboarding launch and landing cover only the app's content area, so the sidebar stays put and
+ * the takeover reads as the *page* doing something rather than the app being replaced. The area is
+ * found by attribute rather than handed down as props, because the moments render from
+ * `MomentsProvider` — nowhere near the layout — and threading a rect through every level in between
+ * would couple the whole tree to two animations.
  */
 
 /** Marks the element the page-scoped moments should cover. Set on the app shell's page wrapper (`App`). */

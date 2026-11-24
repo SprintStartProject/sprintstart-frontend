@@ -1,7 +1,7 @@
 import { BookmarkPlus } from "lucide-react";
 import { CopyButton } from "./CopyButton";
-import { SaveToBoard } from "../../board/save/SaveToBoard";
-import { buddyReplyNote } from "../../board/generation/chatToCard";
+import { SaveToBoard } from "../../board";
+import { buddyReplyNote } from "../../board";
 import { BUDDY_ACTION_PLACE_CHECKLIST } from "../types";
 import type { BuddyMessageView } from "../types";
 import { SaveReplyToBoard } from "./SaveReplyToBoard";

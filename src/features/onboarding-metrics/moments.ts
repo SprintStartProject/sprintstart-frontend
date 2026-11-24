@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { GitMerge, GitPullRequest, Hand, MessageSquare, UserPlus } from "lucide-react";
 import { CONTRIBUTION_WORDING } from "../../config/contributionWording";
-import type { HireTimeline } from "./types";
+import type { HireTimeline } from "../../services/onboardingMetricsTypes";
 
 export type HireMoment = { label: string; at: string | null; icon: LucideIcon };
 

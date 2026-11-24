@@ -3,7 +3,7 @@ import { ApiError } from "../../services/apiClient";
 import { parseApiError } from "../../services/apiError";
 import { suggestSkillsForRole } from "../../services/teamManagementService";
 import type { SuggestSkillsContext } from "../../services/teamManagementService";
-import type { SkillSuggestion } from "./types";
+import type { SkillSuggestion } from "../../services/teamManagementTypes";
 
 export type RoleSkillSuggestionResult =
   { ok: true; suggestions: SkillSuggestion[] } | { ok: false; message: string };

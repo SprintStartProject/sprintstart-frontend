@@ -192,14 +192,9 @@ function BuddyThreadRowImpl({
   const hasActions = (message.actions?.length ?? 0) > 0;
   const citations = message.citations ?? EMPTY_CITATIONS;
 
-  // Until the first token (or an action proposal) arrives the streaming placeholder has
-  // nothing to show, and the typing bubble below already stands in for it — so skip it,
-  // otherwise an empty second bubble appears while the buddy is working. A turn that
-  // failed before writing a word is the exception: its reason *is* the message, and
-  // dropping it here is what made a failed reply look like no reply. Same for a turn whose
-  // only arrival so far is reasoning — its panel is worth showing on its own — and for a turn
-  // the hire stopped: a Stop usually lands before the first word, and the line saying so is
-  // then the only answer the question gets.
+  // Until the first token or proposal arrives, the typing bubble stands in for the empty
+  // placeholder, so it is skipped. Not for a turn that failed or was stopped before writing (its
+  // line is the answer), nor for one that so far only has reasoning.
   if (!isUser && !hasText && !hasActions && !message.error && !hasReasoning && !message.stopped) {
     return null;
   }
@@ -313,13 +308,9 @@ function BuddyThreadImpl({
   const lastTurn = messages[messages.length - 1];
   const streamingId = lastTurn?.id;
 
-  // Which turn the footer hangs under: the buddy's most recent reply. Not every reply — the same
-  // suggestion repeated under all of them reads as the buddy repeating itself. (This started as
-  // the escalation offer, which now lives under the hire's own questions — see
-  // `renderQuestionAction` on the props above.)
-  //
-  // A reply carrying only a proposal counts as a reply: the *empty* message the send loop appends
-  // up front is the one to skip, and skipping it means "nothing written yet, and nothing offered".
+  // Which turn the footer hangs under: only the buddy's latest reply, so a suggestion is not
+  // repeated under every one. A reply carrying only a proposal counts; the empty placeholder does
+  // not.
   const lastAssistantId = [...messages]
     .reverse()
     .find(
@@ -386,9 +377,9 @@ function BuddyThreadImpl({
           compact={compact}
           confirmAction={confirmAction}
           dismissAction={dismissAction}
-          // Handed only to the rows that actually carry a proposal: the drafts object changes
-          // identity on every keystroke in a flag's field, and each row is memoised (#236), so
-          // the shared empty object keeps that keystroke from re-rendering the whole transcript.
+          // Handed only to rows that carry a proposal: the drafts object changes identity on every
+          // keystroke, and each row is memoised, so the shared empty object keeps a keystroke from
+          // re-rendering the transcript.
           actionDrafts={(message.actions?.length ?? 0) > 0 ? actionDrafts : EMPTY_ACTION_DRAFTS}
           setActionDraft={setActionDraft}
           renderQuestionAction={renderQuestionAction}
@@ -399,14 +390,8 @@ function BuddyThreadImpl({
           // row does, a greeting's does not.
           onRetryReply={onRetryReply}
           retryable={Boolean(message.error) && firstUserIndex !== -1 && index > firstUserIndex}
-          // Resolved here rather than inside the row: only the buddy's latest reply gets it, and
-          // only once the thinking bubble is gone — so the offer lands under a finished answer
-          // rather than under a promise.
-          // The opener suggestion hangs under the newest reply — unless that reply brought a next
-          // step of its own: a proposal card and a suggestion under one bubble are two competing
-          // offers. (`streamOpenBuddy` has no `action_proposal` case and never writes `actions`,
-          // so a greeting cannot carry a proposal today; this is the line that keeps it that way,
-          // not a fix for a bug you can reach.)
+          // Only the buddy's latest finished reply gets the footer, and not one that brought a
+          // proposal of its own: two offers under one bubble compete.
           lastMessageFooter={
             !isThinking && message.id === lastAssistantId && !message.actions?.length
               ? lastMessageFooter
@@ -421,11 +406,8 @@ function BuddyThreadImpl({
           showName={showNames}
           gameActive={dinoGameActive}
           replyReady={dinoGameActive && !isThinking && !isStreaming}
-          // How the finished turn ended. A failed reply carries its error on the last turn and
-          // a stopped one carries `stopped` — announcing either as "Reply ready" would be a
-          // lie. The game's row outlives the turn whenever the game is open, which is exactly
-          // how a stopped turn used to reach it and get called ready; `dinoOutcome` renders it
-          // as "Stopped" instead.
+          // How the finished turn ended: a failed or stopped turn must not be announced as "Reply
+          // ready" (the game's row outlives the turn).
           turnOutcome={lastTurn?.error ? "failed" : lastTurn?.stopped === true ? "stopped" : "done"}
           onGameExit={onDinoGameExit}
         />

@@ -1,8 +1,8 @@
 import { AlertTriangle, CheckCircle2, Database, FolderKanban, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
-import { fetchIngestionSources } from "../../data-ingestion/ingestionSources";
-import { formatRelativeDate } from "../../knowledge-gaps/format";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { fetchIngestionSources } from "../../data-ingestion";
+import { formatRelativeDate } from "../../knowledge-gaps";
+import { useProjectContext } from "../../projects";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { queryKeys } from "../../../services/queryKeys";
 
@@ -15,9 +15,8 @@ const chipClassName =
  *
  * Both are true of every section alike, which is what earns them a place in the one header that
  * never changes (section controls stay in their sections — see `PmWorkspace`). The sync chip
- * answers the question the ingestion card at the bottom of the overview used to be scrolled to
- * for: can the buddy's answers, the gaps and the questions be trusted right now? It reads the
- * same cache entry as that card and the Data Ingestion page, so all three agree.
+ * answers the question: can the buddy's answers, the gaps and the questions be trusted right now?
+ * It reads the same cache entry as that card and the Data Ingestion page, so all three agree.
  */
 export function PmHeaderStatus() {
   const { selectedProject, selectedProjectId } = useProjectContext();

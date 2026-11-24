@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { NotionCredentialDto } from "../../../../services/sources/notionService.ts";
-import { NotionCredentialAddForm } from "../../../settings/components/notion/NotionCredentialAddForm.tsx";
-import { useNotionCredentials } from "../../../settings/hooks/useNotionCredentials.ts";
+import { NotionCredentialAddForm } from "../../../settings";
+import { useNotionCredentials } from "../../../settings";
 import { CredentialSlot } from "../../add-source/CredentialSlot.tsx";
 import type { DraftFormProps } from "../types.ts";
 import { createNotionDraft, type NotionDraftSource } from "./draft.ts";

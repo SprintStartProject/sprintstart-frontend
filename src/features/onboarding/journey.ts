@@ -1,11 +1,7 @@
-// ============================================================
-// features/onboarding/journey.ts
-// ============================================================
 // The shared vocabulary of the onboarding views: what state an
 // item or a phase is in, how far along a phase is, and how an
 // item is reached. The hire's page and the PM's member view both
 // read a path through these, so they never disagree about it.
-// ============================================================
 
 import { isPhaseOpen } from "./activePhase";
 import { orderByGraph } from "./graph/layout";
@@ -14,7 +10,7 @@ import type {
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
   OnboardingStepEndpoint,
-} from "./types";
+} from "../../services/onboardingTypes";
 
 /** A node of a phase graph: one step or one knowledge-check question. */
 export type PhaseItem =

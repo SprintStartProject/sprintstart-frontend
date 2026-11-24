@@ -1,0 +1,20 @@
+# What decides how strictly this repository is checked needs the approval of a
+# code owner, who is somebody other than the author. Replace the team with a dedicated quality team
+# if the project creates one.
+/AI_RULES.md                                  @SprintStartProject/frontend
+/AGENTS.md                                    @SprintStartProject/frontend
+/.claude/                                     @SprintStartProject/frontend
+/.github/                                     @SprintStartProject/frontend
+/scripts/quality/                             @SprintStartProject/frontend
+/scripts/ai-guard/                            @SprintStartProject/frontend
+/eslint.config.js                             @SprintStartProject/frontend
+/eslint-suppressions.json                     @SprintStartProject/frontend
+/.dependency-cruiser.cjs                      @SprintStartProject/frontend
+/.dependency-cruiser-known-violations.json    @SprintStartProject/frontend
+/knip.json                                    @SprintStartProject/frontend
+/stryker.config.json                          @SprintStartProject/frontend
+/playwright.config.ts                         @SprintStartProject/frontend
+/tsconfig*.json                               @SprintStartProject/frontend
+/quality-metrics.properties                   @SprintStartProject/frontend
+/contracts/                                   @SprintStartProject/frontend
+/e2e/                                         @SprintStartProject/frontend

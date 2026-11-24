@@ -1,5 +1,6 @@
 import type { IngestionRunFilter } from "../features/data-ingestion/types";
-import type { KnowledgeListParams } from "../features/knowledge-base/types";
+import type { KnowledgeListParams } from "./knowledgeTypes";
+import type { RiskQuery } from "./offboardingTypes";
 
 /**
  * Central query-key factory, shared by every migrated hook, invalidation call and
@@ -48,9 +49,6 @@ export const queryKeys = {
     myStatus: (userId: string) => ["onboarding", "my-status", userId] as const,
     unseenSkipAnswers: (userId: string) => ["onboarding", "unseen-skip-answers", userId] as const,
   },
-  projectInsights: {
-    byProjectIds: (projectIds: string) => ["project-insights", projectIds] as const,
-  },
   atlassianCredentials: {
     // Not scoped by user id: `queryClient.clear()` on logout already keeps a
     // session change from serving the previous user's list, and threading
@@ -66,6 +64,16 @@ export const queryKeys = {
   notionCredentials: {
     // Not scoped by user id, for the same reason as `atlassianCredentials.mine`.
     mine: () => ["notion-credentials"] as const,
+  },
+  offboarding: {
+    // The whole query is part of the key: who leaves, as of when and with which weights are different
+    // rankings, and none may serve another's cache.
+    riskMap: (projectId: string, query: RiskQuery) =>
+      ["offboarding", "risk", projectId, query] as const,
+    members: (projectId: string) => ["offboarding", "members", projectId] as const,
+    snapshots: (projectId: string) => ["offboarding", "snapshots", projectId] as const,
+    comparison: (projectId: string, left: string, right: string) =>
+      ["offboarding", "comparison", projectId, left, right] as const,
   },
   knowledgeGaps: {
     mine: (projectId: string) => ["knowledge-gaps", "mine", projectId] as const,

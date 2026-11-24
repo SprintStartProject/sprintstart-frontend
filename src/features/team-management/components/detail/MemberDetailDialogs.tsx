@@ -1,5 +1,5 @@
 import { AlertDialog } from "../../../../components/ui/AlertDialog";
-import type { ProjectRole } from "../../types";
+import type { ProjectRole } from "../../../../services/teamManagementTypes";
 
 type MemberDetailDialogsProps = {
   firstName: string;

@@ -14,8 +14,7 @@ type BoardFilterTriggersProps = {
  *
  * Lives in the board's tool rail beside the other switches — up the right margin from `lg`, across
  * the top of the page below it. Glyphs only, named by their `aria-label` and tooltip: the rail is
- * the only place this renders, and the worded form it used to have for a row above the board went
- * with that row.
+ * the only place this renders.
  *
  * Toggle buttons with `aria-pressed` rather than a radio group, which is what `SegmentedTabs` does
  * a few lines away and for the same reason: a real radio group promises arrow-key navigation, and

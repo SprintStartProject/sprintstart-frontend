@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { ProjectAttention } from "../types";
+import type { ProjectAttention } from "../../../services/onboardingMetricsTypes";
 
 type UseAttentionResult = {
   attention: ProjectAttention | null;

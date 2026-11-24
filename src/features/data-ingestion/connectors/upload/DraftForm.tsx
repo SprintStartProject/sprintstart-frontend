@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileText, X } from "lucide-react";
 import { Button } from "../../../../components/ui/Button.tsx";
-import { FileUploadZone } from "../../../knowledge-base/components/FileUploadZone.tsx";
+import { FileUploadZone } from "../../../../components/upload/FileUploadZone.tsx";
 import type { DraftFormProps } from "../types.ts";
 import { createUploadDraft, type UploadDraftSource } from "./draft.ts";
 

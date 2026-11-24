@@ -181,8 +181,7 @@ export function PmStat({
   to,
   onClick,
 }: PmStatProps) {
-  // One row, not a tall tile: icon, figure, label and hint side by side. The tiles used to be
-  // 7rem tall with a 3xl number, which gave four small figures a whole band of the page.
+  // One row, not a tall tile: icon, figure, label and hint side by side.
   const body = (
     <>
       <IconTile icon={Icon} size="lg" tone={attention ? "warning" : tone} className="relative">
@@ -236,10 +235,8 @@ export function PmStat({
  * above already says "Team" in the active pill, and repeating it as a visible title under that
  * — with the page's "PM Dashboard" above both — stacked three headings before any content.
  *
- * The controls used to sit in the page header, and each section put different things there —
- * a rebuild button, a rescan button with two timestamps under it — so the header changed
- * height as you moved between them. The header is shared now; what belongs to one section
- * lives in that section.
+ * The controls live in the section, not the shared header: each section has different ones, and a
+ * header that changed height between sections would jump.
  */
 export function PmSectionHeader({
   title,

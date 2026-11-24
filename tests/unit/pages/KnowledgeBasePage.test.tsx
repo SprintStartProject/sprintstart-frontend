@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { KnowledgeBasePage } from "../../../src/pages/KnowledgeBasePage";
-import type { Artifact } from "../../../src/features/knowledge-base/types";
+import type { Artifact } from "../../../src/services/knowledgeTypes";
 import type { ProjectContextValue } from "../../../src/features/projects/ProjectContext";
 import type { UserProfile } from "../../../src/services/types";
 

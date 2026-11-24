@@ -7,7 +7,7 @@ import {
   type AnalysisInput,
   type Finding,
 } from "../../../../../src/features/pm-area/analysis/findings";
-import type { TeamOverviewUser } from "../../../../../src/features/team-management/types";
+import type { TeamOverviewUser } from "../../../../../src/services/teamManagementTypes";
 
 const DAY = 24 * 60 * 60 * 1000;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();

@@ -15,7 +15,7 @@ import {
   retrieveRedirectTarget,
   storeRedirectTarget,
 } from "../auth/redirectUtils";
-import { isSkillLinkedToRole } from "../features/team-management/types";
+import { isSkillLinkedToRole } from "../services/teamManagementTypes";
 import {
   getSkillAssessmentPromptState,
   getMyTeamOverview,

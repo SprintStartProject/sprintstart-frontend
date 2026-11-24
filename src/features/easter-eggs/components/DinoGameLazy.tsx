@@ -5,20 +5,17 @@ import type { DinoGameProps } from "./DinoGame.tsx";
 /**
  * The waiting game, code-split away from the surfaces that host it.
  *
- * The game is the one egg every waiting surface pulls in — chat, buddy,
- * onboarding, ingestion and the summary drawer all import it — which used to
- * put its chunk on the app's boot path through the always-mounted buddy dock.
- * Behind `lazy()` the chunk arrives with the first open instead — or with the
- * phones-only hint that invites it, which preloads the import so the tap
- * rarely meets a cold chunk. The fallback holds the box the game is about to
- * take (the 220 px canvas plus its border), so opening it never shifts the
- * layout around it; it is only ever visible for the moment the chunk spends
- * on the wire. A chunk that fails to arrive (a stale deploy's missing hashed
- * file, a dropped connection) is caught by {@link EggErrorBoundary}: the
- * surface says so, stays closable, and offers a retry — which is a real new
- * import, because `React.lazy` caches a rejection for the page's lifetime
- * and a module-level lazy would turn one dropped fetch into a dead game
- * until a reload.
+ * The game is the one egg every waiting surface pulls in — chat, buddy, onboarding, ingestion and
+ * the summary drawer all import it, so a static import would put its chunk on the app's boot path
+ * through the always-mounted buddy dock. Behind `lazy()` the chunk arrives with the first open
+ * instead — or with the phones-only hint that invites it, which preloads the import so the tap
+ * rarely meets a cold chunk. The fallback holds the box the game is about to take (the 220 px
+ * canvas plus its border), so opening it never shifts the layout around it; it is only ever visible
+ * for the moment the chunk spends on the wire. A chunk that fails to arrive (a stale deploy's
+ * missing hashed file, a dropped connection) is caught by {@link EggErrorBoundary}: the surface
+ * says so, stays closable, and offers a retry — which is a real new import, because `React.lazy`
+ * caches a rejection for the page's lifetime and a module-level lazy would turn one dropped fetch
+ * into a dead game until a reload.
  */
 export function DinoGameLazy(props: DinoGameProps) {
   // The lazy lives in state, not in a memo inside the suspending child: a

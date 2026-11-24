@@ -1,11 +1,11 @@
 import { Spinner } from "../../../components/ui/Spinner";
-import { useProfile } from "../../../features/profile/useProfile";
-import { AccountForm } from "../../../features/profile/components/AccountForm";
-import { PasswordForm } from "../../../features/profile/components/PasswordForm";
+import { useProfile } from "../../profile";
+import { AccountForm } from "../../profile";
+import { PasswordForm } from "../../profile";
 
 /**
  * Profile section of the settings page. Reuses the existing account and
- * password forms (per story: reuse, no rebuild) and the shared `useProfile`
+ * password forms and the shared `useProfile`
  * hook so profile loading and update behaviour match the legacy profile page.
  */
 export function ProfileSection() {

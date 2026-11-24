@@ -10,7 +10,7 @@ import {
 import type {
   ArtifactAiStatus,
   ArtifactAiStatusResponse,
-} from "../../../../../src/features/knowledge-base/types";
+} from "../../../../../src/services/knowledgeTypes";
 import { server } from "../../../setup/vitest.setup";
 
 const STATUS_URL = "/api/v1/projects/:projectId/artifacts/ai-status";

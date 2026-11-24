@@ -50,18 +50,14 @@ const TYPEAHEAD_RESET_MS = 500;
  * for free is reimplemented deliberately: arrow keys, Home/End, Enter/Escape,
  * typeahead, click-outside, and closing on blur.
  *
- * **The menu is rendered into `<body>`, not next to the trigger.** It used to
- * be an absolutely positioned sibling, which meant its `z-index` only counted
- * inside whatever stacking context the caller happened to sit in — and any
- * ancestor with `backdrop-filter`, `filter`, `transform` or `opacity` makes
- * one. The knowledge-gap detail page is the case that surfaced it: every card
- * there carries `backdrop-blur`, so the owner dropdown opened *underneath* the
- * card below it and its options could not be clicked. No z-index on this
- * component could have fixed that, because the whole control was already
- * trapped. A portal is the only way out, and it takes care of an ancestor's
- * `overflow: hidden` clipping the menu at the same time.
+ * **The menu is rendered into `<body>`, not next to the trigger.** As an
+ * absolutely positioned sibling its `z-index` would only count inside the
+ * caller's stacking context, which any ancestor with `backdrop-filter`,
+ * `filter`, `transform` or `opacity` creates, so inside a `backdrop-blur` card
+ * it would open *underneath* the card below. A portal is the only way out, and
+ * it takes care of an ancestor's `overflow: hidden` clipping the menu too.
  *
- * The cost is that the menu no longer moves with the trigger for free, so its
+ * The cost is that the menu does not move with the trigger for free, so its
  * position is measured on open and re-measured on scroll and resize.
  */
 export function FilterSelect<TValue extends string>({

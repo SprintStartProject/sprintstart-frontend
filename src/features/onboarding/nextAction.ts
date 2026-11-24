@@ -1,11 +1,7 @@
-// ============================================================
-// features/onboarding/nextAction.ts
-// ============================================================
 // The one thing a member has to do next in their path, plus how
 // far they have come. Shared by the onboarding views and the
 // dashboard card, so every entry point sends them to the same
 // place.
-// ============================================================
 
 import {
   isPhaseStarted,
@@ -19,7 +15,7 @@ import type {
   OnboardingPhaseEndpoint,
   OnboardingQuestionEndpoint,
   OnboardingStepEndpoint,
-} from "./types";
+} from "../../services/onboardingTypes";
 
 /** A step still waiting to be done — neither finished nor skipped nor locked. */
 export function isStepOpen(step: OnboardingStepEndpoint): boolean {

@@ -1,12 +1,11 @@
-// ============================================================
-// CheckQuestionCard.tsx
-// ============================================================
 // Renders a single knowledge-check question in both of its
 // states: fillable while unanswered, and graded once an attempt
 // result exists. Used inside the per-question answer modal.
-// ============================================================
 
-import type { OnboardingQuestionEndpoint, QuestionAttemptResult } from "../types";
+import type {
+  OnboardingQuestionEndpoint,
+  QuestionAttemptResult,
+} from "../../../services/onboardingTypes";
 import type { DraftAnswer } from "../checkAnswers";
 import { shuffleOptions } from "../questionIntegrity";
 import { CheckCircle2, CircleCheck, CircleX, TriangleAlert, XCircle } from "lucide-react";

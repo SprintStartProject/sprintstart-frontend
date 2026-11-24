@@ -308,9 +308,8 @@ export function RocketPet() {
         onPointerDown={() => setIsPressed(true)}
         onPointerUp={() => setIsPressed(false)}
         onPointerCancel={() => setIsPressed(false)}
-        // Only *keyboard* focus counts as attention. Clicking a button
-        // focuses it too, and treating that as attention is what used to
-        // drag the rocket straight back out of its post-launch hiding.
+        // Only *keyboard* focus counts as attention. Clicking a button focuses it too, and treating
+        // that as attention would drag the rocket straight back out of its post-launch hiding.
         onFocus={(event) => setIsFocused(event.currentTarget.matches(":focus-visible"))}
         onBlur={() => setIsFocused(false)}
       />

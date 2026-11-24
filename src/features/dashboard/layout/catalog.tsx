@@ -1,9 +1,5 @@
-// ============================================================
-// features/dashboard/layout/catalog.tsx
-// ============================================================
 // Every widget the dashboard can hold: what it is called, how
 // big it may be, who may place it, and what it renders.
-// ============================================================
 
 import {
   BookOpen,

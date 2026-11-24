@@ -50,20 +50,11 @@ export function MomentsProvider({ children }: { children: ReactNode }) {
   const nextId = useRef(0);
   const [showRocketPet, setShowRocketPetState] = useState(getInitialShowRocketPet);
 
-  // Boot is *not* covered from here any more, and that is the fix for a
-  // launch that used to stutter, cut to black and then start over.
-  //
-  // Keycloak runs `check-sso` with the login iframe off, which is a full
-  // redirect out to the identity provider and back on every single load. A
-  // sequence started at mount therefore played into a page that was already
-  // on its way out: it janked against the bundle still parsing, the redirect
-  // blacked it out mid-flight, and the reload then played it again from the
-  // top. Nothing about that is fixable from inside React, because two of the
-  // three phases happen before this component exists.
-  //
-  // So the load is covered by the CSS splash in `index.html` — it paints on
-  // the first frame of *both* page loads and animates on the compositor — and
-  // this is left for `playLaunchSequence`.
+  // Boot is not covered from here. Keycloak runs `check-sso` with the login iframe off, a full
+  // redirect out and back on every load, so a sequence started at mount would play into a page on
+  // its way out and start over after the reload; two of the three phases happen before this
+  // component exists. The load is covered by the CSS splash in `index.html`, which paints on the
+  // first frame of both page loads, and this is left for `playLaunchSequence`.
   //
   // Bailing on "unauthenticated" still keeps it off the login screen:
   // launching a rocket at someone who then gets asked to sign in is a promise

@@ -1,9 +1,9 @@
 import { CheckCircle2, CircleDashed, Loader2, Sparkles, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { DinoGameLazy } from "../../../easter-eggs/components/DinoGameLazy";
-import { DinoPlayHint } from "../../../easter-eggs/components/DinoPlayHint";
-import { useDinoUnlocked, useSpaceOpensDino } from "../../../easter-eggs/hooks/useDinoWaitingGame";
+import { DinoGameLazy } from "../../../easter-eggs";
+import { DinoPlayHint } from "../../../easter-eggs";
+import { useDinoUnlocked, useSpaceOpensDino } from "../../../easter-eggs";
 import type { GenerationPhaseProgress } from "../../generation/OnboardingJourneyContext";
 
 /**

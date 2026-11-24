@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { starterWorkService } from "../../../services/starterWorkService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { ProposalStatus } from "../types";
+import type { ProposalStatus } from "../../../services/starterWorkTypes";
 
 /**
  * Loads the starter-work pool at one status, for the compact overview surface.
@@ -14,9 +14,8 @@ import type { ProposalStatus } from "../types";
  * `status` defaults to `LIVE` — what nearly every caller wants — but also takes `STALE` for the
  * pool's "Closed" tab and its count.
  *
- * `reload` no longer takes a `preserveContent` option: react-query already keeps the pool on
- * screen during a refetch (`isLoading` only reports a load with nothing to show yet), which is
- * what every caller of that option wanted.
+ * `reload` needs no `preserveContent` option: react-query keeps the pool on screen during a refetch
+ * (`isLoading` only reports a load with nothing to show yet).
  */
 export function useStarterWorkPool(status: ProposalStatus = "LIVE") {
   const queryClient = useQueryClient();

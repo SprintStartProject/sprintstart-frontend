@@ -1,9 +1,5 @@
-// ============================================================
-// features/projects/projectSelectionStorage.ts
-// ============================================================
 // Which project each user had selected, remembered between
 // page loads and kept apart from everyone else's.
-// ============================================================
 
 /*
   Keyed per user, because the selection outlives the session that made it. On a shared

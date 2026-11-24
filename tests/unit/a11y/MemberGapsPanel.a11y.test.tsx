@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemberGapsPanel } from "../../../src/features/team-management/components/detail/MemberGapsPanel";
-import type { KnowledgeGap } from "../../../src/features/knowledge-gaps/types";
+import type { KnowledgeGap } from "../../../src/services/knowledgeGapTypes";
 import type { UserSkillLevel } from "../../../src/services/teamManagementService";
 
 const skill: UserSkillLevel = {

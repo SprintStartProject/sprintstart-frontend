@@ -1,5 +1,5 @@
 import { ExternalLink, FileText } from "lucide-react";
-import type { OrientationCitation, OrientationSource } from "../types";
+import type { OrientationCitation, OrientationSource } from "../../../services/orientationTypes";
 
 type SourceLinksProps = {
   label: string;

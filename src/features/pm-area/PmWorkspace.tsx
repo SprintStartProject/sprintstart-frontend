@@ -21,12 +21,12 @@ import { useSwipeableTabs } from "../../hooks/useHorizontalWheelNavigation";
 import { PmDashboardPage } from "../../pages/PmDashboardPage";
 import { TeamManagementPage } from "../../pages/TeamManagementPage";
 import { TeamMemberDetailPage } from "../../pages/TeamMemberDetailPage";
-import { FaqPage } from "../faq/components/FaqPage";
-import { KnowledgeGapsPage } from "../knowledge-gaps/components/KnowledgeGapsPage";
-import { KnowledgeRequestInboxPage } from "../knowledge-request/components/KnowledgeRequestInboxPage";
-import { useOpenEscalationCount } from "../knowledge-request/useOpenEscalationCount";
-import { OnboardingMetricsPage } from "../onboarding-metrics/components/OnboardingMetricsPage";
-import { useProjectContext } from "../projects/useProjectContext";
+import { FaqPage } from "../faq";
+import { KnowledgeGapsPage } from "../knowledge-gaps";
+import { KnowledgeRequestInboxPage } from "../knowledge-request";
+import { useOpenEscalationCount } from "../knowledge-request";
+import { OnboardingMetricsPage } from "../onboarding-metrics";
+import { useProjectContext } from "../projects";
 import { ProjectAnalysisLauncher } from "./analysis/ProjectAnalysisLauncher";
 import { MemberPeekPanel } from "./components/MemberPeekPanel";
 import { PmHeaderStatus } from "./components/PmHeaderStatus";
@@ -187,13 +187,11 @@ function resolveSection(pathname: string, analysisRevision: number): ResolvedSec
  * The PM area as one page: one header, one tab bar, and the section underneath sliding in the
  * direction you are moving.
  *
- * A **layout route**. The PM pages used to be separate routes with separate headers: every
- * switch re-mounted the header (whose height depended on what each page put into it), faded
- * the whole page, and waited for that page's lazy chunk — the lag and the jumping header were
- * the same problem. Now the header never changes, every section ships in this one chunk, and
- * switching is a slide.
+ * A **layout route**: the header never changes, every section ships in this one chunk, and
+ * switching is a slide. Separate routes would re-mount a header whose height depends on each page,
+ * and wait for each page's lazy chunk.
  *
- * The section is chosen from the URL rather than from child route elements: the old URLs all
+ * The section is chosen from the URL rather than from child route elements: the section URLs all
  * keep working (`/team/:id`, `/insights/faq/:id`, …), and rendering the sections here instead of
  * through `<Outlet />` means the outgoing section keeps its own props while it slides out.
  *

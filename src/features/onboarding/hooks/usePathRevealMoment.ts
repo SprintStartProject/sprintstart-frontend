@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { useMoments } from "../../moments";
-import type { OnboardingPathEndpoint } from "../types";
+import type { OnboardingPathEndpoint } from "../../../services/onboardingTypes";
 
 /**
  * Where the id of the last path a reveal has been played for is kept.

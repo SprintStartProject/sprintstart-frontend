@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { FilterSelect } from "../../../components/ui/FilterSelect";
-import type { ProjectRole, TeamOverviewUser } from "../../team-management/types";
+import type { ProjectRole, TeamOverviewUser } from "../../team-management";
 import { memberName } from "../memberStatus";
 
 type MemberHeroProps = {
@@ -26,9 +26,8 @@ type MemberHeroProps = {
  * through the team without going back to the list. Where they stand is the summary card's job
  * (`MemberSummary`), right under it.
  *
- * Roles are edited right here. They used to open a modal — press a role chip, find the select
- * inside, pick, press Add — four steps and a dialog for what is one decision. Now the chip has
- * its own remove button and "Add role" assigns the moment a role is picked.
+ * Roles are edited right here: each chip has its own remove button, and "Add role" assigns the
+ * moment a role is picked.
  */
 export function MemberHero({
   member,

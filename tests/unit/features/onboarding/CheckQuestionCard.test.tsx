@@ -4,7 +4,7 @@ import { CheckQuestionCard } from "../../../../src/features/onboarding/component
 import type {
   OnboardingQuestionEndpoint,
   QuestionAttemptResult,
-} from "../../../../src/features/onboarding/types";
+} from "../../../../src/services/onboardingTypes";
 
 const question: OnboardingQuestionEndpoint = {
   id: "q1",

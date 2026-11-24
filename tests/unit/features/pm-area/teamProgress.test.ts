@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { teamProgressData } from "../../../../src/features/pm-area/teamProgress";
-import type { TeamOverviewUser } from "../../../../src/features/team-management/types";
+import type { TeamOverviewUser } from "../../../../src/services/teamManagementTypes";
 
 const DAY = 24 * 60 * 60 * 1000;
 

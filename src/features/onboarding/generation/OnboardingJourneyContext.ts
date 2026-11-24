@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { OnboardingPathEndpoint } from "../types";
+import type { OnboardingPathEndpoint } from "../../../services/onboardingTypes";
 
 /** How far one phase of a running generation has come, as the backend's stage events report it. */
 export type GenerationPhaseProgress = {

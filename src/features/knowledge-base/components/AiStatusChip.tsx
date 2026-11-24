@@ -1,6 +1,6 @@
 import { Badge } from "../../../components/ui/Badge";
 import { AI_STATUS_CHIPS } from "../aiStatus";
-import type { ArtifactAiStatus } from "../types";
+import type { ArtifactAiStatus } from "../../../services/knowledgeTypes";
 
 /** Props for {@link AiStatusChip}. */
 export interface AiStatusChipProps {

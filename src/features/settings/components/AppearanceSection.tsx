@@ -47,17 +47,17 @@ function AppearanceGroup({
  * via the provider. Each option shows an icon and a text label (FRONTEND_CODING_STANDARDS.md §5 —
  * meaning never conveyed by colour alone).
  *
- * The classic-mode notice is the only way out of `style-classic` in the whole app. The mode
- * turns itself on when the OS asks for reduced motion and CSS then hides the aurora layer
- * outright, so without this the Aurora Background switch below was a dead control: it flipped,
- * it persisted, and nothing ever appeared — with nothing on screen saying why.
+ * The classic-mode notice is the only way out of `style-classic` in the whole app. The mode turns
+ * itself on when the OS asks for reduced motion and CSS then hides the aurora layer outright, so
+ * without this the Aurora Background switch below would be a dead control, with nothing on screen
+ * saying why.
  *
  * What the notice *says* is decided by a live `useReducedMotion()` rather than by classic mode
  * itself. The two come apart: turning the OS setting back off does not revert a mode that has
  * been persisted, and the notice would then be explaining the state of a system preference
  * that no longer holds.
  *
- * The rocket pet is off by default (Aug 2026): a novelty like this should be something people
+ * The rocket pet is off by default: a novelty like this should be something people
  * opt into from here, not something everyone has to notice in the corner of every page and
  * dismiss. Further decorative extras belong in the same group.
  */

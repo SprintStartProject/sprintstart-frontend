@@ -5,10 +5,20 @@ Shared, committed entry point for humans and AI agents working in
 exactly one place, and this file says where. If a link here stops matching reality,
 fix it in the same PR.
 
+> **Read [`AI_RULES.md`](./AI_RULES.md) first.** Its rules are binding for every AI
+> agent and override everything linked below wherever they conflict. Claude Code
+> loads it automatically through the committed `.claude/settings.json`; other agents
+> must read it before starting.
+
 ---
 
 ## 1. Where things are documented
 
+- [AI_RULES.md](./AI_RULES.md): binding rules for AI-written code — limits,
+  suppressions, types, single responsibility, no twins, ADRs, tests, how an agent
+  works and reports.
+- [docs/testing/e2e-journeys.md](./docs/testing/e2e-journeys.md): every user
+  journey and the end-to-end spec that covers it.
 - [README.md](./README.md): features, setup, env vars, all npm scripts, Keycloak
   dev users.
 - [docs/FRONTEND_ARCHITECTURE.md](./docs/FRONTEND_ARCHITECTURE.md): tech stack,
@@ -30,9 +40,9 @@ fix it in the same PR.
 
 ## 2. Definition of Done
 
-`npm run try` passes (format check, build, lint, unit and a11y tests), tests of
-changed components are updated in the same PR, and new or changed code is documented
-per the documentation guidelines. Details in
+`npm run try` passes (format check, build, lint, unit and a11y tests),
+`bash scripts/quality/ratchet.sh` passes, tests of changed components are updated in
+the same PR, and new or changed code is documented per the documentation guidelines. Details in
 [FRONTEND_CODING_STANDARDS.md §10](./docs/FRONTEND_CODING_STANDARDS.md#10-enforcement).
 
 ---
@@ -62,6 +72,8 @@ this list is only a reminder.
   checkout. The cluster deployment lives in `sprintstart-k8s`
   ([architecture §10.2](./docs/FRONTEND_ARCHITECTURE.md#102-kubernetes)).
 - Feature work branches off `dev`; PRs target `dev`.
-- Agent instruction files: `AGENTS.md` (this file) is **shared/committed**;
+- Agent instruction files: `AI_RULES.md`, `AGENTS.md` (this file) and
+  `.claude/settings.json` (loads `AI_RULES.md`, runs the guard hooks) are
+  **shared/committed**;
   `GEMINI.md`, `CLAUDE.md`, `AGENTS.local.md`, `GEMINI.local.md` and `CLAUDE.local.md`
   are gitignored (per-developer). Other `*.local.md` files are not ignored.

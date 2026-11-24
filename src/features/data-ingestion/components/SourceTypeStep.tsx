@@ -1,6 +1,6 @@
 import { IconTile } from "../../../components/ui/IconTile";
 import { CONNECTOR_LIST } from "../connectors/registry.ts";
-import type { SourceSystem } from "../connectors/sourceSystems.ts";
+import type { SourceSystem } from "../../../services/sourceSystems.ts";
 
 /**
  * Source-type picker used by the "Add source" wizard and the project-creation

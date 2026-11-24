@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../../components/common/UserAvatar";
 import { EmptyState } from "../../../../components/ui/EmptyState";
 import { SkeletonGroup, SkeletonLine } from "../../../../components/ui/Skeleton";
-import type { TeamOverviewUser } from "../../../team-management/types";
+import type { TeamOverviewUser } from "../../../team-management";
 import type { AttentionEntry, AttentionReason } from "../../attentionQueue";
 import { REASON_META } from "../../attentionReasons";
 import {

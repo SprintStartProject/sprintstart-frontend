@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import { Button, type ButtonSize } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { boardService } from "../../../services/boardService";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { useInvalidateBoard } from "../hooks/useInvalidateBoard";
 import { rememberOrigin, type CardOrigin } from "../layout/cardOrigins";
 import { onboardingOrigin } from "../layout/onboardingOrigin";

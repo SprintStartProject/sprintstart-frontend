@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { OrientationStep } from "../types";
+import type { OrientationStep } from "../../../services/orientationTypes";
 
 const STORAGE_PREFIX = "sprintstart.orientation.openSteps";
 

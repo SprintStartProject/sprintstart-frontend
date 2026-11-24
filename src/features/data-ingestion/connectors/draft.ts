@@ -1,4 +1,4 @@
-import type { SourceSystem } from "./sourceSystems.ts";
+import type { SourceSystem } from "../../../services/sourceSystems.ts";
 import type { BitbucketDraftSource } from "./bitbucket/draft.ts";
 import type { ConfluenceDraftSource } from "./confluence/draft.ts";
 import type { GithubDraftSource } from "./github/draft.ts";

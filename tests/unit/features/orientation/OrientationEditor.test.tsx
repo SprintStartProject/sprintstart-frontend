@@ -7,7 +7,7 @@ import { ToastProvider } from "../../../../src/context/ToastProvider";
 import type {
   AuthorOrientationInput,
   OrientationPacket,
-} from "../../../../src/features/orientation/types";
+} from "../../../../src/services/orientationTypes";
 
 function render(ui: ReactElement) {
   return testingRender(<ToastProvider>{ui}</ToastProvider>);

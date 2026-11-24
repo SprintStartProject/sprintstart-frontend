@@ -15,10 +15,10 @@ import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { queryKeys } from "../../../services/queryKeys";
 import { getTeamOverview } from "../../../services/teamManagementService";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { daysSince, formatDateTime, formatRelativeDate } from "../format";
 import { SEVERITY_FILL, SEVERITY_STYLES } from "../severity";
-import type { KnowledgeGap } from "../types";
+import type { KnowledgeGap } from "../../../services/knowledgeGapTypes";
 
 // Nudge the PM to re-ingest when the newest artifact is older than this.
 const STALE_AFTER_DAYS = 30;
@@ -266,7 +266,7 @@ type KnowledgeGapPanelProps = {
 
 /**
  * One knowledge gap in a side panel over the list: what is missing, who owns it, and where to
- * go to fix the source. Used to be a page of its own.
+ * go to fix the source.
  */
 export function KnowledgeGapPanel({ gapId, gap, onClose }: KnowledgeGapPanelProps) {
   return (

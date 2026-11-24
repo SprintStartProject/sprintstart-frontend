@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FaqPage } from "../../../../../src/features/faq/components/FaqPage";
-import type { FAQOverview } from "../../../../../src/features/faq/types";
+import type { FAQOverview } from "../../../../../src/services/faqTypes";
 import { MemoryRouter } from "react-router-dom";
 
 const mockOverview: FAQOverview = {

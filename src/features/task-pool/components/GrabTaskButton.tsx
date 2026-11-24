@@ -4,7 +4,7 @@ import { Button } from "../../../components/ui/Button";
 import { ApiError } from "../../../services/apiClient";
 import { parseApiError } from "../../../services/apiError";
 import { useToastApi } from "../../../context/useToast";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { useCurrentTask, useGrabTask } from "../hooks/useTaskPool";
 
 type GrabTaskButtonProps = {

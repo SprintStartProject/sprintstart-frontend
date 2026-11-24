@@ -48,7 +48,7 @@ export interface MomentsContextValue {
   /**
    * Plays the arcing launch sequence.
    *
-   * No longer fires on boot — that is the CSS splash in `index.html`, which
+   * Does not fire on boot: that is the CSS splash in `index.html`, which
    * is the only thing that can cover a load that starts before this bundle
    * and survives Keycloak's silent-SSO redirect. This is left for on-demand
    * use (dev tools today).

@@ -1,7 +1,7 @@
 // Presentational severity components shared by the knowledge-gaps widget and
 // pages. Styling constants live in ../severity.
 
-import type { KnowledgeGap, KnowledgeGapSeverity } from "../types";
+import type { KnowledgeGap, KnowledgeGapSeverity } from "../../../services/knowledgeGapTypes";
 import { SEVERITIES, SEVERITY_STYLES } from "../severity";
 
 /**

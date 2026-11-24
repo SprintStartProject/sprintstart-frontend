@@ -1,7 +1,4 @@
-import {
-  KB_URL_PARAM,
-  toKnowledgeBaseSearchString,
-} from "../../knowledge-base/hooks/useKnowledgeBaseUrlState.ts";
+import { KB_URL_PARAM, toKnowledgeBaseSearchString } from "../../../router/knowledgeBaseUrl.ts";
 import type { DataSource } from "../types.ts";
 import { getConnector } from "./registry.ts";
 

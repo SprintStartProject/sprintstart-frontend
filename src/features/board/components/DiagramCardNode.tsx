@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import { Boxes, Cloud, Database, FileCode, Footprints, HelpCircle, Server } from "lucide-react";
-import { NODE_HEIGHT, NODE_WIDTH } from "../../competency-graph/layout";
+import { NODE_HEIGHT, NODE_WIDTH } from "../../competency-graph";
 import type { DiagramNode, DiagramNodeKind } from "../types";
 
 const KIND_ICONS: Record<DiagramNodeKind, typeof Boxes> = {

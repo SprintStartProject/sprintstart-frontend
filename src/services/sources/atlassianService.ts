@@ -1,7 +1,5 @@
 import { apiClient } from "../apiClient.ts";
 
-// ---- Credentials ----
-
 export type AddAtlassianCredentialRequest = {
   userEmail: string;
   tokenName: string;

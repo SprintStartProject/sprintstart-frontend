@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { HireTimelineCard } from "../../../src/features/onboarding-metrics/components/HireTimelineCard";
-import type { HireTimeline } from "../../../src/features/onboarding-metrics/types";
+import type { HireTimeline } from "../../../src/services/onboardingMetricsTypes";
 
 vi.mock("../../../src/components/common/UserAvatar", () => ({
   UserAvatar: () => <svg role="img" aria-label="User Avatar" width="40" height="40" />,

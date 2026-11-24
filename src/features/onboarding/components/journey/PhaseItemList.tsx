@@ -13,7 +13,7 @@ import {
 import { ItemFlags, ItemGlyph } from "../../graph/JourneyNodeCards";
 import { itemNumbers } from "../../itemNumbers";
 import { itemKindLabel, itemStateLabel, primaryActionLabel } from "../../graph/nodeLabels";
-import type { OnboardingPhaseEndpoint } from "../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../services/onboardingTypes";
 
 type Props = {
   phase: OnboardingPhaseEndpoint;

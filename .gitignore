@@ -64,3 +64,12 @@ CLAUDE.local.md
 # Agent-session worktrees and their JetBrains include file (per-developer)
 .worktrees/
 .worktreeinclude
+
+# Quality tooling output
+reports/
+.stryker-tmp/
+test-results/
+playwright-report/
+
+# End-to-end sessions (e2e/global-setup.ts)
+e2e/.auth/

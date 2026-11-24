@@ -13,9 +13,8 @@ const SWIPE_THRESHOLD_PX = 36;
 /**
  * How long the wheel must be quiet before the gesture is considered over.
  *
- * Short, because it is no longer the only thing separating one flick from the
- * next -- see the re-acceleration check below. A long pause here is what made
- * two quick swipes in a row lose the second one.
+ * Short, because the re-acceleration check below also separates one flick from the next, and a long
+ * pause would make two quick swipes in a row lose the second one.
  */
 const GESTURE_END_MS = 120;
 

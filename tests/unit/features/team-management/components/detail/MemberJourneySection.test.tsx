@@ -10,7 +10,7 @@ import {
 import type {
   OnboardingPathEndpoint,
   OnboardingStepEndpoint,
-} from "../../../../../../src/features/onboarding/types";
+} from "../../../../../../src/services/onboardingTypes";
 import { memberJourneyViewKey } from "../../../../../../src/features/onboarding/journeyViewMemory";
 
 // The remembered List/Graph view is keyed on the manager looking as well as on the member, so

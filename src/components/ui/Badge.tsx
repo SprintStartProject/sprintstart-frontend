@@ -10,11 +10,6 @@ import type { ReactNode } from "react";
  *   confused with Success and Warning. "Onboarding: Done" sits directly under
  *   "Account: Active"; in green they read as the same statement, which they are
  *   not. Kept deliberately small: two accents, one meaning each.
- *
- * `pink`, `yellow` and `navy` used to exist here too. Nothing ever used them,
- * and each carried three hardcoded Tailwind colours with `dark:` overrides —
- * together 30 of the 38 raw colour values in the whole codebase. They are gone
- * (standards §1: no abstractions for potential future use).
  */
 export type BadgeVariant =
   "success" | "brand" | "warning" | "neutral" | "danger" | "purple" | "orange";

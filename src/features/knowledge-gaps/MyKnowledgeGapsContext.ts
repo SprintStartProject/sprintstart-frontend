@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { KnowledgeGap } from "./types";
+import type { KnowledgeGap } from "../../services/knowledgeGapTypes";
 
 /**
  * The components the signed-in user owns that are missing documentation, and which of them

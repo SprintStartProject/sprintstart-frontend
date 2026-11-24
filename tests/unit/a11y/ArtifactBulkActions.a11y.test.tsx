@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { ArtifactList } from "../../../src/features/knowledge-base/components/ArtifactList";
 import { ArtifactBulkActions } from "../../../src/features/knowledge-base/components/ArtifactBulkActions";
-import type { Artifact } from "../../../src/features/knowledge-base/types";
+import type { Artifact } from "../../../src/services/knowledgeTypes";
 import { knowledgeService } from "../../../src/services/knowledgeService";
 
 function makeArtifact(id: string, title: string, sourceSystem: Artifact["sourceSystem"]): Artifact {

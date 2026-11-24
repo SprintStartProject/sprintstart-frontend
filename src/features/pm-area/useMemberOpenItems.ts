@@ -22,8 +22,7 @@ export function isUnread(feedback: OnboardingFeedback): boolean {
  * reading feedback.
  *
  * Shared by the side panel and the full profile, so a skip can be decided from wherever the
- * manager happens to be looking — the decision used to live only on the profile page, two
- * clicks away from the dashboard that announced it.
+ * manager happens to be looking.
  *
  * Both actions already fire `onPmAttentionChanged`, which invalidates the team overview; the
  * profile page reads its member through a different call, so it passes `onChanged` to reload.

@@ -32,7 +32,7 @@ import type {
   BlueprintGraphNode,
   BlueprintPath,
   BlueprintPathOverview,
-} from "../features/blueprints/types.ts";
+} from "../services/blueprintTypes.ts";
 import { blueprintService, type BlueprintScope } from "../services/blueprintService.ts";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
 import { useAuth } from "../context/useAuth.ts";

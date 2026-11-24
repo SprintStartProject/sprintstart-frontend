@@ -2,7 +2,7 @@ import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 
 import { CheckCircle2, Layers, ListChecks, Lock, Milestone } from "lucide-react";
 import { Textarea, type TextareaProps } from "../../../components/ui/Textarea";
 import { onboardingService } from "../../../services/onboardingService";
-import type { PhaseState } from "../../onboarding/journey";
+import type { PhaseState } from "../../onboarding";
 import { useBoardPath } from "../hooks/boardPath";
 import { completeLink, deepenLink, openLinkBefore, titleKey } from "../layout/stepLinks";
 import { openLinkLevel } from "../layout/pathStages";

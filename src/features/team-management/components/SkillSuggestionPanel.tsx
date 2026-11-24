@@ -6,7 +6,7 @@ import { Checkbox } from "../../../components/ui/Checkbox";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Spinner } from "../../../components/ui/Spinner";
 import { skillSuggestionKey } from "../skillSuggestion";
-import type { Skill, SkillSuggestion } from "../types";
+import type { Skill, SkillSuggestion } from "../../../services/teamManagementTypes";
 
 export type SkillSuggestionPanelProps = {
   currentSkills: Skill[];

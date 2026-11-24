@@ -12,8 +12,7 @@ type SourceTypeBadgeProps = {
 /**
  * The one badge used to label a source's type, wherever a source is shown
  * (list, details drawer, admin project view). Kept as a single component so the
- * type marker cannot drift into a different colour per screen — it previously
- * rendered blue in the source list and grey in the details drawer.
+ * type marker cannot drift into a different colour per screen.
  */
 export function SourceTypeBadge({ type, size = "md" }: SourceTypeBadgeProps) {
   return (

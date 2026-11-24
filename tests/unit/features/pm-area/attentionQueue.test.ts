@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildAttentionQueue } from "../../../../src/features/pm-area/attentionQueue";
-import type { AttentionItem } from "../../../../src/features/onboarding-metrics/types";
-import type { TeamOverviewUser } from "../../../../src/features/team-management/types";
+import type { AttentionItem } from "../../../../src/services/onboardingMetricsTypes";
+import type { TeamOverviewUser } from "../../../../src/services/teamManagementTypes";
 
 function member(overrides: Partial<TeamOverviewUser>): TeamOverviewUser {
   return {

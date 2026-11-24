@@ -1,7 +1,7 @@
 import { ChartPie } from "lucide-react";
 import { EmptyState } from "../../../../components/ui/EmptyState";
 import { SkeletonGroup, SkeletonLine } from "../../../../components/ui/Skeleton";
-import type { TeamOverviewUser } from "../../../team-management/types";
+import type { TeamOverviewUser } from "../../../team-management";
 import { phaseSpread, teamProgressData } from "../../teamProgress";
 import { DonutChart } from "../charts/DonutChart";
 import { PmCard, PmCardHeader, PmCardLink, PmEyebrow } from "../PmCard";
@@ -21,9 +21,6 @@ type TeamProgressCardProps = {
  * stages, and which phases the ones underway sit in), how far the hires have come towards
  * accepted work (the funnel and its four figures), and what happened lately (the newest
  * milestones, and to whom).
- *
- * It used to be a big card with a ring on one side and the funnel on the other and a lot of air
- * in between; the same height now carries the phases and the latest milestones too.
  */
 export function TeamProgressCard({ roster, loading, error }: TeamProgressCardProps) {
   const { stages, averageProgress } = teamProgressData(roster);

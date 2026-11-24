@@ -6,7 +6,7 @@ import type {
   CreateArrivalStepRequest,
   DerivableArrivalStep,
   UpdateArrivalStepRequest,
-} from "../types";
+} from "../../../services/arrivalTypes";
 
 /**
  * The company-wide and (when there is one) project arrival lists, loaded together for the people

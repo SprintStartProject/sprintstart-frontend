@@ -20,7 +20,7 @@ export type BoardGroup = {
   cardIds: string[];
   collapsed: boolean;
   /**
-   * The colour the hire painted this area, or none for the blue every area used to be.
+   * The colour the hire painted this area, or none for the default blue.
    *
    * A property of the area rather than of its cards: see `areaAccents.ts` for why a person may
    * colour a group they named and may not colour a card.
@@ -162,9 +162,8 @@ export function groupOf(groups: BoardGroup[], cardId: string): BoardGroup | null
  *
  * `groupId` of null means "no group".
  *
- * **An area left with nothing in it survives.** It used to be dropped — the name was for the cards,
- * and there were none — which was right while the only way to make an area was to put a card in
- * one. Now that an area can be made empty and named first, "empty" can no longer mean "delete me":
+ * **An area left with nothing in it survives.** An area can be made empty and named first, so
+ * "empty" cannot mean "delete me":
  * a hire who drags the last card out of *Paperwork* to look at it somewhere else would come back to
  * find the area gone and its name with it. Removing an area is {@link dissolveGroup}'s job, which
  * is the only place a person actually asks for it.

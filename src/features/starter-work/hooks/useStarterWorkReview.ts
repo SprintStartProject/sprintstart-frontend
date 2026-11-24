@@ -6,7 +6,7 @@ import type {
   CreateStarterWorkTaskInput,
   GenerateStarterWorkResult,
   StarterWorkTask,
-} from "../types";
+} from "../../../services/starterWorkTypes";
 
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;

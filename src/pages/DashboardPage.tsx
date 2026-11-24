@@ -11,17 +11,15 @@ import { DashboardGrid } from "../features/dashboard/components/DashboardGrid";
 import { useDashboardLayout } from "../features/dashboard/layout/useDashboardLayout";
 
 /**
- * Central hub displayed after login — and, since the dashboard became configurable, little
- * more than a frame around one.
+ * Central hub displayed after login: little more than a frame around the configurable dashboard.
  *
  * The page owns three things: whether the board is being edited, the two dialogs that only
- * exist in that mode, and the easter-egg shortcuts that have always lived here. Everything
+ * exist in that mode, and the easter-egg shortcuts. Everything
  * about *what* is on the dashboard belongs to {@link useDashboardLayout}, and everything
  * about how it is arranged to `DashboardGrid` — so adding a widget never means touching this
  * file.
  *
- * A user who has never edited anything sees exactly the dashboard they saw before: the
- * default layout is the old page, in the old order, with the same role-dependent slot.
+ * A user who has never edited anything sees the default layout, with its role-dependent slot.
  *
  * Bound to `/`, open to every permission group; `getDefaultRoute` sends everybody here after
  * login when there is no stored target.

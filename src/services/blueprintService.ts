@@ -11,7 +11,7 @@ import type {
   BlueprintQuestionType,
   BlueprintRequirementType,
   BlueprintStepType,
-} from "../features/blueprints/types.ts";
+} from "./blueprintTypes.ts";
 
 type PathInput = { title: string; description: string };
 type OrderedContentInput = {

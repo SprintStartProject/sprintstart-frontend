@@ -5,8 +5,8 @@ import { Field } from "../../../../components/ui/Field";
 import { Input } from "../../../../components/ui/Input";
 import { Textarea } from "../../../../components/ui/Textarea";
 import { useToast } from "../../../../context/useToast";
-import { formatMinutes } from "../../../onboarding/journey";
-import type { OnboardingStepEndpoint } from "../../../onboarding/types";
+import { formatMinutes } from "../../../onboarding";
+import type { OnboardingStepEndpoint } from "../../../onboarding";
 import { updateOnboardingStep } from "../../../../services/teamManagementService";
 
 /**

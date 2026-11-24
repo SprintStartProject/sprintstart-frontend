@@ -8,7 +8,7 @@ import { confluenceConnector } from "./confluence/definition.ts";
 import { githubConnector } from "./github/definition.ts";
 import { jiraConnector } from "./jira/definition.ts";
 import { notionConnector } from "./notion/definition.ts";
-import { SOURCE_SYSTEMS, type SourceSystem } from "./sourceSystems.ts";
+import { SOURCE_SYSTEMS, type SourceSystem } from "../../../services/sourceSystems.ts";
 import type { ConnectorDefinition } from "./types.ts";
 import { uploadConnector } from "./upload/definition.ts";
 

@@ -1,0 +1,31 @@
+# End-to-end stack, layered over sprintstart-backend's docker-compose.yaml so the services
+# are defined once. Backend and Keycloak come from the images published on `dev`; the AI service is
+# replaced by e2e/ai-stub. Started by `npm run e2e:stack` — see e2e/stack.sh.
+# Own container names, so the stack runs next to a developer's normal local stack.
+services:
+  database:
+    container_name: sprintstart-e2e-db
+
+  keycloak-database:
+    container_name: sprintstart-e2e-keycloak-db
+
+  keycloak:
+    container_name: sprintstart-e2e-keycloak
+    image: ghcr.io/sprintstartproject/sprintstart-keycloak:dev
+    pull_policy: always
+
+  backend:
+    container_name: sprintstart-e2e-backend
+    image: ghcr.io/sprintstartproject/sprintstart-backend:dev
+    pull_policy: always
+    depends_on:
+      ai-stub:
+        condition: service_started
+
+  ai-stub:
+    image: node:22-alpine
+    command: ["node", "/stub/server.mjs"]
+    volumes:
+      - ${E2E_DIR}/ai-stub:/stub:ro
+    ports:
+      - "8000:8000"

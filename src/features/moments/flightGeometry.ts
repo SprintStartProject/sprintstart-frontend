@@ -7,8 +7,7 @@ import { FLIGHT_DURATION_S } from "../../styles/tokens.ts";
  *
  * Flatter than a straight diagonal, because the loop is not on the line — it
  * bulges a full diameter off it, on the upper side. A steeper climb spends that
- * bulge above the top edge, which is what used to swing the rocket briefly out
- * of view on the way past.
+ * bulge above the top edge and swings the rocket briefly out of view on the way past.
  */
 const FLIGHT_X = 0.74;
 const FLIGHT_Y = -0.42;

@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { MemberOpenItems } from "../../../../src/features/pm-area/components/MemberOpenItems";
-import type { TeamOverviewUser } from "../../../../src/features/team-management/types";
+import type { TeamOverviewUser } from "../../../../src/services/teamManagementTypes";
 
 function member(overrides: Partial<TeamOverviewUser> = {}): TeamOverviewUser {
   return {

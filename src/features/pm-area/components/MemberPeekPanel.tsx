@@ -12,10 +12,10 @@ import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
 import { queryKeys } from "../../../services/queryKeys";
 import { getUserOnboardingPath, getUserSkillLevels } from "../../../services/teamManagementService";
-import { formatDuration, formatMoment } from "../../onboarding-metrics/format";
-import { isAwaitingFirstResponse } from "../../onboarding-metrics/hireStatus";
-import { hireMoments } from "../../onboarding-metrics/moments";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { formatDuration, formatMoment } from "../../onboarding-metrics";
+import { isAwaitingFirstResponse } from "../../onboarding-metrics";
+import { hireMoments } from "../../onboarding-metrics";
+import { useProjectContext } from "../../projects";
 import { memberName, waitingOn } from "../memberStatus";
 import { MEMBER_PHASE_PARAM, MEMBER_STEP_PARAM } from "../pmWorkspacePaths";
 import { useMemberOpenItems } from "../useMemberOpenItems";
@@ -107,7 +107,7 @@ function MemberPeekContent({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* The member's onboarding at a glance — the card the full profile used to open on. A phase
+      {/* The member's onboarding at a glance — the summary card from the full profile. A phase
           in it leads to the full profile with that phase shown in the path. */}
       <MemberSummary
         member={member}

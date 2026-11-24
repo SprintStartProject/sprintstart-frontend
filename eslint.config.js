@@ -87,6 +87,19 @@ export default defineConfig([
     },
   },
   {
+    // Size limits and typed ids. Existing violations are frozen in eslint-suppressions.json, which
+    // may only shrink: fix one, then run `npx eslint . --prune-suppressions`.
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      complexity: ["error", 10],
+      "max-depth": ["error", 3],
+      "max-params": ["error", 4],
+      "max-lines-per-function": ["error", { max: 60, skipBlankLines: true, skipComments: true }],
+      "max-lines": ["error", { max: 400 }],
+      "@typescript-eslint/no-explicit-any": "error",
+    },
+  },
+  {
     // A `render` re-export for tests, not a component boundary the dev server hot-reloads.
     files: ["tests/unit/setup/rtl.tsx"],
     rules: {

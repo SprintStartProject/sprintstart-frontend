@@ -1,0 +1,8 @@
+{
+  "answer": "Deploys run from the release branch, after the code freeze on Thursday.",
+  "greeting": "Welcome to SprintStart! Your path for this week is ready.",
+  "flagged": "I can pass this on to your project manager for you.",
+  "cited": "The deploy guide describes it, see the cited source.",
+  "reused": "A teammate answered this before:",
+  "unanswered": "Nobody has answered that yet."
+}

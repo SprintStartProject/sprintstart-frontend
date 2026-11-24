@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { TriangleAlert, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { DropdownSelect } from "../../../components/ui/DropdownSelect.tsx";
-import { canConnect } from "../../graph-diagram/graphLayout.ts";
-import { LOCK_SENTENCE } from "../../graph-diagram/lockWords.ts";
-import type { BlueprintPhase } from "../types.ts";
+import { canConnect } from "../../graph-diagram";
+import { LOCK_SENTENCE } from "../../graph-diagram";
+import type { BlueprintPhase } from "../../../services/blueprintTypes.ts";
 
 /**
  * The resting state of both pickers: nothing chosen, and the control saying what choosing one

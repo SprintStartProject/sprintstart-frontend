@@ -6,11 +6,11 @@ import {
 } from "../../../../src/features/dashboard/teamInsights";
 import { PermissionGroup } from "../../../../src/services/types";
 import type { UserProfile } from "../../../../src/services/types";
-import type { FAQGroup } from "../../../../src/features/faq/types";
+import type { FAQGroup } from "../../../../src/services/faqTypes";
 import type {
   KnowledgeGap,
   KnowledgeGapSeverity,
-} from "../../../../src/features/knowledge-gaps/types";
+} from "../../../../src/services/knowledgeGapTypes";
 
 const createProfile = (permissionGroup: PermissionGroup): UserProfile => ({
   id: "user-1",

@@ -11,8 +11,8 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { chainFor, type GraphShape } from "../competency-graph/layout";
-import { useForceLayout } from "../competency-graph/useForceLayout";
+import { chainFor, type GraphShape } from "../competency-graph";
+import { useForceLayout } from "../competency-graph";
 
 /** How faint an edge outside the lit chain gets. Visible enough to read, faint enough to recede. */
 const DIMMED_EDGE_OPACITY = 0.12;

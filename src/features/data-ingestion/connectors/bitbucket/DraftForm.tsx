@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AtlassianCredentialAddForm } from "../../../settings/components/atlassian/AtlassianCredentialAddForm.tsx";
+import { AtlassianCredentialAddForm } from "../../../settings";
 import { CredentialSlot } from "../../add-source/CredentialSlot.tsx";
 import { useAtlassianCredentialChoice } from "../../add-source/useAtlassianCredentialChoice.ts";
 import { BitbucketRepositoryDiscovery } from "../../components/BitbucketRepositoryDiscovery.tsx";

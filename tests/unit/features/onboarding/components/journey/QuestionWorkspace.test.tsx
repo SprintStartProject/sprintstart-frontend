@@ -5,7 +5,7 @@ import { QuestionWorkspace } from "../../../../../../src/features/onboarding/com
 import type {
   OnboardingQuestionEndpoint,
   QuestionAttemptResult,
-} from "../../../../../../src/features/onboarding/types";
+} from "../../../../../../src/services/onboardingTypes";
 import {
   COPIED_SAMPLE_WARNING,
   readRevealed,

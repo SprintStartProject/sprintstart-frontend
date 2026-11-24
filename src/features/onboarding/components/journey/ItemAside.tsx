@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { formatMinutes, itemState, phaseItems, unlockedBy, type PhaseItem } from "../../journey";
 import { ItemKindIcon } from "../../graph/JourneyNodeCards";
 import { itemKindLabel, itemStateLabel } from "../../graph/nodeLabels";
-import type { OnboardingPhaseEndpoint } from "../../types";
+import type { OnboardingPhaseEndpoint } from "../../../../services/onboardingTypes";
 
 /**
  * The details of the item selected on a phase graph, drawn over the canvas.

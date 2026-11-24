@@ -63,6 +63,9 @@ const BoardPage = lazy(() =>
 const HireSetupPage = lazy(() =>
   import("../pages/HireSetupPage").then((module) => ({ default: module.HireSetupPage })),
 );
+const OffboardingPage = lazy(() =>
+  import("../pages/OffboardingPage").then((module) => ({ default: module.OffboardingPage })),
+);
 const NotFoundPage = lazy(() =>
   import("../pages/NotFoundPage.tsx").then((module) => ({ default: module.NotFoundPage })),
 );
@@ -194,6 +197,14 @@ export function AppRouter() {
                 <Route path="/insights/knowledge-gaps/:gapId?" />
               </Route>
               <Route path="/admin" element={<AdminPage />} />
+              <Route
+                path="/offboarding"
+                element={
+                  <ManagerAreaGuard route="/offboarding">
+                    <OffboardingPage />
+                  </ManagerAreaGuard>
+                }
+              />
               {/* The surfaces the buddy's tools serve. Added beside the onboarding path above, not
               in place of it: both ways in stay open. The buddy itself is its own page, `/buddy`. */}
               <Route path="/board" element={<BoardPage />} />

@@ -10,10 +10,7 @@ import {
   hasRepositoryFacet,
   sourceSystemOfCitation,
 } from "../../../../../src/features/data-ingestion/connectors/registry";
-import {
-  SOURCE_SYSTEMS,
-  toSourceSystem,
-} from "../../../../../src/features/data-ingestion/connectors/sourceSystems";
+import { SOURCE_SYSTEMS, toSourceSystem } from "../../../../../src/services/sourceSystems";
 import { createDataSource, SOURCE_META } from "../../../../../src/features/data-ingestion/data";
 import type { SourceInstanceIngestionStatus } from "../../../../../src/features/data-ingestion/types";
 import { getConnectorMeta } from "../../../../../src/features/connectors/data";

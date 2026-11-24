@@ -1,4 +1,4 @@
-import { onboardingPlace, onboardingPlaceUrl } from "../../onboarding/onboardingPlace";
+import { onboardingPlace, onboardingPlaceUrl } from "../../onboarding";
 import type { CardOrigin } from "./cardOrigins";
 
 /** Whether an in-app path is the Onboarding page, with or without a step after it. */

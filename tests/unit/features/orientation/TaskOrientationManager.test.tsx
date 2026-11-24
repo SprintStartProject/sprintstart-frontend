@@ -6,7 +6,7 @@ import { TaskOrientationManager } from "../../../../src/features/orientation/com
 import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { starterWorkService } from "../../../../src/services/starterWorkService";
 import { orientationService } from "../../../../src/services/orientationService";
-import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
+import type { StarterWorkTask } from "../../../../src/services/starterWorkTypes";
 
 function render(ui: ReactElement) {
   return testingRender(<ToastProvider>{ui}</ToastProvider>);

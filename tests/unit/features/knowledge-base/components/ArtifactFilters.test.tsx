@@ -6,7 +6,7 @@ import type {
   TabOption,
 } from "../../../../../src/features/knowledge-base/hooks/useKnowledgeBase";
 import type { KnowledgeTab, UploadFormat } from "../../../../../src/features/knowledge-base/tabs";
-import type { SourceSystem } from "../../../../../src/features/knowledge-base/types";
+import type { SourceSystem } from "../../../../../src/services/knowledgeTypes";
 
 const SOURCE_OPTIONS: FacetOption<SourceSystem>[] = [
   { value: "GITHUB", label: "GitHub", count: 6 },

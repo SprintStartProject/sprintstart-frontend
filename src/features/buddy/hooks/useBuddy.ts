@@ -55,11 +55,9 @@ export function useBuddy() {
   // hire's session resolves, long before they click. Doing it here means the click finds the
   // conversation already there.
   //
-  // It is `ensureOpened`, never a bare open. A blind open used to run here, on the premise that
-  // opening twice is idempotent — true only while the hire has said nothing. Once they have, a
-  // visit has ended, so an open writes a *new* opening marker and `getMessagesForMe` returns
-  // only from there: every reload silently threw the hire's scrollback away. Reading first
-  // costs one cheap request and greets only a visit that really is empty.
+  // It is `ensureOpened`, never a bare open: once the hire has spoken, an open writes a new opening
+  // marker and the history read starts there, dropping their scrollback. Reading first greets only
+  // a visit that really is empty.
   useEffect(() => {
     void ensureOpened();
   }, [ensureOpened]);

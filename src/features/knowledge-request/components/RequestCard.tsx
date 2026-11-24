@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { AlarmClock, Clock, MessageSquareText } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Button } from "../../../components/ui/Button";
-import type { EscalationHire, KnowledgeRequest } from "../types";
+import type { EscalationHire, KnowledgeRequest } from "../../../services/knowledgeRequestTypes";
 import { formatWaiting, hasWaitedADay } from "../format";
 import { AnswerForm } from "./AnswerForm";
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useGithubTokens } from "../../../settings/hooks/useGithubTokens.ts";
-import { TokenAddForm } from "../../../settings/components/TokenAddForm.tsx";
+import { useGithubTokens } from "../../../settings";
+import { TokenAddForm } from "../../../settings";
 import { CredentialSlot } from "../../add-source/CredentialSlot.tsx";
 import {
   GithubRepositoryDiscovery,

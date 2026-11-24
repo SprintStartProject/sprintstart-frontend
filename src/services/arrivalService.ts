@@ -5,7 +5,7 @@ import type {
   DerivableArrivalStep,
   MyArrival,
   UpdateArrivalStepRequest,
-} from "../features/arrival/types";
+} from "./arrivalTypes";
 
 const BASE = "/api/v1/onboarding";
 

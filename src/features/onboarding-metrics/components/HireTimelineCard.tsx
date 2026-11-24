@@ -1,6 +1,6 @@
 import { CONTRIBUTION_WORDING } from "../../../config/contributionWording";
 import { Check, ChevronRight, Clock, GitMerge } from "lucide-react";
-import type { HireTimeline } from "../types";
+import type { HireTimeline } from "../../../services/onboardingMetricsTypes";
 import { Badge } from "../../../components/ui/Badge";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { formatDuration, formatMoment } from "../format";

@@ -276,3 +276,94 @@ describe("ProjectProvider imperative selection", () => {
     expect(window.localStorage.getItem(`${BASE_KEY}:user-a`)).toBe("p1");
   });
 });
+
+describe("ProjectProvider loading state", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  /** Records what every render of the context said, so a transient state cannot slip past. */
+  function LoadingProbe({ log }: { log: { isLoading: boolean; projects: number }[] }) {
+    const context = useContext(ProjectContext);
+    log.push({ isLoading: context?.isLoading ?? true, projects: context?.projects.length ?? 0 });
+    return null;
+  }
+
+  it("stays loading from sign-in until the signed-in user's projects have arrived", async () => {
+    // Before sign-in the provider settles on "nothing to load". A guard that trusted that state
+    // in the render right after sign-in sent a manager's deep link to /pm-dashboard back home.
+    auth.status = "loading";
+    auth.userId = "";
+    auth.permissionGroup = "ADMIN";
+    let releaseProjects: ((projects: AdminProject[]) => void) | undefined;
+    vi.mocked(projectService.getProjects).mockReturnValue(
+      new Promise((resolve) => {
+        releaseProjects = resolve;
+      }),
+    );
+    const log: { isLoading: boolean; projects: number }[] = [];
+    const view = render(
+      <ProjectProvider>
+        <LoadingProbe log={log} />
+      </ProjectProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    auth.status = "authenticated";
+    auth.userId = "user-a";
+    log.length = 0;
+    view.rerender(
+      <ProjectProvider>
+        <LoadingProbe log={log} />
+      </ProjectProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const beforeTheList = [...log];
+    await act(async () => {
+      releaseProjects?.([project("p1", "Alpha")]);
+      await Promise.resolve();
+    });
+
+    expect(beforeTheList.length).toBeGreaterThan(0);
+    expect(beforeTheList.every((entry) => entry.isLoading)).toBe(true);
+    await waitFor(() => expect(log.at(-1)).toEqual({ isLoading: false, projects: 1 }));
+  });
+});
+
+describe("ProjectProvider loading state before the profile", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("stays loading while the session is signed in but the profile has not arrived", async () => {
+    // Keycloak reports the session before /users/me answers. Without a profile there is no list to
+    // load yet, and reporting that as loaded made the manager guard decide with no profile at all.
+    auth.status = "authenticated";
+    auth.userId = "";
+    auth.permissionGroup = "PM";
+    const states: boolean[] = [];
+    function Probe() {
+      const context = useContext(ProjectContext);
+      states.push(context?.isLoading ?? true);
+      return null;
+    }
+
+    render(
+      <ProjectProvider>
+        <Probe />
+      </ProjectProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(states.length).toBeGreaterThan(0);
+    expect(states.every((isLoading) => isLoading)).toBe(true);
+  });
+});

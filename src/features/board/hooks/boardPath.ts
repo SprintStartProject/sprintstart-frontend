@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { OnboardingPathEndpoint } from "../../onboarding/types";
+import type { OnboardingPathEndpoint } from "../../onboarding";
 import type { PathPhases } from "../layout/pathStages";
 
 /**

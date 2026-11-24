@@ -288,8 +288,8 @@ function BuddyDockImpl({
         x: dragX,
         y: dragY,
       }}
-      // No `max-h`/`max-w` caps any more: `dockBox` already fits the window inside the viewport,
-      // with its header on screen, and caps would stop the growth into the page short of the edges.
+      // No `max-h`/`max-w`: `dockBox` already fits the window inside the viewport, and caps would
+      // stop the growth into the page short of the edges.
       className="fixed z-50 flex flex-col overflow-hidden border border-app-border bg-app-bg shadow-2xl"
     >
       {/* Everything inside fades as the window grows, so by the time the route changes the
@@ -435,9 +435,8 @@ function BuddyDockImpl({
                 suggestions={suggestions}
                 onPick={setDraft}
                 heading="Try asking"
-                // The full row took roughly half the window: five chips at reading size wrapped
-                // over three lines, leaving the conversation the other half. Compact caps them
-                // and shrinks them, and the hire can put the row away entirely.
+                // Compact: at reading size the chips wrap over several lines and take half the
+                // window. The hire can also put the row away.
                 compact
                 headingAction={
                   onHideSuggestions && (

@@ -4,8 +4,8 @@ import {
   phaseProgress,
   phaseState,
   sortedPhases,
-} from "../onboarding/journey";
-import type { OnboardingPathEndpoint } from "../onboarding/types";
+} from "../onboarding";
+import type { OnboardingPathEndpoint } from "../onboarding";
 import type { OnboardingFeedback } from "../../services/teamManagementService";
 import type { ChartDatum } from "./components/charts/chartTypes";
 

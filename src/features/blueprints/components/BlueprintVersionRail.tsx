@@ -6,10 +6,9 @@ const RAIL_LIMIT = 6;
 /**
  * A blueprint's versions as a line, with the one in service marked and the draft ahead of it.
  *
- * Version was a number in the corner of a badge — "v4" — which says how many times this has been
- * republished and nothing about where the blueprint stands. The two facts a PM has about a
- * blueprint are *what hires are getting* and *what is being written*, and they used to be a status
- * chip and a sentence in different parts of the card, in a group heading that contradicted both.
+ * A version number alone ("v4") says how many times this has been republished and nothing about
+ * where the blueprint stands. The two facts a PM has about a blueprint are *what hires are getting*
+ * and *what is being written*.
  *
  * Here they are one picture: earlier versions behind, the live one filled, and the draft as a
  * hollow ring one step ahead — not yet real, and plainly not what anybody has. A blueprint with no

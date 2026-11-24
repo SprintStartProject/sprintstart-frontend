@@ -11,7 +11,7 @@ import {
   withAttempt,
   writeRevealed,
 } from "../../../../src/features/onboarding/questionIntegrity.ts";
-import type { OnboardingQuestionOptionEndpoint } from "../../../../src/features/onboarding/types.ts";
+import type { OnboardingQuestionOptionEndpoint } from "../../../../src/services/onboardingTypes.ts";
 
 function options(...labels: string[]): OnboardingQuestionOptionEndpoint[] {
   return labels.map((label, index) => ({ id: `o${index + 1}`, position: index, label }));

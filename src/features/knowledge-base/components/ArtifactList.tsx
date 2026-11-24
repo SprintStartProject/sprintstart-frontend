@@ -9,7 +9,7 @@ import {
   FileText,
   GitPullRequest,
 } from "lucide-react";
-import type { Artifact, ArtifactAiStatus, ArtifactType } from "../types";
+import type { Artifact, ArtifactAiStatus, ArtifactType } from "../../../services/knowledgeTypes";
 import { AI_STATUS_CHIPS } from "../aiStatus";
 import { AiStatusChip } from "./AiStatusChip";
 import { getArtifactRepository } from "../githubMetadata";

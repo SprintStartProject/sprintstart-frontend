@@ -7,7 +7,7 @@ import type {
   QuestionAttemptsReviewEndpoint,
   UpsertQuestion,
   CheckQuestionType,
-} from "../../../onboarding/types";
+} from "../../../onboarding";
 import {
   Loader2,
   AlertCircle,
@@ -301,10 +301,6 @@ function TabButton({
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Results tab
-// ─────────────────────────────────────────────────────────────
-
 function ResultsTab({ userId, questions }: { userId: string; questions: AdminQuestionEndpoint[] }) {
   const [attemptsByQuestion, setAttemptsByQuestion] = useState<
     Record<string, QuestionAttemptsReviewEndpoint | null>
@@ -436,10 +432,6 @@ function ResultsTab({ userId, questions }: { userId: string; questions: AdminQue
     </div>
   );
 }
-
-// ─────────────────────────────────────────────────────────────
-// Questions editor
-// ─────────────────────────────────────────────────────────────
 
 function QuestionsEditor({
   drafts,

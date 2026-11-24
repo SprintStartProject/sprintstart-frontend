@@ -78,8 +78,7 @@ export const slidingIndicatorSpringToken: Transition = {
  *
  * Single source of truth: the panel animation, how long `PanelPresence` keeps
  * a closing panel mounted, and the admin drawers' own close delay all derive
- * from this. Keeping them independent is what previously cut the slide off
- * halfway.
+ * from this. Kept apart, they would cut the slide off halfway.
  */
 export const SIDE_PANEL_SLIDE_MS = 420;
 
@@ -106,13 +105,10 @@ export const sidePanelSlideToken: Transition = {
  * <motion.button {...buttonHoverMotion} className="...">Save</motion.button>
  * ```
  *
- * **The scale never goes above 1, and that is the point.** This used to grow
- * the control to 1.03 on hover, with an underdamped spring that then sprang
- * past 1 again on release. A control sitting flush against the right end of a
- * toolbar has nothing to grow into: the extra sliver landed outside the
- * surrounding panel and was visibly sliced off — on the admin filters, and
- * again on the access view's add button. Hover feedback is carried by the
- * `hover:` colours every button variant already has, which no layout can clip.
+ * **The scale never goes above 1, and that is the point.** A control sitting flush against the end
+ * of a toolbar has nothing to grow into, so any growth would be clipped by the surrounding panel.
+ * Hover feedback is carried by the `hover:` colours every button variant already has, which no
+ * layout can clip.
  *
  * `dockMagnifySpringToken` rather than `hoverSpringToken` for the same reason:
  * it is damped to the point of not overshooting, so releasing a press returns

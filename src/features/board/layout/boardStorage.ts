@@ -13,7 +13,7 @@
  *   look again. Fired only when a write came from somewhere those readers cannot see: the selection
  *   toolbar recording where a card came from, or a whole document arriving from the server.
  *
- * Collapsing them into one event was the first attempt and it is a render loop: every reader
+ * Collapsing them into one event is a render loop: every reader
  * re-reads on every write, including its own, and re-seats state it already had.
  *
  * Window events rather than the `storage` event, which browsers fire only in *other* tabs — the one

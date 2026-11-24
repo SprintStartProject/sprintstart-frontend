@@ -1,7 +1,7 @@
 import { Plus, X } from "lucide-react";
 import { useId, useState } from "react";
 import { Input } from "../../../components/ui/Input";
-import type { Skill } from "../types";
+import type { Skill } from "../../../services/teamManagementTypes";
 
 /** How many catalog skills are offered under the field while typing. */
 const MAX_MATCHES = 6;

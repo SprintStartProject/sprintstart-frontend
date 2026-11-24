@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
 import { BuddyProviderWithStubs } from "./buddyTestHarness";
@@ -35,16 +35,10 @@ function replyStream(text: string) {
 describe("buddy message options", () => {
   let bodies: SentBody[] = [];
 
-  const originalTz = process.env.TZ;
-
   beforeEach(() => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     bodies = [];
     localStorage.clear();
-
-    // A fixed zone with daylight saving, like `filterRange.test.ts`: the wire instants for a
-    // chosen day depend on the zone the composer runs in.
-    process.env.TZ = "Europe/Berlin";
 
     server.use(
       http.get(MESSAGES, () => HttpResponse.json([])),
@@ -54,11 +48,6 @@ describe("buddy message options", () => {
         return replyStream("Answer");
       }),
     );
-  });
-
-  afterEach(() => {
-    if (originalTz === undefined) delete process.env.TZ;
-    else process.env.TZ = originalTz;
   });
 
   /** Mounts the session with its opening settled, so the composer is free to send. */

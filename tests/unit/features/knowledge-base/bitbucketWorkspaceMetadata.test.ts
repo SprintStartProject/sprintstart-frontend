@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { parseBitbucketWorkspaceMetadata } from "../../../../src/features/knowledge-base/bitbucketWorkspaceMetadata";
+import { parseBitbucketWorkspaceMetadata } from "../../../../src/services/bitbucketWorkspaceMetadata";
 
 describe("parseBitbucketWorkspaceMetadata", () => {
   afterEach(() => {

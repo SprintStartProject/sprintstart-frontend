@@ -1,5 +1,5 @@
 import type { Citation } from "./citations/types";
-import type { SourceSystem } from "../data-ingestion/connectors/sourceSystems";
+import type { SourceSystem } from "../../services/sourceSystems";
 
 /**
  * An action the buddy has *proposed* — the hire must confirm it before anything changes. Carried on

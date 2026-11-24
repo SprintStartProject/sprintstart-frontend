@@ -1,6 +1,6 @@
 import { AlarmClock, BookCheck, Clock, MessageSquareOff } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { formatDateTime, formatWaiting, hasWaitedADay } from "../../knowledge-request/format";
+import { formatDateTime, formatWaiting, hasWaitedADay } from "../../knowledge-request";
 import type { PmReplies } from "../hooks/usePmReplies";
 
 /**

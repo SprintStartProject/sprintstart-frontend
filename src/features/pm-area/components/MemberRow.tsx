@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
-import type { TeamOverviewUser } from "../../team-management/types";
+import type { TeamOverviewUser } from "../../team-management";
 import type { AttentionReason } from "../attentionQueue";
 import { REASON_META } from "../attentionReasons";
 import { usePeekClick } from "../usePeekClick";

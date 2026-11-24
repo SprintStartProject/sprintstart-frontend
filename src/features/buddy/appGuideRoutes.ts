@@ -38,5 +38,7 @@ export const APP_GUIDE_EXCLUDED_ROUTES: Partial<Record<AppRoute, string>> = {
   "/arrival-steps": "Redirects to /hire-setup?tab=arrival.",
   "/starter-work": "Redirects to /hire-setup?tab=starter.",
   "/profile": "Redirects to /settings.",
+  "/offboarding":
+    "Not yet described in the backend's AppGuide.kt; add it there before listing it here.",
   "/chat": "The retired chat — both of its addresses redirect to /buddy.",
 };

@@ -26,11 +26,10 @@ import { onboardingMetricsService } from "../services/onboardingMetricsService";
 import { queryKeys } from "../services/queryKeys";
 
 /**
- * The overview section of the PM workspace (see `PmWorkspace`): what needs the manager today, how the team is doing, and the
- * three insight readouts — each a click from the section it summarizes.
+ * The overview section of the PM workspace (see `PmWorkspace`): what needs the manager today, how
+ * the team is doing, and the three insight readouts — each a click from the section it summarizes.
  *
- * Built around "does anybody need me" rather than a column of equal widgets. The old page gave
- * ingestion health the top row and made a manager scroll past it to find a skip request. Now the
+ * Built around "does anybody need me" rather than a column of equal widgets: the
  * "Waiting on you" figure says how many answers are owed, and the team card below lists the
  * people who need the manager first, each opening in the side panel where it can be acted on.
  *

@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { KnowledgeGapsPage } from "../../../../../src/features/knowledge-gaps/components/KnowledgeGapsPage";
-import type { KnowledgeGapOverview } from "../../../../../src/features/knowledge-gaps/types";
+import type { KnowledgeGapOverview } from "../../../../../src/services/knowledgeGapTypes";
 import { MemoryRouter } from "react-router-dom";
 
 const mockOverview: KnowledgeGapOverview = {

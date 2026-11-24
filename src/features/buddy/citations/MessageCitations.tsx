@@ -29,7 +29,6 @@ type CitationGroup = {
 function formatRanges(prefix: string, numbers: number[]): string[] {
   if (numbers.length === 0) return [];
 
-  // remove duplicates and sort
   const sorted = [...new Set(numbers)].sort((a, b) => a - b);
 
   const ranges: string[] = [];
@@ -70,9 +69,8 @@ function formatRanges(prefix: string, numbers: number[]): string[] {
 export function MessageCitations({ citations, onOpenArtifact }: MessageCitationsProps) {
   const [open, setOpen] = useState(false);
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
-  // E3/E4: anchor rect of the chip that opened the sub-popover, so the
-  // popover can be positioned fixed (viewport-clamped) and dismissed on
-  // outside click / Escape.
+  // The anchor rect of the chip that opened the sub-popover, so it can be positioned fixed
+  // (viewport-clamped) and dismissed on an outside click or Escape.
   const [activeRect, setActiveRect] = useState<DOMRect | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 

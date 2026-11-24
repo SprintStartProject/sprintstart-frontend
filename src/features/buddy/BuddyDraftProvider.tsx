@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { matchEggPhrase } from "../easter-eggs/lib/eggPhrases";
-import { playEggEffect } from "../easter-eggs/eggEffectBus";
+import { matchEggPhrase } from "../easter-eggs";
+import { playEggEffect } from "../easter-eggs";
 import { BuddyDraftActionsContext, BuddyDraftContext } from "./buddyDraftContext";
 import type { BuddyDraft, BuddyDraftActions } from "./buddyDraftContext";
 import { useBuddySession } from "./buddySessionContext";
@@ -89,9 +89,8 @@ export function BuddyDraftProvider({ children }: { children: ReactNode }) {
     setSeen({ userId, key: conversationKey });
   }
 
-  // Debounced save while the hire types — the retired chat's window, so a reload lands on the
-  // same words. An empty draft removes the entry rather than storing one: a box nobody has
-  // touched is not a draft.
+  // Debounced save while the hire types, so a reload lands on the same words. An empty draft
+  // removes the entry: a box nobody has touched is not a draft.
   useEffect(() => {
     const id = window.setTimeout(() => {
       if (!isSessionBinned(conversationKey)) writeDraft(userId, conversationKey, draft);

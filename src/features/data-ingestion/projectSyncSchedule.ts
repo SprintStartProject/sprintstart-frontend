@@ -4,7 +4,7 @@ import {
   type SyncScheduleRequest,
 } from "../../services/sources/syncSchedule.ts";
 import { getConnector } from "./connectors/registry.ts";
-import type { SourceSystem } from "./connectors/sourceSystems.ts";
+import type { SourceSystem } from "../../services/sourceSystems.ts";
 import type { DataSource } from "./types.ts";
 
 /** The schedule to show in the project-wide form and whether the sources disagree on it. */

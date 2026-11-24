@@ -1,10 +1,6 @@
-// ============================================================
-// features/onboarding/journeyViewMemory.ts
-// ============================================================
 // Remembers how a path was last looked at -- list or graph, and
 // which phase the graph was zoomed into -- so coming back does
 // not mean switching and zooming all over again.
-// ============================================================
 
 export type JourneyViewMode = "list" | "graph";
 

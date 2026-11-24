@@ -40,8 +40,7 @@ in [UI_DESIGN_DECISIONS.md](./UI_DESIGN_DECISIONS.md).
   follow the convention of the file you're editing.
 
 - **Don't use `any`.** Narrow types using explicit interfaces or type guards.
-  ESLint only warns (`@typescript-eslint/no-explicit-any: warn`), but treat the
-  warning as something to fix, not to live with.
+  `@typescript-eslint/no-explicit-any` is an error in `src/` (tests excepted).
 
 - **`eqeqeq: error`** — always `===` / `!==`.
 
@@ -56,16 +55,12 @@ in [UI_DESIGN_DECISIONS.md](./UI_DESIGN_DECISIONS.md).
 - **No type suppressions** — never commit `// @ts-ignore` or `// @ts-expect-error`.
   Fix the underlying type mismatch instead.
 
-- **`eslint-disable` only as a last resort** — disable one rule for one line
-  (`// eslint-disable-next-line <rule>`), never a whole block or file, and give the
-  reason after `--`:
-
-  ```typescript
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- `act` closes over fresh state each render
-  ```
-
-  When the reason needs more than a line, write it as a comment directly above the
-  disable instead. A disable with no reason at all is not allowed.
+- **No new `eslint-disable`**. If a rule fires,
+  restructure the code. If the rule is genuinely wrong for one case, that is a human
+  decision: one rule, one line (`// eslint-disable-next-line <rule> -- <reason>`),
+  and the PR needs the `quality-exception` label from a second person. An agent
+  never adds one. The quality ratchet counts the existing disables, and the count may
+  only go down.
 
 ---
 
@@ -413,6 +408,13 @@ ESLint flat config ([`eslint.config.js`](../eslint.config.js)):
 - `react-refresh` Vite preset.
 - `jsx-a11y` flat recommended.
 - `prettier` (formatting via `eslint-config-prettier`).
+- Size and complexity limits for `src/`:
+  `max-lines-per-function` 60, `complexity` 10, `max-depth` 3, `max-params` 4,
+  `max-lines` 400, all errors. Existing violations are frozen in
+  [`eslint-suppressions.json`](../eslint-suppressions.json); after fixing one, run
+  `npx eslint . --prune-suppressions` (lint fails until you do). Never add to it.
+- `bash scripts/quality/ratchet.sh` — also run in CI on every PR — fails when
+  suppressions, skipped tests, oversized files or protected config change for the worse.
 
 **Definition of Done:** `npm run try` passes. It runs `npm install`, the Prettier
 check, the build (`tsc -b` + `vite build`), ESLint, and the unit and a11y tests.

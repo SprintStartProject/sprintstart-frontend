@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { groupByScope } from "../../../../src/features/arrival/scopeGroups";
-import type { ArrivalStep } from "../../../../src/features/arrival/types";
+import type { ArrivalStep } from "../../../../src/services/arrivalTypes";
 
 const step = (key: string, projectName: string | null): ArrivalStep => ({
   key,

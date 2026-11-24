@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OrientationPanel } from "../../../../src/features/orientation/components/OrientationPanel";
 import { onboardingFeedbackService } from "../../../../src/services/onboardingFeedbackService";
-import type { MyOrientation } from "../../../../src/features/orientation/types";
+import type { MyOrientation } from "../../../../src/services/orientationTypes";
 
 const withPacket: MyOrientation = {
   taskId: "task-1",

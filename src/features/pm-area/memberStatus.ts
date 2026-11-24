@@ -1,4 +1,4 @@
-import type { TeamOverviewUser } from "../team-management/types";
+import type { TeamOverviewUser } from "../team-management";
 
 /**
  * Where a member stands, read off one team-overview row.

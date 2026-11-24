@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Layers, ListChecks, Milestone } from "lucide-react";
 import { Link } from "react-router-dom";
-import { onboardingPlaceUrl } from "../../onboarding/onboardingPlace";
+import { onboardingPlaceUrl } from "../../onboarding";
 import { useBoardPath } from "../hooks/boardPath";
 import { resolveLink, type ResolvedLink } from "../layout/pathStages";
 import { titleKey } from "../layout/stepLinks";

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { parseOrgMetadata } from "../../../../src/features/knowledge-base/orgMetadata";
+import { parseOrgMetadata } from "../../../../src/services/orgMetadata";
 
 describe("parseOrgMetadata", () => {
   afterEach(() => {

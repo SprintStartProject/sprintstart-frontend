@@ -7,10 +7,10 @@ import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { insightsService } from "../../../services/faqService";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { FAQGroup } from "../../faq/types";
-import type { KnowledgeGap, KnowledgeGapSeverity } from "../../knowledge-gaps/types";
-import { SEVERITIES, SEVERITY_ORDER, SEVERITY_STYLES } from "../../knowledge-gaps/severity";
-import { useProjectContext } from "../../projects/useProjectContext";
+import type { FAQGroup } from "../../faq";
+import type { KnowledgeGap, KnowledgeGapSeverity } from "../../knowledge-gaps";
+import { SEVERITIES, SEVERITY_ORDER, SEVERITY_STYLES } from "../../knowledge-gaps";
+import { useProjectContext } from "../../projects";
 import { summarizeGaps, topQuestions, type GapSummary } from "../teamInsights";
 import type { DashboardWidgetSize } from "../layout/types";
 

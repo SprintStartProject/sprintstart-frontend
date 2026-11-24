@@ -7,7 +7,7 @@ import type {
   Artifact,
   ArtifactPage,
   KnowledgeListParams,
-} from "../../../../../src/features/knowledge-base/types";
+} from "../../../../../src/services/knowledgeTypes";
 import { matchesFormat } from "../../../../../src/features/knowledge-base/tabs";
 import {
   getArtifactRepository,

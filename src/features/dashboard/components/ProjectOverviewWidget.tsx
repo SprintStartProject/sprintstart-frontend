@@ -1,5 +1,5 @@
 import { FolderKanban } from "lucide-react";
-import { useProjectContext } from "../../projects/useProjectContext";
+import { useProjectContext } from "../../projects";
 import { summarizeProjects } from "../organizationOverview";
 import type { DashboardWidgetSize } from "../layout/types";
 import { WidgetBar } from "./WidgetBar";

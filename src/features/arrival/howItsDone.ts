@@ -1,5 +1,5 @@
 import { CheckCircle2, Eye, GitBranch, GitPullRequest, type LucideIcon } from "lucide-react";
-import type { Rigor } from "./types";
+import type { Rigor } from "../../services/arrivalTypes";
 
 export type HowItsDone = {
   /** One or two words for the badge — see the "What the badges mean" hint for the full sentence. */

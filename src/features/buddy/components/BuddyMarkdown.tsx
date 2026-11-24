@@ -71,25 +71,22 @@ type BuddyMarkdownProps = {
 function BuddyMarkdownImpl({ content, citations, onCitationClick }: BuddyMarkdownProps) {
   const citationCount = citations?.length ?? 0;
 
-  // A2-style: linkify once per (content, citation count) pair instead of every render.
+  // Linkified once per (content, citation count) pair instead of every render.
   const mdContent = useMemo(
     () => linkifyCitations(content, citationCount),
     [content, citationCount],
   );
 
-  // A4-style: the components map closes over the citations and the click handler, so it can't be
-  // module-scope — but memoizing on those deps keeps its identity stable across renders that
-  // don't change them, which is what stops ReactMarkdown re-walking the AST for nothing.
+  // The components map closes over the citations and the click handler, so it cannot be module-
+  // scope; memoised so ReactMarkdown does not re-walk the AST on renders that change neither.
   const components = useMemo(() => {
     function citationLink({ href, children }: { href?: string; children?: ReactNode }) {
       const match = href ? /^#cite-(\d+)$/.exec(href) : null;
 
       if (match) {
         const n = Number(match[1]);
-        // Positional, like the model's own numbering: the stream emits citations in the order
-        // the reply referenced them, and the read-back must return them in that order too — a
-        // contract flagged in review (backend#281 has no explicit order yet). A wrong source
-        // would be worse than none.
+        // Positional, like the model's own numbering: citations arrive in the order the reply
+        // referenced them. A wrong source would be worse than none.
         const citation = citations?.[n - 1];
 
         return (

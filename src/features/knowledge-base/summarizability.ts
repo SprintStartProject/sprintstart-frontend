@@ -1,4 +1,4 @@
-import type { ArtifactContent } from "./types";
+import type { ArtifactContent } from "../../services/knowledgeTypes";
 
 /**
  * How many lines of real content an artifact needs before asking the AI for a

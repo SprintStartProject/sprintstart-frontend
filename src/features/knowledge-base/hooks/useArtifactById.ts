@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { Artifact } from "../types";
+import type { Artifact } from "../../../services/knowledgeTypes";
 
 /**
  * Loads a single artifact by its ID within a project scope.

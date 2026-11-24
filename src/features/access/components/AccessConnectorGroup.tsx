@@ -75,10 +75,7 @@ export function AccessConnectorGroup({
       aria-label={`${connector.label} access`}
       data-testid={`access-group-${connector.id}`}
     >
-      {/* Header carries identity only. A per-source add button used to sit here
-          too, which meant two controls for the same job once the view grew its
-          own — and the one in the header claimed to be about GitHub while the
-          other claimed to be about credentials in general. */}
+      {/* Header carries identity only. */}
       <div className="flex items-center gap-3">
         <IconTile icon={Icon} size="lg" tone="neutral" />
 
