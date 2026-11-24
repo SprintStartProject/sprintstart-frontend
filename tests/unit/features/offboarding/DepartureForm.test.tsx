@@ -117,31 +117,50 @@ describe("DepartureForm", () => {
     const { user, onSubmit } = setup();
     await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}");
     await user.type(screen.getByLabelText("As of"), "2026-11-20");
-    await user.type(screen.getByLabelText("Review weight"), "0.5");
+    await user.clear(screen.getByLabelText("Review weight"));
+    await user.type(screen.getByLabelText("Review weight"), "0.8");
 
     await user.click(screen.getByRole("button", { name: "Rank files" }));
 
     expect(onSubmit).toHaveBeenCalledWith({
       leaving: ["ada"],
       asOf: "2026-11-20T23:59:59Z",
-      reviewWeight: 0.5,
+      reviewWeight: 0.8,
+      ranking: "placeholder",
+      knowledge: "time-weighted",
       limit: 200,
     });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("submits the chosen ranking and knowledge model", async () => {
+  it("starts with the selection's settings and submits them", async () => {
     const { user, onSubmit } = setup();
     await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}");
-    await user.selectOptions(screen.getByLabelText("Rank files by"), "placeholder");
-    await user.selectOptions(screen.getByLabelText("Who knows a file"), "time-weighted");
 
     await user.click(screen.getByRole("button", { name: "Rank files" }));
 
     expect(onSubmit).toHaveBeenCalledWith({
       leaving: ["ada"],
+      reviewWeight: 0.5,
       ranking: "placeholder",
       knowledge: "time-weighted",
+      limit: 200,
+    });
+  });
+
+  it("submits the departing share and authorship when they are chosen", async () => {
+    const { user, onSubmit } = setup();
+    await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}");
+    await user.selectOptions(screen.getByLabelText("Rank files by"), "departing-share");
+    await user.selectOptions(screen.getByLabelText("Who knows a file"), "authorship");
+    await user.clear(screen.getByLabelText("Review weight"));
+
+    await user.click(screen.getByRole("button", { name: "Rank files" }));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      leaving: ["ada"],
+      ranking: "departing-share",
+      knowledge: "authorship",
       limit: 200,
     });
   });
@@ -149,6 +168,7 @@ describe("DepartureForm", () => {
   it("refuses a negative review weight", async () => {
     const { user, onSubmit } = setup();
     await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}");
+    await user.clear(screen.getByLabelText("Review weight"));
     await user.type(screen.getByLabelText("Review weight"), "-1");
 
     await user.click(screen.getByRole("button", { name: "Rank files" }));

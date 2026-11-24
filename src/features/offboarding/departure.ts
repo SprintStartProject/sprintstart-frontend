@@ -31,6 +31,13 @@ export function endOfDay(date: string): string | undefined {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T23:59:59Z` : undefined;
 }
 
+/** The settings a new departure starts with: the selection's knowledge model, reviews at half a commit, ranked by its score. */
+export const DEFAULT_SETTINGS = {
+  reviewWeight: "0.5",
+  ranking: "placeholder",
+  knowledge: "time-weighted",
+} as const;
+
 /** What somebody entered to describe a departure, as the form holds it. */
 export interface DepartureDraft {
   /** The members chosen to leave, by user id. */
@@ -78,8 +85,8 @@ export function toRiskQuery(draft: DepartureDraft, members: MemberMatch[]): Risk
     leaving: leavingIdentities(draft, members),
     asOf: endOfDay(draft.asOfDay),
     reviewWeight: parseWeight(draft.reviewWeight),
-    ranking: draft.ranking === "placeholder" ? draft.ranking : undefined,
-    knowledge: draft.knowledge === "time-weighted" ? draft.knowledge : undefined,
+    ranking: draft.ranking,
+    knowledge: draft.knowledge,
     limit: RISK_LIST_LIMIT,
   };
 }

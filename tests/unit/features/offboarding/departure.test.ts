@@ -106,6 +106,8 @@ describe("toRiskQuery", () => {
       leaving: ["ada", "ben"],
       asOf: "2026-11-20T23:59:59Z",
       reviewWeight: 0.5,
+      ranking: "departing-share",
+      knowledge: "authorship",
       limit: RISK_LIST_LIMIT,
     });
   });
@@ -117,8 +119,11 @@ describe("toRiskQuery", () => {
     expect(query.reviewWeight).toBeUndefined();
   });
 
-  it("sends the ranking and the knowledge model only when they differ from the defaults", () => {
-    expect(toRiskQuery(ok, [])).toMatchObject({ ranking: undefined, knowledge: undefined });
+  it("sends the chosen ranking and knowledge model", () => {
+    expect(toRiskQuery(ok, [])).toMatchObject({
+      ranking: "departing-share",
+      knowledge: "authorship",
+    });
     expect(
       toRiskQuery({ ...ok, ranking: "placeholder", knowledge: "time-weighted" }, []),
     ).toMatchObject({ ranking: "placeholder", knowledge: "time-weighted" });

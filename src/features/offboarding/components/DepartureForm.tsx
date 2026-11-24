@@ -9,7 +9,7 @@ import type {
   RankingName,
   RiskQuery,
 } from "../../../services/offboardingTypes";
-import { draftProblem, toRiskQuery, type DepartureDraft } from "../departure";
+import { DEFAULT_SETTINGS, draftProblem, toRiskQuery, type DepartureDraft } from "../departure";
 import { HintedField } from "./HintedField";
 import { WhoIsLeaving, type TeamState } from "./WhoIsLeaving";
 
@@ -23,9 +23,7 @@ const EMPTY_DRAFT: DepartureDraft = {
   memberIds: [],
   people: [],
   asOfDay: "",
-  reviewWeight: "",
-  ranking: "departing-share",
-  knowledge: "authorship",
+  ...DEFAULT_SETTINGS,
 };
 
 function ModelFields({
