@@ -48,7 +48,7 @@ function Step({ step }: { step: MetricStep }) {
  * Goes through every metric of the ranking, one after the other, and shows what each measured on a
  * file of the ranking on screen: the question, how it is calculated, and the numbers it came to.
  */
-export function MetricsWalkthrough({ map }: { map: RiskMap | undefined }) {
+export function MetricsWalkthrough({ map }: { map: RiskMap | null | undefined }) {
   const [chosen, setChosen] = useState(0);
   if (!map || map.files.length === 0) {
     return (
