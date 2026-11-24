@@ -3,5 +3,6 @@ export { RiskResults } from "./components/RiskResults";
 export { useRiskMap } from "./useRiskMap";
 export { useProjectMembers } from "./useProjectMembers";
 export { IdentitiesPanel } from "./components/IdentitiesPanel";
+export { MetricsWalkthrough } from "./components/MetricsWalkthrough";
 export { SaveMapBar } from "./components/SaveMapBar";
 export { SavedMapsPanel } from "./components/SavedMapsPanel";

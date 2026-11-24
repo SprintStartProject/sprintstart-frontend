@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { History, ListOrdered, UserMinus, Users } from "lucide-react";
+import { History, ListOrdered, Ruler, UserMinus, Users } from "lucide-react";
 
 import { MainContent } from "../components/layout/MainContent";
 import { PageHeader } from "../components/layout/PageHeader";
@@ -8,6 +8,7 @@ import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/Segment
 import {
   DepartureForm,
   IdentitiesPanel,
+  MetricsWalkthrough,
   RiskResults,
   SaveMapBar,
   SavedMapsPanel,
@@ -17,10 +18,11 @@ import {
 import { useProjectContext } from "../features/projects";
 import type { RiskQuery } from "../services/offboardingTypes";
 
-type View = "ranking" | "saved" | "identities";
+type View = "ranking" | "metrics" | "saved" | "identities";
 
 const VIEWS: SegmentedTabOption<View>[] = [
   { value: "ranking", label: "Ranking", icon: <ListOrdered className="h-4 w-4" aria-hidden /> },
+  { value: "metrics", label: "Metrics", icon: <Ruler className="h-4 w-4" aria-hidden /> },
   { value: "saved", label: "Saved maps", icon: <History className="h-4 w-4" aria-hidden /> },
   { value: "identities", label: "Identities", icon: <Users className="h-4 w-4" aria-hidden /> },
 ];
@@ -79,6 +81,7 @@ export function OffboardingPage() {
             </>
           )}
         </div>
+        {view === "metrics" && <MetricsWalkthrough map={map} />}
         {view === "saved" && <SavedMapsPanel projectId={selectedProjectId} />}
         {view === "identities" && <IdentitiesPanel projectId={selectedProjectId} />}
       </MainContent>

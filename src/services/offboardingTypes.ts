@@ -17,6 +17,8 @@ export interface RiskSettings {
   sourceWeights: Record<string, number>;
   /** How the files were put in order; maps stored before there was a choice used the departing share. */
   ranking?: RankingName;
+  /** How who knows a file was decided; maps stored before there was a choice used authorship. */
+  knowledge?: { model: KnowledgeModelName; knowsAtLeast: number; foundingBonus: number };
 }
 
 /** How the files at risk are put in order. */
