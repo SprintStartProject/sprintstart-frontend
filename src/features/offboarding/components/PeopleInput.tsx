@@ -2,9 +2,9 @@ import { useState, type KeyboardEvent } from "react";
 import { Plus, X } from "lucide-react";
 
 import { Button } from "../../../components/ui/Button";
-import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { parsePeople } from "../departure";
+import { HintedField } from "./HintedField";
 
 type PeopleInputProps = {
   people: string[];
@@ -35,7 +35,7 @@ export function PeopleInput({ people, onChange, label, hint }: PeopleInputProps)
 
   return (
     <div className="space-y-2">
-      <Field label={label} hint={hint}>
+      <HintedField label={label} hint={hint}>
         <Input
           value={typed}
           onChange={(event) => setTyped(event.target.value)}
@@ -47,7 +47,7 @@ export function PeopleInput({ people, onChange, label, hint }: PeopleInputProps)
             </Button>
           }
         />
-      </Field>
+      </HintedField>
       {people.length > 0 && (
         <ul className="flex flex-wrap gap-2" aria-label="People who are leaving">
           {people.map((person) => (

@@ -150,9 +150,6 @@ export function SavedMapsPanel({ projectId }: { projectId: string }) {
           ))}
         </ul>
       </PmCard>
-      {picked.length === 1 && (
-        <p className="text-sm text-app-text-muted">Pick a second map to compare it with.</p>
-      )}
       {comparison.data && <ComparisonView comparison={comparison.data} />}
     </div>
   );

@@ -3,8 +3,9 @@ import { Ruler } from "lucide-react";
 
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
-import { Field } from "../../../components/ui/Field";
+import { InfoHint } from "../../../components/ui/InfoHint";
 import { Select } from "../../../components/ui/Select";
+import { HintedField } from "./HintedField";
 import type { RiskMap } from "../../../services/offboardingTypes";
 import { PmCard, PmCardHeader } from "../../pm-area";
 import { describeMetrics, type MetricStep } from "../metricGuide";
@@ -22,30 +23,27 @@ function Bar({ value }: { value: number }) {
   );
 }
 
+function explanation(step: MetricStep): string {
+  return `${step.asks} ${step.how} Why: ${step.why} Source: ${step.source}.`;
+}
+
 function Step({ step }: { step: MetricStep }) {
   return (
-    <li className="border-t border-app-border px-4 py-4 first:border-t-0">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-app-brand-soft text-xs font-semibold text-app-brand">
+    <li className="flex flex-wrap items-start gap-x-6 gap-y-2 border-t border-app-border px-4 py-3.5 first:border-t-0">
+      <div className="flex w-64 shrink-0 items-center gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-app-brand-soft text-xs font-semibold text-app-brand">
           {step.number ?? "Σ"}
         </span>
         <h3 className="text-sm font-semibold text-app-text">{step.name}</h3>
         <Badge variant="neutral" size="sm">
           {step.id}
         </Badge>
+        <InfoHint text={explanation(step)} label={`About ${step.name}`} />
       </div>
-      <p className="mt-2 text-sm text-app-text">{step.asks}</p>
-      <p className="mt-1 text-sm text-app-text-muted">{step.how}</p>
-      <p className="mt-1 text-sm text-app-text-muted">
-        <span className="font-medium text-app-text">Why: </span>
-        {step.why}
-      </p>
-      <div className="mt-2 rounded-lg bg-app-brand-soft px-3 py-2 text-sm text-app-text">
-        <span className="font-medium">On this file: </span>
+      <div className="min-w-0 flex-1 text-sm text-app-text">
         {step.measured}
         {step.value !== null && <Bar value={step.value} />}
       </div>
-      <p className="mt-1 text-xs text-app-text-muted">Source: {step.source}</p>
     </li>
   );
 }
@@ -69,7 +67,7 @@ export function MetricsWalkthrough({ map }: { map: RiskMap | undefined }) {
   const steps = describeMetrics(file, map);
   return (
     <div className="space-y-4">
-      <Field label="Example file" hint="The most urgent files of the ranking on screen.">
+      <HintedField label="Example file" hint="The most urgent files of the ranking on screen.">
         <Select value={chosen} onChange={(event) => setChosen(Number(event.target.value))}>
           {files.map((candidate, index) => (
             <option key={`${candidate.repository}:${candidate.path}`} value={index}>
@@ -77,7 +75,7 @@ export function MetricsWalkthrough({ map }: { map: RiskMap | undefined }) {
             </option>
           ))}
         </Select>
-      </Field>
+      </HintedField>
       <PmCard aria-label="Metrics">
         <PmCardHeader
           icon={Ruler}

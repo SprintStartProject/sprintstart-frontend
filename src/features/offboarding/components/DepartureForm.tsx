@@ -2,7 +2,6 @@ import { useState, type FormEvent } from "react";
 import { Search } from "lucide-react";
 
 import { Button } from "../../../components/ui/Button";
-import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import type {
@@ -11,6 +10,7 @@ import type {
   RiskQuery,
 } from "../../../services/offboardingTypes";
 import { draftProblem, toRiskQuery, type DepartureDraft } from "../departure";
+import { HintedField } from "./HintedField";
 import { WhoIsLeaving, type TeamState } from "./WhoIsLeaving";
 
 type DepartureFormProps = {
@@ -37,7 +37,7 @@ function ModelFields({
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <Field
+      <HintedField
         label="Rank files by"
         hint="The departing share puts files that lose their knowledge first; the placeholder score also weighs how relevant a file is."
       >
@@ -48,8 +48,8 @@ function ModelFields({
           <option value="departing-share">Departing share</option>
           <option value="placeholder">Placeholder score</option>
         </Select>
-      </Field>
-      <Field
+      </HintedField>
+      <HintedField
         label="Who knows a file"
         hint="Authorship counts whoever wrote enough of it; time-weighted lets evidence fade with its age."
       >
@@ -62,7 +62,42 @@ function ModelFields({
           <option value="authorship">Authorship</option>
           <option value="time-weighted">Time-weighted</option>
         </Select>
-      </Field>
+      </HintedField>
+    </div>
+  );
+}
+
+function ScopeFields({
+  draft,
+  onChange,
+}: {
+  draft: DepartureDraft;
+  onChange: (draft: DepartureDraft) => void;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <HintedField
+        label="As of"
+        hint="Replays the history up to the end of this day. Empty means now."
+      >
+        <Input
+          type="date"
+          value={draft.asOfDay}
+          onChange={(event) => onChange({ ...draft, asOfDay: event.target.value })}
+        />
+      </HintedField>
+      <HintedField
+        label="Review weight"
+        hint="Commits count 1. Give reviews a weight to let them count too; empty leaves them out."
+      >
+        <Input
+          type="number"
+          min={0}
+          step={0.1}
+          value={draft.reviewWeight}
+          onChange={(event) => onChange({ ...draft, reviewWeight: event.target.value })}
+        />
+      </HintedField>
     </div>
   );
 }
@@ -91,27 +126,7 @@ export function DepartureForm({ team, busy, onSubmit }: DepartureFormProps) {
       aria-label="Departure to simulate"
     >
       <WhoIsLeaving team={team} draft={draft} onChange={setDraft} />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="As of" hint="Replays the history up to the end of this day. Empty means now.">
-          <Input
-            type="date"
-            value={draft.asOfDay}
-            onChange={(event) => setDraft({ ...draft, asOfDay: event.target.value })}
-          />
-        </Field>
-        <Field
-          label="Review weight"
-          hint="Commits count 1. Give reviews a weight to let them count too; empty leaves them out."
-        >
-          <Input
-            type="number"
-            min={0}
-            step={0.1}
-            value={draft.reviewWeight}
-            onChange={(event) => setDraft({ ...draft, reviewWeight: event.target.value })}
-          />
-        </Field>
-      </div>
+      <ScopeFields draft={draft} onChange={setDraft} />
       <ModelFields draft={draft} onChange={setDraft} />
       {problem && (
         <p role="alert" className="text-sm text-app-danger-text">
