@@ -191,6 +191,15 @@ describe("FileTree", () => {
     expect(screen.getByText("72% of the lines from people who left")).toBeInTheDocument();
   });
 
+  it("shows the placeholder score of the selected file when it was measured", async () => {
+    const user = userEvent.setup();
+    render(<FileTree files={[file("github:acme/app", "src/A.kt", { placeholderScore: 0.456 })]} />);
+
+    await user.click(button(/A\.kt/));
+
+    expect(screen.getByText("Placeholder score 46%")).toBeInTheDocument();
+  });
+
   it("says nothing of the lines of a file that was never blamed", async () => {
     const user = userEvent.setup();
     render(<FileTree files={[file("github:acme/app", "src/A.kt", { abandonedShare: null })]} />);

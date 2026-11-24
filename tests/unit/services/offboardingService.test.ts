@@ -35,6 +35,8 @@ describe("offboardingService.fetchRiskMap", () => {
       leaving: ["ada@example.com", "ben"],
       asOf: "2026-11-20T23:59:59Z",
       reviewWeight: 0.5,
+      ranking: "placeholder",
+      knowledge: "time-weighted",
       limit: 200,
     });
 
@@ -42,6 +44,8 @@ describe("offboardingService.fetchRiskMap", () => {
     expect(requested!.searchParams.getAll("leaving")).toEqual(["ada@example.com", "ben"]);
     expect(requested!.searchParams.get("asOf")).toBe("2026-11-20T23:59:59Z");
     expect(requested!.searchParams.get("reviewWeight")).toBe("0.5");
+    expect(requested!.searchParams.get("ranking")).toBe("placeholder");
+    expect(requested!.searchParams.get("knowledge")).toBe("time-weighted");
     expect(requested!.searchParams.get("limit")).toBe("200");
   });
 
@@ -58,6 +62,8 @@ describe("offboardingService.fetchRiskMap", () => {
 
     expect(requested!.searchParams.has("asOf")).toBe(false);
     expect(requested!.searchParams.has("reviewWeight")).toBe(false);
+    expect(requested!.searchParams.has("ranking")).toBe(false);
+    expect(requested!.searchParams.has("knowledge")).toBe(false);
     expect(requested!.searchParams.has("limit")).toBe(false);
   });
 

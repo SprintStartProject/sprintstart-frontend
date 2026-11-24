@@ -1,4 +1,9 @@
-import type { MemberMatch, RiskQuery } from "../../services/offboardingTypes";
+import type {
+  KnowledgeModelName,
+  MemberMatch,
+  RankingName,
+  RiskQuery,
+} from "../../services/offboardingTypes";
 
 /** How many files a ranking lists; the summary counts all of them. */
 export const RISK_LIST_LIMIT = 200;
@@ -36,6 +41,10 @@ export interface DepartureDraft {
   asOfDay: string;
   /** A weight for reviews as typed, or empty to leave reviews out. */
   reviewWeight: string;
+  /** How the files are put in order. */
+  ranking: RankingName;
+  /** How to decide who knows a file. */
+  knowledge: KnowledgeModelName;
 }
 
 /** Why a draft cannot be ranked yet, or `null` when it can. */
@@ -69,6 +78,8 @@ export function toRiskQuery(draft: DepartureDraft, members: MemberMatch[]): Risk
     leaving: leavingIdentities(draft, members),
     asOf: endOfDay(draft.asOfDay),
     reviewWeight: parseWeight(draft.reviewWeight),
+    ranking: draft.ranking === "placeholder" ? draft.ranking : undefined,
+    knowledge: draft.knowledge === "time-weighted" ? draft.knowledge : undefined,
     limit: RISK_LIST_LIMIT,
   };
 }

@@ -130,6 +130,22 @@ describe("DepartureForm", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("submits the chosen ranking and knowledge model", async () => {
+    const { user, onSubmit } = setup();
+    await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}");
+    await user.selectOptions(screen.getByLabelText("Rank files by"), "placeholder");
+    await user.selectOptions(screen.getByLabelText("Who knows a file"), "time-weighted");
+
+    await user.click(screen.getByRole("button", { name: "Rank files" }));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      leaving: ["ada"],
+      ranking: "placeholder",
+      knowledge: "time-weighted",
+      limit: 200,
+    });
+  });
+
   it("refuses a negative review weight", async () => {
     const { user, onSubmit } = setup();
     await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}");

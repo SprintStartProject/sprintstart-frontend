@@ -27,7 +27,14 @@ function member(id: string, identities: string[]): MemberMatch {
 
 const team = [member("u1", ["ada", "ada@x.org"]), member("u2", ["ben"])];
 
-const ok = { memberIds: [], people: ["ada"], asOfDay: "", reviewWeight: "" };
+const ok = {
+  memberIds: [],
+  people: ["ada"],
+  asOfDay: "",
+  reviewWeight: "",
+  ranking: "departing-share" as const,
+  knowledge: "authorship" as const,
+};
 
 describe("parsePeople", () => {
   it("splits on commas, spaces, semicolons and lines and trims", () => {
@@ -92,7 +99,7 @@ describe("toRiskQuery", () => {
   it("builds the request a draft stands for", () => {
     expect(
       toRiskQuery(
-        { memberIds: [], people: ["ada", "ben"], asOfDay: "2026-11-20", reviewWeight: "0.5" },
+        { ...ok, people: ["ada", "ben"], asOfDay: "2026-11-20", reviewWeight: "0.5" },
         [],
       ),
     ).toEqual({
@@ -110,6 +117,13 @@ describe("toRiskQuery", () => {
     expect(query.reviewWeight).toBeUndefined();
   });
 
+  it("sends the ranking and the knowledge model only when they differ from the defaults", () => {
+    expect(toRiskQuery(ok, [])).toMatchObject({ ranking: undefined, knowledge: undefined });
+    expect(
+      toRiskQuery({ ...ok, ranking: "placeholder", knowledge: "time-weighted" }, []),
+    ).toMatchObject({ ranking: "placeholder", knowledge: "time-weighted" });
+  });
+
   it("reads a review weight with blanks around it", () => {
     expect(toRiskQuery({ ...ok, reviewWeight: " 0.5 " }, []).reviewWeight).toBe(0.5);
   });
@@ -120,7 +134,7 @@ describe("toRiskQuery", () => {
 });
 
 describe("leavingIdentities", () => {
-  const base = { memberIds: [], people: [], asOfDay: "", reviewWeight: "" };
+  const base = { ...ok, people: [] };
 
   it("sends every name the history knows a chosen member by", () => {
     expect(leavingIdentities({ ...base, memberIds: ["u1"] }, team)).toEqual(["ada", "ada@x.org"]);

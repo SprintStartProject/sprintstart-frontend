@@ -15,7 +15,15 @@ export interface RiskSettings {
   name: string;
   /** How much each kind of evidence counted, such as `commits` and `reviews`. */
   sourceWeights: Record<string, number>;
+  /** How the files were put in order; maps stored before there was a choice used the departing share. */
+  ranking?: RankingName;
 }
+
+/** How the files at risk are put in order. */
+export type RankingName = "departing-share" | "placeholder";
+
+/** How to decide who knows a file. */
+export type KnowledgeModelName = "authorship" | "time-weighted";
 
 /** How many files fall in each class; `listed` is how many of the at-risk files `files` carries. */
 export interface RiskSummary {
@@ -42,6 +50,8 @@ export interface FileRisk {
   concentration?: Concentration | null;
   /** How complicated and how often changed the file is against the others, from 0 to 1; none when its complexity was never measured. */
   hotspot?: number | null;
+  /** The provisional score of the team's metric selection, from 0 to 1; maps stored before it was measured have none. */
+  placeholderScore?: number | null;
   /** The share of the lines written by people who are leaving or have left, from 0 to 1; none when never blamed. */
   abandonedShare?: number | null;
   /** The files that change together with this one; maps stored before it was measured have none. */
@@ -102,6 +112,10 @@ export interface RiskQuery {
   asOf?: string;
   /** Let reviews count with this weight next to commits; left out, reviews are not used. */
   reviewWeight?: number;
+  /** How to order the files; left out, by the departing share. */
+  ranking?: RankingName;
+  /** How to decide who knows a file; left out, by authorship. */
+  knowledge?: KnowledgeModelName;
   /** How many files to list. */
   limit?: number;
 }

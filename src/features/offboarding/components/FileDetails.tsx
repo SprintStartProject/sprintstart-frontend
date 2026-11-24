@@ -71,6 +71,11 @@ export function FileDetails({ file }: { file: FileRisk }) {
           {level.label}
         </Badge>
         <span className="text-app-text">Risk {percent(file.score)}</span>
+        {typeof file.placeholderScore === "number" && (
+          <span className="text-app-text-muted">
+            Placeholder score {percent(file.placeholderScore)}
+          </span>
+        )}
         {typeof file.abandonedShare === "number" && (
           <span className="text-app-text-muted">
             {percent(file.abandonedShare)} of the lines from people who left

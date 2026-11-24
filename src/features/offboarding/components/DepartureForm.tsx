@@ -4,7 +4,12 @@ import { Search } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
-import type { RiskQuery } from "../../../services/offboardingTypes";
+import { Select } from "../../../components/ui/Select";
+import type {
+  KnowledgeModelName,
+  RankingName,
+  RiskQuery,
+} from "../../../services/offboardingTypes";
 import { draftProblem, toRiskQuery, type DepartureDraft } from "../departure";
 import { WhoIsLeaving, type TeamState } from "./WhoIsLeaving";
 
@@ -14,7 +19,14 @@ type DepartureFormProps = {
   onSubmit: (query: RiskQuery) => void;
 };
 
-const EMPTY_DRAFT: DepartureDraft = { memberIds: [], people: [], asOfDay: "", reviewWeight: "" };
+const EMPTY_DRAFT: DepartureDraft = {
+  memberIds: [],
+  people: [],
+  asOfDay: "",
+  reviewWeight: "",
+  ranking: "departing-share",
+  knowledge: "authorship",
+};
 
 /**
  * Describes a departure: who leaves, as of which day, and whether reviews count next to commits.
@@ -59,6 +71,34 @@ export function DepartureForm({ team, busy, onSubmit }: DepartureFormProps) {
             value={draft.reviewWeight}
             onChange={(event) => setDraft({ ...draft, reviewWeight: event.target.value })}
           />
+        </Field>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label="Rank files by"
+          hint="The departing share puts files that lose their knowledge first; the placeholder score also weighs how relevant a file is."
+        >
+          <Select
+            value={draft.ranking}
+            onChange={(event) => setDraft({ ...draft, ranking: event.target.value as RankingName })}
+          >
+            <option value="departing-share">Departing share</option>
+            <option value="placeholder">Placeholder score</option>
+          </Select>
+        </Field>
+        <Field
+          label="Who knows a file"
+          hint="Authorship counts whoever wrote enough of it; time-weighted lets evidence fade with its age."
+        >
+          <Select
+            value={draft.knowledge}
+            onChange={(event) =>
+              setDraft({ ...draft, knowledge: event.target.value as KnowledgeModelName })
+            }
+          >
+            <option value="authorship">Authorship</option>
+            <option value="time-weighted">Time-weighted</option>
+          </Select>
         </Field>
       </div>
       {problem && (

@@ -7,6 +7,8 @@ function riskSearchParams(query: RiskQuery): string {
   query.leaving.forEach((person) => params.append("leaving", person));
   if (query.asOf) params.set("asOf", query.asOf);
   if (query.reviewWeight !== undefined) params.set("reviewWeight", String(query.reviewWeight));
+  if (query.ranking) params.set("ranking", query.ranking);
+  if (query.knowledge) params.set("knowledge", query.knowledge);
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   return params.toString();
 }
