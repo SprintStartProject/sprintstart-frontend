@@ -116,6 +116,10 @@ export interface RiskQuery {
   asOf?: string;
   /** Let reviews count with this weight next to commits; left out, reviews are not used. */
   reviewWeight?: number;
+  /** How much documentation pages count next to commits; left out, the server's default of 1, 0 leaves them out. */
+  pageEditWeight?: number;
+  /** Let the people behind the tickets commits name count with this weight; left out, tickets are not used. */
+  ticketWeight?: number;
   /** How to order the files; left out, by the departing share. */
   ranking?: RankingName;
   /** How to decide who knows a file; left out, by authorship. */

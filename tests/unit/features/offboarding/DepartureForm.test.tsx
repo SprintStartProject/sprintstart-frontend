@@ -126,6 +126,7 @@ describe("DepartureForm", () => {
       leaving: ["ada"],
       asOf: "2026-11-20T23:59:59Z",
       reviewWeight: 0.8,
+      pageEditWeight: 1,
       ranking: "placeholder",
       knowledge: "time-weighted",
       limit: 200,
@@ -142,6 +143,7 @@ describe("DepartureForm", () => {
     expect(onSubmit).toHaveBeenCalledWith({
       leaving: ["ada"],
       reviewWeight: 0.5,
+      pageEditWeight: 1,
       ranking: "placeholder",
       knowledge: "time-weighted",
       limit: 200,
@@ -159,10 +161,36 @@ describe("DepartureForm", () => {
 
     expect(onSubmit).toHaveBeenCalledWith({
       leaving: ["ada"],
+      pageEditWeight: 1,
       ranking: "departing-share",
       knowledge: "authorship",
       limit: 200,
     });
+  });
+
+  it("submits the page and ticket weights that are given", async () => {
+    const { user, onSubmit } = setup();
+    await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}");
+    await user.clear(screen.getByLabelText("Page weight"));
+    await user.type(screen.getByLabelText("Page weight"), "0");
+    await user.type(screen.getByLabelText("Ticket weight"), "0.3");
+
+    await user.click(screen.getByRole("button", { name: "Rank files" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ pageEditWeight: 0, ticketWeight: 0.3 }),
+    );
+  });
+
+  it("refuses a ticket weight below 0", async () => {
+    const { user, onSubmit } = setup();
+    await user.type(screen.getByLabelText("Who is leaving?"), "ada{Enter}");
+    await user.type(screen.getByLabelText("Ticket weight"), "-2");
+
+    await user.click(screen.getByRole("button", { name: "Rank files" }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("ticket weight");
   });
 
   it("refuses a negative review weight", async () => {
