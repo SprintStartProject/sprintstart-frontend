@@ -173,4 +173,19 @@ describe("OffboardingPage with the members of the project", () => {
     expect(await screen.findByText(/team could not be loaded/)).toBeInTheDocument();
     expect(screen.getByLabelText("Who is leaving?")).toBeInTheDocument();
   });
+
+  it("plans the interview of the departure ranked under Ranking", async () => {
+    server.use(http.get("/api/v1/projects/proj1/offboarding/risk", () => HttpResponse.json(map)));
+    const user = renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Interview" }));
+    expect(screen.getByText("Nobody named yet")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Ranking" }));
+    await rankFor(user, "ada");
+    await user.click(screen.getByRole("button", { name: "Interview" }));
+
+    expect(screen.getByRole("button", { name: /plan the interview/i })).toBeVisible();
+    expect(screen.queryByText("src/Engine.kt")).not.toBeVisible();
+  });
 });

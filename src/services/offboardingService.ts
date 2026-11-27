@@ -1,6 +1,7 @@
 import { apiClient } from "./apiClient";
 import type {
   AliasLink,
+  InterviewPlan,
   MembersOverview,
   RiskMap,
   RiskQuery,
@@ -35,6 +36,14 @@ export const offboardingService = {
   async fetchRiskMap(projectId: string, query: RiskQuery): Promise<RiskMap> {
     return await apiClient.fetch<RiskMap>(
       `/api/v1/projects/${encodeURIComponent(projectId)}/offboarding/risk?${riskSearchParams(query)}`,
+    );
+  },
+
+  /** Plans the exit interview of [query]'s departure: the questions only the leaving people can answer. */
+  async planInterview(projectId: string, query: RiskQuery): Promise<InterviewPlan> {
+    return await apiClient.fetch<InterviewPlan>(
+      `${base(projectId)}/interview-questions?${riskSearchParams(query)}`,
+      { method: "POST" },
     );
   },
 

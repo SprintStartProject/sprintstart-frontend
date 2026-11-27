@@ -41,6 +41,30 @@ function mapOf(files: FileRisk[], overrides: Partial<RiskMap> = {}): RiskMap {
 }
 
 describe("the list of files at risk", () => {
+  it("marks documentation pages and settings, not code", () => {
+    render(
+      <RiskResults
+        map={mapOf([
+          file({ path: "Setup", repository: "confluence:ENG", kind: "PROSE" }),
+          file({ path: "k8s/app.yaml", kind: "CONFIG" }),
+          file({ kind: "CODE" }),
+        ])}
+      />,
+    );
+
+    expect(screen.getByText("Setup").closest("li")!).toContainElement(
+      screen.getByLabelText("Document"),
+    );
+    expect(screen.getByText("k8s/app.yaml").closest("li")!).toContainElement(
+      screen.getByLabelText("Settings"),
+    );
+    expect(
+      within(screen.getByText("src/core/Engine.kt").closest("li")!).queryByLabelText(
+        /document|settings/i,
+      ),
+    ).toBeNull();
+  });
+
   it("lists each file with how it was left, its score and what the evidence says", () => {
     render(<RiskResults map={mapOf([file()])} />);
 

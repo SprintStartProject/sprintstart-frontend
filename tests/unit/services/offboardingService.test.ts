@@ -114,3 +114,23 @@ describe("offboardingService.fetchMembers", () => {
     await expect(offboardingService.fetchMembers("p1")).rejects.toThrow();
   });
 });
+
+describe("offboardingService.planInterview", () => {
+  it("posts the departure to the project's interview planner", async () => {
+    let requested: Request | null = null;
+    const plan = { questions: [], answeredByRecords: [], files: 0 };
+    server.use(
+      http.post("/api/v1/projects/p1/offboarding/interview-questions", ({ request }) => {
+        requested = request;
+        return HttpResponse.json(plan);
+      }),
+    );
+
+    const result = await offboardingService.planInterview("p1", { leaving: ["ada"], limit: 20 });
+
+    expect(result).toEqual(plan);
+    const url = new URL(requested!.url);
+    expect(url.searchParams.getAll("leaving")).toEqual(["ada"]);
+    expect(url.searchParams.get("limit")).toBe("20");
+  });
+});
