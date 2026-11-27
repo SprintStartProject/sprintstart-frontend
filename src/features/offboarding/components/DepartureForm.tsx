@@ -84,24 +84,70 @@ function ScopeFields({
           onChange={(event) => onChange({ ...draft, asOfDay: event.target.value })}
         />
       </HintedField>
-      <HintedField
+      <WeightField
         label="Review weight"
         hint="Commits count 1. Give reviews a weight to let them count too; empty leaves them out."
-      >
-        <Input
-          type="number"
-          min={0}
-          step={0.1}
-          value={draft.reviewWeight}
-          onChange={(event) => onChange({ ...draft, reviewWeight: event.target.value })}
-        />
-      </HintedField>
+        value={draft.reviewWeight}
+        onChange={(reviewWeight) => onChange({ ...draft, reviewWeight })}
+      />
+    </div>
+  );
+}
+
+/** How much one kind of evidence counts next to commits, as typed. */
+function WeightField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <HintedField label={label} hint={hint}>
+      <Input
+        type="number"
+        min={0}
+        step={0.1}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </HintedField>
+  );
+}
+
+/** How much the evidence from documentation pages and tickets counts next to commits. */
+function SourceFields({
+  draft,
+  onChange,
+}: {
+  draft: DepartureDraft;
+  onChange: (draft: DepartureDraft) => void;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <WeightField
+        label="Page weight"
+        hint="Confluence and Notion pages people wrote. 1 counts them like commits; 0 leaves pages off the map."
+        value={draft.pageEditWeight}
+        onChange={(pageEditWeight) => onChange({ ...draft, pageEditWeight })}
+      />
+      <WeightField
+        label="Ticket weight"
+        hint="People on the Jira tickets a commit names count for its files. Empty leaves tickets out."
+        value={draft.ticketWeight}
+        onChange={(ticketWeight) => onChange({ ...draft, ticketWeight })}
+      />
     </div>
   );
 }
 
 /**
- * Describes a departure: who leaves, as of which day, and whether reviews count next to commits.
+ * Describes a departure: who leaves, as of which day, and how much reviews, pages and tickets count
+ * next to commits.
  *
  * It only builds the request; ranking is the page's business.
  */
@@ -125,6 +171,7 @@ export function DepartureForm({ team, busy, onSubmit }: DepartureFormProps) {
     >
       <WhoIsLeaving team={team} draft={draft} onChange={setDraft} />
       <ScopeFields draft={draft} onChange={setDraft} />
+      <SourceFields draft={draft} onChange={setDraft} />
       <ModelFields draft={draft} onChange={setDraft} />
       {problem && (
         <p role="alert" className="text-sm text-app-danger-text">

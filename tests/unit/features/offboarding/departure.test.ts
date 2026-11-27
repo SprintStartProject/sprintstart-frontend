@@ -32,6 +32,8 @@ const ok = {
   people: ["ada"],
   asOfDay: "",
   reviewWeight: "",
+  pageEditWeight: "",
+  ticketWeight: "",
   ranking: "departing-share" as const,
   knowledge: "authorship" as const,
 };
@@ -162,5 +164,23 @@ describe("leavingIdentities", () => {
     expect(leavingIdentities({ ...base, memberIds: ["gone"], people: ["ben"] }, team)).toEqual([
       "ben",
     ]);
+  });
+
+  describe("the weights of pages and tickets", () => {
+    it("are sent when given and left out when empty", () => {
+      const given = toRiskQuery({ ...ok, pageEditWeight: "0", ticketWeight: " 0.25 " }, []);
+      const empty = toRiskQuery(ok, []);
+
+      expect(given.pageEditWeight).toBe(0);
+      expect(given.ticketWeight).toBe(0.25);
+      expect(empty.pageEditWeight).toBeUndefined();
+      expect(empty.ticketWeight).toBeUndefined();
+    });
+
+    it("must be numbers from 0, each named in the problem", () => {
+      expect(draftProblem({ ...ok, pageEditWeight: "-1" })).toMatch(/page weight/);
+      expect(draftProblem({ ...ok, ticketWeight: "some" })).toMatch(/ticket weight/);
+      expect(draftProblem({ ...ok, pageEditWeight: "2", ticketWeight: "0" })).toBeNull();
+    });
   });
 });

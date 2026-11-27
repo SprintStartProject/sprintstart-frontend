@@ -31,9 +31,14 @@ export function endOfDay(date: string): string | undefined {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T23:59:59Z` : undefined;
 }
 
-/** The settings a new departure starts with: the selection's knowledge model, reviews at half a commit, ranked by its score. */
+/**
+ * The settings a new departure starts with: the selection's knowledge model, reviews at half a commit,
+ * documentation pages like commits, tickets left out, ranked by its score.
+ */
 export const DEFAULT_SETTINGS = {
   reviewWeight: "0.5",
+  pageEditWeight: "1",
+  ticketWeight: "",
   ranking: "placeholder",
   knowledge: "time-weighted",
 } as const;
@@ -48,6 +53,10 @@ export interface DepartureDraft {
   asOfDay: string;
   /** A weight for reviews as typed, or empty to leave reviews out. */
   reviewWeight: string;
+  /** A weight for the versions people saved of documentation pages, or empty for the server's default. */
+  pageEditWeight: string;
+  /** A weight for the people behind the tickets commits name, or empty to leave tickets out. */
+  ticketWeight: string;
   /** How the files are put in order. */
   ranking: RankingName;
   /** How to decide who knows a file. */
@@ -59,9 +68,16 @@ export function draftProblem(draft: DepartureDraft): string | null {
   if (draft.memberIds.length === 0 && draft.people.length === 0) {
     return "Choose at least one person who is leaving.";
   }
-  const weight = parseWeight(draft.reviewWeight);
-  if (weight !== undefined && !(weight >= 0)) return "The review weight must be a number from 0.";
-  return null;
+  const weights: [string, string][] = [
+    ["review", draft.reviewWeight],
+    ["page", draft.pageEditWeight],
+    ["ticket", draft.ticketWeight],
+  ];
+  const bad = weights.find(([, raw]) => {
+    const weight = parseWeight(raw);
+    return weight !== undefined && !(weight >= 0);
+  });
+  return bad ? `The ${bad[0]} weight must be a number from 0.` : null;
 }
 
 function parseWeight(raw: string): number | undefined {
@@ -85,6 +101,8 @@ export function toRiskQuery(draft: DepartureDraft, members: MemberMatch[]): Risk
     leaving: leavingIdentities(draft, members),
     asOf: endOfDay(draft.asOfDay),
     reviewWeight: parseWeight(draft.reviewWeight),
+    pageEditWeight: parseWeight(draft.pageEditWeight),
+    ticketWeight: parseWeight(draft.ticketWeight),
     ranking: draft.ranking,
     knowledge: draft.knowledge,
     limit: RISK_LIST_LIMIT,
