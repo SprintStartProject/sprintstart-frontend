@@ -1,3 +1,5 @@
+import { FileText, Settings2 } from "lucide-react";
+
 import { Badge } from "../../../components/ui/Badge";
 import type { FileRisk } from "../../../services/offboardingTypes";
 import { describeBreakdown, percent } from "../format";
@@ -20,6 +22,14 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
+/** Marks a file that is not code, so documentation pages and settings stand out in the list. */
+function KindIcon({ kind }: { kind: FileRisk["kind"] }) {
+  if (kind === "PROSE") return <FileText className="h-3.5 w-3.5 shrink-0" aria-label="Document" />;
+  if (kind === "CONFIG")
+    return <Settings2 className="h-3.5 w-3.5 shrink-0" aria-label="Settings" />;
+  return null;
+}
+
 /** One file at risk: where it is, how it was left, how much it matters and who still knows it. */
 export function RiskFileRow({ file }: { file: FileRisk }) {
   const level = LEVELS[file.level];
@@ -27,8 +37,12 @@ export function RiskFileRow({ file }: { file: FileRisk }) {
   return (
     <li className="flex flex-col gap-2 border-b border-app-border px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-4">
       <div className="min-w-0 flex-1">
-        <p className="truncate font-mono text-sm text-app-text" title={file.path}>
-          {file.path}
+        <p
+          className="flex items-center gap-1.5 truncate font-mono text-sm text-app-text"
+          title={file.path}
+        >
+          <KindIcon kind={file.kind} />
+          <span className="truncate">{file.path}</span>
         </p>
         <p className="truncate text-xs text-app-text-muted">
           {file.repository}

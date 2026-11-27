@@ -52,6 +52,8 @@ export interface FileRisk {
   concentration?: Concentration | null;
   /** How complicated and how often changed the file is against the others, from 0 to 1; none when its complexity was never measured. */
   hotspot?: number | null;
+  /** What the file holds; none when it was never measured. */
+  kind?: FileKind | null;
   /** The provisional score of the team's metric selection, from 0 to 1; maps stored before it was measured have none. */
   placeholderScore?: number | null;
   /** The share of the lines written by people who are leaving or have left, from 0 to 1; none when never blamed. */
@@ -213,4 +215,37 @@ export interface SnapshotComparison {
 export interface StudyExport {
   exportedAt: string;
   snapshots: { id: string; computedAt: string; map: RiskMap }[];
+}
+
+/** What a file holds: source code, written text such as documentation pages, or settings. */
+export type FileKind = "CODE" | "PROSE" | "CONFIG";
+
+/** What an interview question tries to learn from the leaver. */
+export type InterviewQuestionType = "rationale" | "operational" | "gotcha" | "handover";
+
+/** How much of a question the project's records already answer. */
+export type InterviewCoverage = "open" | "partial" | "answered";
+
+/** One question of an interview plan, with what the records already say about it. */
+export interface InterviewQuestion {
+  /** The repository and directory it is about. */
+  component: string;
+  text: string;
+  type: InterviewQuestionType;
+  /** The findings of the risk map that make it worth asking. */
+  triggers: string[];
+  files: string[];
+  priority: number;
+  coverage: InterviewCoverage;
+  recordAnswer: string | null;
+  sources: string[];
+}
+
+/** The questions only the leaving people can answer, most urgent first. */
+export interface InterviewPlan {
+  questions: InterviewQuestion[];
+  /** Questions the project's records already answer, so they are not asked. */
+  answeredByRecords: InterviewQuestion[];
+  /** How many files at risk the plan was made from. */
+  files: number;
 }
